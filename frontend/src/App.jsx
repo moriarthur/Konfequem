@@ -1,18 +1,7 @@
-import RoomBooking from './RoomBooking'
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
-
+import Home from "./assets/pages/Home";
 
 function App() {
-  return (
-    <div className="App">
-      <h1>Бронирование переговорных комнат</h1>
-      <RoomBooking />
-    </div>
-  );
+  return <Home />;
 }
 
 export default App;
-
