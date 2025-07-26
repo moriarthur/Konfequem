@@ -13,6 +13,15 @@ import os
 import dj_database_url  # Import dj_database_url to handle database URLs
 from pathlib import Path
 
+# Check if running in Docker and set the database URL accordingly
+# If running in Docker, use the Docker service name for the database
+# Otherwise, use the local database URL from environment variables
+if os.environ.get('DOCKER') == 'true':
+    DATABASE_URL = 'postgres://admin:secret@db:5432/booking'  
+else:
+    DATABASE_URL = os.environ.get('DATABASE_URL', 'postgres://admin:secret@localhost:5432/booking')
+
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
