@@ -1,7 +1,12 @@
-import Home from "./assets/pages/Home";
+import LoginForm from "./components/LoginForm";
 
 function App() {
-  return <Home />;
+  return (
+    <main className="min-h-screen flex items-center justify-center">
+      <LoginForm />
+    </main>
+  );
 }
 
 export default App;
+
