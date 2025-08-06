@@ -4,7 +4,7 @@ from .views import RoomViewSet, BookingViewSet
 
 router = DefaultRouter()
 router.register(r'rooms', RoomViewSet)
-router.register(r'bookings', BookingViewSet)
+router.register(r'bookings', BookingViewSet, basename='booking')  # добавили basename
 
 urlpatterns = [
     path('', include(router.urls)),
