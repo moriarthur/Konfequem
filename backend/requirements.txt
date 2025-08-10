@@ -4,4 +4,4 @@ dj-database-url>=1.0
 djangorestframework
 django-cors-headers
 django-admin-interface
-
+djangorestframework-simplejwt

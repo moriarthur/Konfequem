@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
+import { authFetch } from '../api';
 
 export default function BookingList() {
   const [bookings, setBookings] = useState([]);
 
-  useEffect(() => {
-    fetch("http://localhost:8000/api/bookings/")
-      .then((res) => res.json())
-      .then((data) => setBookings(data))
-      .catch((error) => console.error("Error fetching bookings:", error));
-  }, []);
+useEffect(() => {
+  authFetch("http://localhost:8000/api/bookings/")
+    .then((data) => setBookings(data))
+    .catch((error) => console.error("Error fetching bookings:", error));
+}, []);
 
   return (
     <div>

@@ -21,6 +21,9 @@ if os.environ.get('DOCKER') == 'true':
 else:
     DATABASE_URL = os.environ.get('DATABASE_URL', 'postgres://admin:secret@localhost:5432/booking')
 
+DATABASES = {
+    'default': dj_database_url.parse(DATABASE_URL)
+}
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -35,7 +38,7 @@ SECRET_KEY = 'django-insecure-_$0rm23qjui^7afln%qu)_u#5ert3$d9b&36!ji9s*)mho9s+y
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -50,6 +53,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',  # Django REST framework for building APIs
+    'rest_framework_simplejwt',  # JWT authentication for REST framework
     'rooms',  # Custom app for room booking
     'corsheaders',  # CORS headers for cross-origin requests
 ]
@@ -90,9 +94,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/3.2/ref/settings/#databases
 
 DATABASES = {
-    'default': dj_database_url.config(
-        default='postgres://room_user:room_password@localhost:5432/room_db'
-    )
+    'default': dj_database_url.parse(DATABASE_URL)
 }
 
 

@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import RoomList from "../../components/RoomList";
 import BookingList from "../../components/BookingList";
 import BookingForm from "../../components/BookingForm";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Home() {
+  const { authFetch, logout, isAuthenticated } = useAuth();
   const [rooms, setRooms] = useState([]);
   const [bookings, setBookings] = useState([]);
 
@@ -13,20 +15,24 @@ export default function Home() {
     email: "artur@example.com",
   };
 
-  // Получение комнат и бронирований при загрузке
   useEffect(() => {
-    fetch("/api/rooms/")
-      .then((res) => res.json())
+    if (!isAuthenticated) {
+      setRooms([]);
+      setBookings([]);
+      return;
+    }
+
+    // Fetch rooms with authFetch, which returns parsed JSON directly
+    authFetch("/api/rooms/")
       .then(setRooms)
       .catch((err) => console.error("Room fetch error:", err));
 
-    fetch("/api/bookings/")
-      .then((res) => res.json())
+    // Fetch bookings with authFetch
+    authFetch("/api/bookings/")
       .then(setBookings)
       .catch((err) => console.error("Booking fetch error:", err));
-  }, []);
+  }, [isAuthenticated, authFetch]);
 
-  // Обработка создания нового бронирования
   const handleBookingSubmit = async (formData) => {
     const dataToSend = {
       ...formData,
@@ -35,38 +41,45 @@ export default function Home() {
     };
 
     try {
-      const res = await fetch("/api/bookings/", {
+      // authFetch throws on HTTP errors, so no need to check res.ok
+      const result = await authFetch("/api/bookings/", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(dataToSend),
       });
 
-      const result = await res.json();
-      console.log("Booking result:", result);
-
-      if (!res.ok) {
-        alert("Error: " + JSON.stringify(result));
-        return;
-      }
-
+      // Add new booking to state
       setBookings((prev) => [...prev, result]);
     } catch (err) {
       console.error("Booking error:", err);
-      alert("Network error");
+      alert("Error: " + JSON.stringify(err));
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-100 px-6 py-12">
-      <h1 className="text-4xl font-bold text-center text-gray-900 mb-12">
-        Welcome to Konfequem
-      </h1>
+      <header className="flex justify-between items-center mb-6">
+        <h1 className="text-4xl font-bold text-gray-900">Welcome to Konfequem</h1>
+        {isAuthenticated && (
+          <button
+            onClick={logout}
+            className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+          >
+            Logout
+          </button>
+        )}
+      </header>
 
-      <RoomList rooms={rooms} />
-      <BookingForm rooms={rooms} onBookingSubmit={handleBookingSubmit} />
-      <BookingList bookings={bookings} currentUser={mockUser} />
+      {isAuthenticated ? (
+        <>
+          <p className="mb-6 text-gray-700">Logged in as {mockUser.name}</p>
+          <RoomList rooms={rooms} />
+          <BookingForm rooms={rooms} onBookingSubmit={handleBookingSubmit} />
+          <BookingList bookings={bookings} currentUser={mockUser} />
+        </>
+      ) : (
+        <p className="text-center text-gray-600">Please log in to see rooms and bookings.</p>
+      )}
     </div>
   );
 }
