@@ -2,12 +2,13 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 
 const AuthContext = createContext();
 
+const API_URL = import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:8000";
+
 export function AuthProvider({ children }) {
   const [access, setAccess] = useState(localStorage.getItem("access") || null);
   const [refresh, setRefresh] = useState(localStorage.getItem("refresh") || null);
   const [isAuthenticated, setIsAuthenticated] = useState(!!access);
 
-  // Сохраняем токены в localStorage при изменении
   useEffect(() => {
     if (access) localStorage.setItem("access", access);
     else localStorage.removeItem("access");
@@ -18,9 +19,8 @@ export function AuthProvider({ children }) {
     setIsAuthenticated(!!access);
   }, [access, refresh]);
 
-  // Функция логина
   const login = async (username, password) => {
-    const res = await fetch("http://127.0.0.1:8000/api/token/", {
+    const res = await fetch(`${API_URL}/api/token/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
@@ -35,13 +35,11 @@ export function AuthProvider({ children }) {
     setRefresh(data.refresh);
   };
 
-  // Функция логаута
   const logout = () => {
     setAccess(null);
     setRefresh(null);
   };
 
-  // Обновление access токена с помощью refresh
   const refreshAccessToken = async () => {
     if (!refresh) {
       logout();
@@ -49,7 +47,7 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/token/refresh/", {
+      const res = await fetch(`${API_URL}/api/token/refresh/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh }),
@@ -67,21 +65,19 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Обёртка fetch с автоматической подстановкой access токена
   const authFetch = async (url, options = {}) => {
     if (!options.headers) options.headers = {};
     options.headers["Authorization"] = `Bearer ${access}`;
 
-    let res = await fetch(url, options);
+    let res = await fetch(`${API_URL}${url}`, options);
 
     if (res.status === 401) {
-      // Попытка обновить токен и повторить запрос
       await refreshAccessToken();
 
       if (!access) throw new Error("Unauthorized");
 
       options.headers["Authorization"] = `Bearer ${access}`;
-      res = await fetch(url, options);
+      res = await fetch(`${API_URL}${url}`, options);
     }
 
     if (!res.ok) {
@@ -101,7 +97,6 @@ export function AuthProvider({ children }) {
   );
 }
 
-// Хук для удобного доступа к AuthContext
 export function useAuth() {
   return useContext(AuthContext);
 }

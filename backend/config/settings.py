@@ -12,6 +12,20 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 import os
 import dj_database_url  # Import dj_database_url to handle database URLs
 from pathlib import Path
+from dotenv import load_dotenv
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")  # Загружаем .env
+
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "fallback-secret-key")
+DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
+
+DATABASE_URL = os.getenv("DATABASE_URL", "postgres://admin:secret@localhost:5432/booking")
+
+import dj_database_url
+DATABASES = {
+    "default": dj_database_url.parse(DATABASE_URL) 
+}
 
 # Check if running in Docker and set the database URL accordingly
 # If running in Docker, use the Docker service name for the database
