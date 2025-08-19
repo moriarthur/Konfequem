@@ -6,3 +6,4 @@ django-cors-headers
 django-admin-interface
 djangorestframework-simplejwt
 python-dotenv
+python-decouple
