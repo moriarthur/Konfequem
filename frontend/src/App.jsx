@@ -12,7 +12,7 @@ function PrivateRoute({ children }) {
 export default function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router future={{ v7_startTransition: true }}>
         <Routes>
           <Route path="/login" element={<LoginForm />} />
           <Route
