@@ -14,12 +14,14 @@ export function AuthProvider({ children }) {
     setAccess(null);
     setRefresh(null);
     setIsAuthenticated(false);
+    localStorage.removeItem("access");
+    localStorage.removeItem("refresh");
   };
 
   const refreshAccessToken = useCallback(async () => {
     if (!refresh) {
       logout();
-      return false;
+      return null;
     }
     try {
       const res = await fetch(`${API_URL}/api/token/refresh/`, {
@@ -29,62 +31,103 @@ export function AuthProvider({ children }) {
       });
       if (!res.ok) {
         logout();
-        return false;
+        return null;
       }
       const data = await res.json();
       setAccess(data.access);
-      return true;
+      return data.access;
     } catch {
       logout();
-      return false;
+      return null;
     }
   }, [refresh]);
 
   const authFetch = useCallback(
     async (url, options = {}) => {
       if (!options.headers) options.headers = {};
-      options.headers["Authorization"] = `Bearer ${access}`;
+      if (access) options.headers["Authorization"] = `Bearer ${access}`;
+      else delete options.headers["Authorization"];
 
-      let res = await fetch(`${API_URL}${url}`, options);
+      let res;
+      try {
+        res = await fetch(`${API_URL}${url}`, options);
+      } catch {
+        throw new Error("Network error. Please try again.");
+      }
 
       if (res.status === 401) {
-        const refreshed = await refreshAccessToken();
-        if (!refreshed) throw new Error("Unauthorized");
-        options.headers["Authorization"] = `Bearer ${access}`;
-        res = await fetch(`${API_URL}${url}`, options);
+        const newAccess = await refreshAccessToken();
+        if (!newAccess) throw new Error("Unauthorized");
+
+        options.headers["Authorization"] = `Bearer ${newAccess}`;
+        try {
+          res = await fetch(`${API_URL}${url}`, options);
+        } catch {
+          throw new Error("Network error. Please try again.");
+        }
       }
 
       if (!res.ok) {
-        const error = await res.json();
-        throw error;
+        const contentType = res.headers.get("content-type") || "";
+        let errorPayload = {};
+        if (contentType.includes("application/json")) {
+          errorPayload = await res.json().catch(() => ({}));
+        } else {
+          const text = await res.text().catch(() => "");
+          if (text) errorPayload = { message: text };
+        }
+        throw { status: res.status, ...errorPayload };
       }
+
       return res.json();
     },
     [access, refreshAccessToken]
   );
 
   const login = async (username, password) => {
-    const res = await fetch(`${API_URL}/api/token/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
-    if (!res.ok) throw new Error("Invalid credentials");
+    let res;
+    try {
+      res = await fetch(`${API_URL}/api/token/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+    } catch {
+      throw new Error("Network error. Please try again.");
+    }
+
+    if (!res.ok) {
+      const contentType = res.headers.get("content-type") || "";
+      let message = `Login failed (${res.status})`;
+
+      if (contentType.includes("application/json")) {
+        const body = await res.json().catch(() => ({}));
+        message =
+          body.detail ||
+          body.error ||
+          (Array.isArray(body.non_field_errors) && body.non_field_errors[0]) ||
+          (typeof body.message === "string" && body.message) ||
+          message;
+      } else {
+        const text = await res.text().catch(() => "");
+        if (text) message = text;
+      }
+      throw new Error(message);
+    }
+
     const data = await res.json();
     setAccess(data.access);
     setRefresh(data.refresh);
     setIsAuthenticated(true);
+    return data;
   };
 
   useEffect(() => {
-    if (access) localStorage.setItem("access", access);
-    else localStorage.removeItem("access");
-
-    if (refresh) localStorage.setItem("refresh", refresh);
-    else localStorage.removeItem("refresh");
-
     setIsAuthenticated(!!access);
     setLoading(false);
+
+    if (access) localStorage.setItem("access", access);
+    if (refresh) localStorage.setItem("refresh", refresh);
   }, [access, refresh]);
 
   return (
