@@ -2,64 +2,70 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator, MaxValueValidator, ValidationError
 from django.utils import timezone
-from datetime import date, timedelta
-from django.utils.translation import gettext_lazy as _
+from datetime import timedelta, time
 from django.db.models import Q
 
-User = get_user_model()  
+User = get_user_model()
 
-# --- Room ---
+
 class Room(models.Model):
-    name = models.CharField(max_length=100)                         # Name of the room
-    location = models.CharField(max_length=100, blank=True)         # Location of the room
-    capacity = models.PositiveIntegerField(                         # Capacity (how many people can fit)
-        validators=[MinValueValidator(1), MaxValueValidator(50)] 
-    )  
+    """Room model."""
+    name = models.CharField(max_length=100)
+    location = models.CharField(max_length=100, blank=True)
+    capacity = models.PositiveIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(50)]
+    )
 
-    def __str__(self):  
+    def __str__(self):
         return self.name
 
-# --- Booking ---
+
 class Booking(models.Model):
-    room = models.ForeignKey('Room', on_delete=models.CASCADE, related_name='bookings')
+    """Booking model with validations."""
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name='bookings')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bookings')
-    date = models.DateField(default=date.today)
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def clean(self):
-        super().clean()
-        if not self.start_time or not self.end_time:
-            return
+    # Work hours constants
+    WORK_START = time(8, 0)
+    WORK_END = time(18, 0)
+    MAX_DAYS_AHEAD = 14
 
+    def clean(self):
+        """Validate booking rules."""
+        super().clean()
         now = timezone.now()
 
+        # Cannot book in the past
         if self.start_time < now:
-            raise ValidationError({'start_time': _("Das Startdatum der Buchung darf nicht in der Vergangenheit liegen.")})
+            raise ValidationError({'start_time': "Start time cannot be in the past."})
 
+        # End must be after start
         if self.end_time <= self.start_time:
-            raise ValidationError({'end_time': _("Das Enddatum muss nach dem Startdatum liegen.")})
+            raise ValidationError({'end_time': "End time must be after start time."})
 
-        max_end = now + timedelta(days=14)
-        if self.end_time > max_end:
-            raise ValidationError({'end_time': _("Das Enddatum darf nicht später als in 14 Tagen liegen.")})  
+        # Booking must be within working hours
+        if self.start_time.time() < self.WORK_START or self.end_time.time() > self.WORK_END:
+            raise ValidationError({
+                'start_time': f"Booking must be within working hours {self.WORK_START}-{self.WORK_END}."
+            })
 
-        overlapping = Booking.objects.filter(
-            room=self.room
-        ).filter(
+        # Cannot book more than MAX_DAYS_AHEAD days ahead
+        if self.start_time > now + timedelta(days=self.MAX_DAYS_AHEAD):
+            raise ValidationError({
+                'start_time': f"Booking cannot be more than {self.MAX_DAYS_AHEAD} days in advance."
+            })
+
+        # Check overlapping bookings
+        overlapping = Booking.objects.filter(room=self.room).filter(
             Q(start_time__lt=self.end_time) & Q(end_time__gt=self.start_time)
         )
-
         if self.pk:
             overlapping = overlapping.exclude(pk=self.pk)
-
         if overlapping.exists():
-            raise ValidationError(_("Diese Zeit ist für diesen Raum bereits gebucht."))
+            raise ValidationError("This room is already booked for the selected time range.")
 
     def __str__(self):
         return f"{self.room.name} — {self.start_time} to {self.end_time}"
-
-    class Meta:
-        ordering = ['start_time']
-        unique_together = ['room', 'start_time', 'end_time']

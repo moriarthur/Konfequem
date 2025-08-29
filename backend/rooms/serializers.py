@@ -1,16 +1,19 @@
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from rest_framework import serializers
-from .models import Room, Booking
 from django.utils import timezone
+from .models import Room, Booking
 
 
 class RoomSerializer(serializers.ModelSerializer):
+    """Serializer for Room."""
     class Meta:
         model = Room
         fields = ['id', 'name', 'capacity', 'location']
 
 
 class BookingSerializer(serializers.ModelSerializer):
+    """Serializer for reading bookings."""
     room = RoomSerializer(read_only=True)
     user = serializers.ReadOnlyField(source='user.username')
 
@@ -18,52 +21,31 @@ class BookingSerializer(serializers.ModelSerializer):
         model = Booking
         fields = ['id', 'room', 'user', 'start_time', 'end_time', 'created_at']
 
-    def validate(self, data):
-        start_time = data.get('start_time')
-        end_time = data.get('end_time')
-        room = data.get('room')
-
-        if start_time < timezone.now():
-            raise serializers.ValidationError("Start time cannot be in the past.")
-
-        if end_time <= start_time:
-            raise serializers.ValidationError("End time must be after start time.")
-
-        # Check if booking overlaps with existing bookings for the same room
-        overlapping = Booking.objects.filter(
-            room=room
-        ).filter(
-            Q(start_time__lt=end_time) & Q(end_time__gt=start_time)
-        )
-        
-        # When updating existing booking, exclude current instance
-        if self.instance:
-            overlapping = overlapping.exclude(pk=self.instance.pk)
-
-        if overlapping.exists():
-            raise serializers.ValidationError("This room is already booked for the selected time range.")
-
-        return data
-
-    def create(self, validated_data):
-        user = self.context['request'].user
-        booking = Booking(**validated_data, user=user)
-        booking.clean()  # model validation (optional here, since we already validate)
-        booking.save()
-        return booking
 
 class BookingCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating bookings with full validation."""
+
     class Meta:
         model = Booking
         fields = ['room', 'start_time', 'end_time']
 
     def validate(self, data):
-        # your validation logic here (optional)
+        """Validate booking constraints."""
+        booking = Booking(**data, user=self.context['request'].user)
+        try:
+            booking.clean()
+        except ValidationError as e:
+            # Convert Django ValidationError to DRF-friendly format
+            if hasattr(e, 'message_dict'):
+                raise serializers.ValidationError(e.message_dict)
+            else:
+                raise serializers.ValidationError({'non_field_errors': e.messages})
         return data
 
     def create(self, validated_data):
+        """Create booking and associate with user."""
         user = self.context['request'].user
         booking = Booking(**validated_data, user=user)
-        booking.clean()
+        booking.clean()  # run model validations again to be safe
         booking.save()
         return booking

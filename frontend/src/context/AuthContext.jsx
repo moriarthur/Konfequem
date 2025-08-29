@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 
 const AuthContext = createContext();
-
 const API_URL = import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:8000";
 
 export function AuthProvider({ children }) {
@@ -9,30 +8,26 @@ export function AuthProvider({ children }) {
   const [refresh, setRefresh] = useState(localStorage.getItem("refresh") || null);
   const [isAuthenticated, setIsAuthenticated] = useState(!!access);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
 
   const logout = () => {
     setAccess(null);
     setRefresh(null);
     setIsAuthenticated(false);
+    setUser(null);
     localStorage.removeItem("access");
     localStorage.removeItem("refresh");
   };
 
   const refreshAccessToken = useCallback(async () => {
-    if (!refresh) {
-      logout();
-      return null;
-    }
+    if (!refresh) { logout(); return null; }
     try {
       const res = await fetch(`${API_URL}/api/token/refresh/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh }),
       });
-      if (!res.ok) {
-        logout();
-        return null;
-      }
+      if (!res.ok) { logout(); return null; }
       const data = await res.json();
       setAccess(data.access);
       return data.access;
@@ -49,22 +44,15 @@ export function AuthProvider({ children }) {
       else delete options.headers["Authorization"];
 
       let res;
-      try {
-        res = await fetch(`${API_URL}${url}`, options);
-      } catch {
-        throw new Error("Network error. Please try again.");
-      }
+      try { res = await fetch(`${API_URL}${url}`, options); } 
+      catch { throw new Error("Network error. Please try again."); }
 
       if (res.status === 401) {
         const newAccess = await refreshAccessToken();
         if (!newAccess) throw new Error("Unauthorized");
-
         options.headers["Authorization"] = `Bearer ${newAccess}`;
-        try {
-          res = await fetch(`${API_URL}${url}`, options);
-        } catch {
-          throw new Error("Network error. Please try again.");
-        }
+        try { res = await fetch(`${API_URL}${url}`, options); } 
+        catch { throw new Error("Network error. Please try again."); }
       }
 
       if (!res.ok) {
@@ -72,10 +60,15 @@ export function AuthProvider({ children }) {
         let errorPayload = {};
         if (contentType.includes("application/json")) {
           errorPayload = await res.json().catch(() => ({}));
+
+          // normalize messages
+          if (errorPayload.detail) errorPayload.message = errorPayload.detail;
+          else if (errorPayload.errors) errorPayload.message = Object.values(errorPayload.errors).flat().join("\n");
         } else {
           const text = await res.text().catch(() => "");
           if (text) errorPayload = { message: text };
         }
+
         throw { status: res.status, ...errorPayload };
       }
 
@@ -92,14 +85,11 @@ export function AuthProvider({ children }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
-    } catch {
-      throw new Error("Network error. Please try again.");
-    }
+    } catch { throw new Error("Network error. Please try again."); }
 
     if (!res.ok) {
       const contentType = res.headers.get("content-type") || "";
       let message = `Login failed (${res.status})`;
-
       if (contentType.includes("application/json")) {
         const body = await res.json().catch(() => ({}));
         message =
@@ -119,19 +109,42 @@ export function AuthProvider({ children }) {
     setAccess(data.access);
     setRefresh(data.refresh);
     setIsAuthenticated(true);
+
+    // fetch full user object immediately
+    await fetchUser(data.access);
+
     return data;
   };
+
+  const fetchUser = useCallback(
+    async (token) => {
+      try {
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        else if (access) headers["Authorization"] = `Bearer ${access}`;
+
+        const res = await fetch(`${API_URL}/api/users/me/`, { headers });
+        if (!res.ok) throw new Error("Failed to fetch user");
+        const data = await res.json();
+        setUser(data);
+      } catch (error) {
+        console.error("Error fetching user:", error);
+        setUser(null);
+      }
+    },
+    [access]
+  );
 
   useEffect(() => {
     setIsAuthenticated(!!access);
     setLoading(false);
-
     if (access) localStorage.setItem("access", access);
     if (refresh) localStorage.setItem("refresh", refresh);
-  }, [access, refresh]);
+    if (access) fetchUser();
+  }, [access, refresh, fetchUser]);
 
   return (
-    <AuthContext.Provider value={{ access, refresh, isAuthenticated, loading, login, logout, authFetch }}>
+    <AuthContext.Provider value={{ access, refresh, isAuthenticated, loading, login, logout, authFetch, user }}>
       {children}
     </AuthContext.Provider>
   );
