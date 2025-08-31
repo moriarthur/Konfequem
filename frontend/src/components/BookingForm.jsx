@@ -79,8 +79,9 @@ export default function BookingForm({ roomId, onSuccess }) {
         if (err.start_time && err.start_time.toLowerCase().includes("start")) backendErrors.start_time = true;
         if (err.start_time && err.start_time.toLowerCase().includes("end")) backendErrors.end_time = true;
       }
-
+      setGeneralError("Rooms can be booked between 8:00 - 18:00.");
       setErrors(backendErrors);
+
     } finally {
       setLoading(false);
     }
