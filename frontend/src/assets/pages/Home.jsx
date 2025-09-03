@@ -80,7 +80,7 @@ export default function Home() {
         <>
           <header className="flex justify-between items-center mb-6">
             <h1 className="text-4xl font-bold text-gray-900">
-              Welcome{user ? `, ${user.username}` : ""} 👋
+              Welcome, {user?.first_name || user?.username} 👋
             </h1>
             {isAuthenticated && (
               <button

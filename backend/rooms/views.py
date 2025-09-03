@@ -7,18 +7,18 @@ from rest_framework.response import Response
 from .models import Room, Booking
 from .serializers import RoomSerializer, BookingSerializer, BookingCreateSerializer
 
-
 class RoomViewSet(viewsets.ReadOnlyModelViewSet):
+    """Read-only view for rooms."""
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
-    permission_classes = [AllowAny]  # доступно для всех
-
+    permission_classes = [AllowAny]
 
 class BookingViewSet(viewsets.ModelViewSet):
+    """CRUD view for bookings; user must be authenticated."""
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # показываем только брони текущего пользователя
+        # Show only bookings for current user
         return Booking.objects.filter(user=self.request.user)
 
     def get_serializer_class(self):
@@ -27,10 +27,10 @@ class BookingViewSet(viewsets.ModelViewSet):
         return BookingSerializer
 
     def perform_create(self, serializer):
+        # Pass user only here to avoid duplicate user in create()
         serializer.save(user=self.request.user)
 
-
-# Новый эндпоинт для текущего пользователя
+# Endpoint for current user info
 class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -40,8 +40,9 @@ class CurrentUserView(APIView):
             "id": user.id,
             "username": user.username,
             "email": user.email,
+            "first_name": user.first_name,
         })
-        
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_user(request):

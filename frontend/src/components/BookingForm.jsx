@@ -3,27 +3,30 @@ import { useAuth } from "../context/AuthContext.jsx";
 
 export default function BookingForm({ roomId, onSuccess }) {
   const { authFetch } = useAuth();
+
+  // --- Form state ---
   const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [errors, setErrors] = useState({});
-  const [generalError, setGeneralError] = useState("");
+  const [generalError, setGeneralError] = useState(""); // Top block error
+  const [errors, setErrors] = useState({}); // For input highlight
   const [loading, setLoading] = useState(false);
 
+  // --- Handle form submission ---
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     setGeneralError("");
     setErrors({});
 
-    // Client-side required check
+    // --- Frontend required validation ---
     const requiredErrors = {};
     if (!date) requiredErrors.date = true;
     if (!startTime) requiredErrors.start_time = true;
     if (!endTime) requiredErrors.end_time = true;
-    if (Object.keys(requiredErrors).length > 0) {
+
+    if (Object.keys(requiredErrors).length) {
       setErrors(requiredErrors);
-      setGeneralError("All fields are required.");
+      setGeneralError("Please fix the highlighted fields.");
       return;
     }
 
@@ -33,24 +36,16 @@ export default function BookingForm({ roomId, onSuccess }) {
     const endDateTime = new Date(`${date}T${endTime}`);
     const now = new Date();
 
-    const fieldErrors = {};
-
-    // Past date/time check
     if (startDateTime < now) {
-      if (startDateTime.toDateString() < now.toDateString()) {
-        fieldErrors.date = true; // past date
-      } else {
-        fieldErrors.date = true; // today
-        fieldErrors.start_time = true; // time in past
-      }
-      setErrors(fieldErrors);
+      setErrors({ date: true });
       setGeneralError("Start time cannot be in the past.");
       setLoading(false);
       return;
     }
 
     try {
-      await authFetch("/api/bookings/", {
+      // --- Send POST request to backend ---
+      const newBooking = await authFetch("/api/bookings/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -60,46 +55,57 @@ export default function BookingForm({ roomId, onSuccess }) {
         }),
       });
 
-      // success
-      onSuccess(roomId, { start_time: startDateTime, end_time: endDateTime });
+      // --- Call success callback ---
+      onSuccess(roomId, newBooking);
+
+      // --- Reset form ---
       setDate("");
       setStartTime("");
       setEndTime("");
+      setErrors({});
+      setGeneralError("");
     } catch (err) {
-      // Backend errors mapping
-      const backendErrors = {};
-      if (err.start_time) backendErrors.start_time = true;
-      if (err.end_time) backendErrors.end_time = true;
-      if (err.non_field_errors) setGeneralError(Array.isArray(err.non_field_errors) ? err.non_field_errors.join(" ") : err.non_field_errors);
-      if (err.detail) setGeneralError(err.detail);
+      console.log("Booking error:", err);
 
-      // Working hours error detection
-      if (backendErrors.start_time && backendErrors.start_time.includes && backendErrors.start_time.includes("working hours")) {
-        // Highlight the actual field(s)
-        if (err.start_time && err.start_time.toLowerCase().includes("start")) backendErrors.start_time = true;
-        if (err.start_time && err.start_time.toLowerCase().includes("end")) backendErrors.end_time = true;
+      // --- Collect backend errors ---
+      let backendMessage = "Unknown error. Try again.";
+      if (err.non_field_errors) {
+        // Join multiple messages into one string
+        backendMessage = Array.isArray(err.non_field_errors)
+          ? err.non_field_errors.join(" ")
+          : err.non_field_errors;
+      } else if (err.detail) {
+        backendMessage = err.detail;
       }
-      setGeneralError("Rooms can be booked between 8:00 - 18:00.");
-      setErrors(backendErrors);
 
+      setGeneralError(backendMessage);
+
+      // --- Highlight all fields if any error ---
+      setErrors({
+        date: true,
+        start_time: true,
+        end_time: true,
+      });
     } finally {
       setLoading(false);
     }
   };
 
+  // --- Input CSS classes ---
   const inputClass = (field) =>
-    `w-full p-2 border rounded ${
-      errors[field] ? "border-red-500" : "border-gray-300"
+    `w-full p-2 border rounded transition-colors duration-200 bg-white ${errors[field] ? "border-red-500" : "border-gray-300"
     }`;
 
   return (
-    <form onSubmit={handleSubmit} className="mt-4 p-4 border rounded bg-gray-50 relative">
+    <form onSubmit={handleSubmit} className="mt-2 p-4 border rounded bg-gray-50 relative">
+      {/* General top error */}
       {generalError && (
-        <div className="bg-red-100 text-red-700 p-2 mb-2 rounded text-sm font-medium">
+        <div className="bg-red-100 text-red-700 p-2 mb-2 rounded text-sm font-medium transition-all duration-200">
           {generalError}
         </div>
       )}
 
+      {/* Date input */}
       <div>
         <label className="block text-sm font-medium mb-1">Date</label>
         <input
@@ -110,6 +116,7 @@ export default function BookingForm({ roomId, onSuccess }) {
         />
       </div>
 
+      {/* Start Time input */}
       <div className="mt-2">
         <label className="block text-sm font-medium mb-1">Start Time</label>
         <input
@@ -120,6 +127,7 @@ export default function BookingForm({ roomId, onSuccess }) {
         />
       </div>
 
+      {/* End Time input */}
       <div className="mt-2">
         <label className="block text-sm font-medium mb-1">End Time</label>
         <input
@@ -130,10 +138,11 @@ export default function BookingForm({ roomId, onSuccess }) {
         />
       </div>
 
+      {/* Submit button */}
       <button
         type="submit"
         disabled={loading}
-        className="mt-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
+        className="mt-4 w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 disabled:bg-gray-400 transition-colors duration-200"
       >
         {loading ? "Booking..." : "Book Now"}
       </button>

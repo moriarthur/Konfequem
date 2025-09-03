@@ -17,29 +17,30 @@ export default function LoginForm() {
   const usernameRef = useRef();
   const passwordRef = useRef();
 
-  // --- Validation function ---
-  const validateField = (field, value) => {
-    let error = "";
-    const trimmed = value.trim();
+// --- Validation function ---
+const validateField = (field, value) => {
+  let error = "";
+  const trimmed = value.trim();
 
-    if (field === "username") {
-      if (!trimmed) error = "Username is required";
-      else if (/\s/.test(value)) error = "Spaces are not allowed";
-      else if (!/^[a-zA-Z0-9._-]+$/.test(value))
-        error = "Only letters, numbers, ., _ and - are allowed";
-      else if (trimmed.length < 3 || trimmed.length > 20)
-        error = "Username must be 3-20 characters long";
-    }
+  if (field === "username") {
+    if (!trimmed) error = "Username is required";
+    else if (/\s/.test(value)) error = "Spaces are not allowed";
+    else if (!/^[a-zA-ZäöüÄÖÜß0-9._-]+$/.test(value))
+      error = "Only letters, numbers, ., _ and - are allowed";
+    else if (trimmed.length < 3 || trimmed.length > 20)
+      error = "Username must be 3-20 characters long";
+  }
 
-    if (field === "password") {
-      if (!trimmed) error = "Password is required";
-      else if (/\s/.test(value)) error = "Spaces are not allowed";
-      else if (trimmed.length < 6 || trimmed.length > 50)
-        error = "Password must be 6-50 characters long";
-    }
+  if (field === "password") {
+    if (!trimmed) error = "Password is required";
+    else if (/\s/.test(value)) error = "Spaces are not allowed";
+    else if (trimmed.length < 6 || trimmed.length > 50)
+      error = "Password must be 6-50 characters long";
+  }
 
-    return error;
-  };
+  return error;
+};
+
 
   // --- Live validation only if field is touched ---
   useEffect(() => {

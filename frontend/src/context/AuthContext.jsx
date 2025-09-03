@@ -41,7 +41,6 @@ export function AuthProvider({ children }) {
     async (url, options = {}) => {
       if (!options.headers) options.headers = {};
       if (access) options.headers["Authorization"] = `Bearer ${access}`;
-      else delete options.headers["Authorization"];
 
       let res;
       try { res = await fetch(`${API_URL}${url}`, options); } 
@@ -60,8 +59,6 @@ export function AuthProvider({ children }) {
         let errorPayload = {};
         if (contentType.includes("application/json")) {
           errorPayload = await res.json().catch(() => ({}));
-
-          // normalize messages
           if (errorPayload.detail) errorPayload.message = errorPayload.detail;
           else if (errorPayload.errors) errorPayload.message = Object.values(errorPayload.errors).flat().join("\n");
         } else {
@@ -75,6 +72,27 @@ export function AuthProvider({ children }) {
       return res.json();
     },
     [access, refreshAccessToken]
+  );
+
+  const fetchUser = useCallback(
+    async (tokenParam) => {
+      const token = tokenParam || access;
+      if (!token) return setUser(null);
+
+      try {
+        const res = await fetch(`${API_URL}/api/users/me/`, {
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error("Failed to fetch user");
+        const data = await res.json();
+        setUser(data);
+        console.log("User data fetched:", data);
+      } catch (error) {
+        console.error("Error fetching user:", error);
+        setUser(null);
+      }
+    },
+    [access]
   );
 
   const login = async (username, password) => {
@@ -110,30 +128,14 @@ export function AuthProvider({ children }) {
     setRefresh(data.refresh);
     setIsAuthenticated(true);
 
-    // fetch full user object immediately
+    // fetch full user object сразу после логина
     await fetchUser(data.access);
+
+    localStorage.setItem("access", data.access);
+    localStorage.setItem("refresh", data.refresh);
 
     return data;
   };
-
-  const fetchUser = useCallback(
-    async (token) => {
-      try {
-        const headers = { "Content-Type": "application/json" };
-        if (token) headers["Authorization"] = `Bearer ${token}`;
-        else if (access) headers["Authorization"] = `Bearer ${access}`;
-
-        const res = await fetch(`${API_URL}/api/users/me/`, { headers });
-        if (!res.ok) throw new Error("Failed to fetch user");
-        const data = await res.json();
-        setUser(data);
-      } catch (error) {
-        console.error("Error fetching user:", error);
-        setUser(null);
-      }
-    },
-    [access]
-  );
 
   useEffect(() => {
     setIsAuthenticated(!!access);

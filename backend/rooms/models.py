@@ -7,7 +7,6 @@ from django.db.models import Q
 
 User = get_user_model()
 
-
 class Room(models.Model):
     """Room model."""
     name = models.CharField(max_length=100)
@@ -19,11 +18,11 @@ class Room(models.Model):
     def __str__(self):
         return self.name
 
-
 class Booking(models.Model):
     """Booking model with validations."""
     room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name='bookings')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bookings')
+    date = models.DateField()  # will be automatically set from start_time
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -49,7 +48,7 @@ class Booking(models.Model):
         # Booking must be within working hours
         if self.start_time.time() < self.WORK_START or self.end_time.time() > self.WORK_END:
             raise ValidationError({
-                'start_time': f"Booking must be within working hours {self.WORK_START}-{self.WORK_END}."
+                'non_field_errors': f"Booking must be within working hours {self.WORK_START.strftime('%H:%M')}-{self.WORK_END.strftime('%H:%M')}."
             })
 
         # Cannot book more than MAX_DAYS_AHEAD days ahead
@@ -65,7 +64,13 @@ class Booking(models.Model):
         if self.pk:
             overlapping = overlapping.exclude(pk=self.pk)
         if overlapping.exists():
-            raise ValidationError("This room is already booked for the selected time range.")
+            raise ValidationError({'non_field_errors': "This room is already booked for the selected time range."})
+
+    def save(self, *args, **kwargs):
+        """Automatically set date from start_time before saving."""
+        if self.start_time and not self.date:
+            self.date = self.start_time.date()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.room.name} — {self.start_time} to {self.end_time}"
