@@ -5,7 +5,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 
 from .models import Room, Booking
-from .serializers import RoomSerializer, BookingSerializer, BookingCreateSerializer
+from .serializers import RoomSerializer, BookingSerializer
+
 
 class RoomViewSet(viewsets.ReadOnlyModelViewSet):
     """Read-only view for rooms."""
@@ -13,24 +14,21 @@ class RoomViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = RoomSerializer
     permission_classes = [AllowAny]
 
+
 class BookingViewSet(viewsets.ModelViewSet):
     """CRUD view for bookings; user must be authenticated."""
+    serializer_class = BookingSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         # Show only bookings for current user
         return Booking.objects.filter(user=self.request.user)
 
-    def get_serializer_class(self):
-        if self.action in ['create', 'update', 'partial_update']:
-            return BookingCreateSerializer
-        return BookingSerializer
-
     def perform_create(self, serializer):
-        # Pass user only here to avoid duplicate user in create()
+        # Attach current user to booking
         serializer.save(user=self.request.user)
 
-# Endpoint for current user info
+
 class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -42,6 +40,7 @@ class CurrentUserView(APIView):
             "email": user.email,
             "first_name": user.first_name,
         })
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

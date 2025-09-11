@@ -30,6 +30,7 @@ export function AuthProvider({ children }) {
       if (!res.ok) { logout(); return null; }
       const data = await res.json();
       setAccess(data.access);
+      localStorage.setItem("access", data.access); // ⚡ FIX
       return data.access;
     } catch {
       logout();
@@ -65,7 +66,6 @@ export function AuthProvider({ children }) {
           const text = await res.text().catch(() => "");
           if (text) errorPayload = { message: text };
         }
-
         throw { status: res.status, ...errorPayload };
       }
 
@@ -128,7 +128,6 @@ export function AuthProvider({ children }) {
     setRefresh(data.refresh);
     setIsAuthenticated(true);
 
-    // fetch full user object сразу после логина
     await fetchUser(data.access);
 
     localStorage.setItem("access", data.access);
