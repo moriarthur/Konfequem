@@ -1,82 +1,87 @@
-import React, { useState } from "react";
-import { useAuth } from "../context/AuthContext.jsx";
+import { useState } from "react";
+import { useAuth } from "../context/AuthContext";
 
-export default function BookingForm({ roomId, onSuccess }) {
+export default function BookingForm({ roomId, onBookingCreated }) {
   const { authFetch } = useAuth();
-  const [date, setDate] = useState("");
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
-  const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [errorMessages, setErrorMessages] = useState([]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setErrors({});
-    setLoading(true);
-
-    if (!date || !startTime || !endTime) {
-      setErrors({ general: "Please fill in all fields." });
-      setLoading(false);
-      return;
-    }
-
-    // Frontend working hours validation
-    if (startTime < "08:00" || endTime > "18:00") {
-      setErrors({ general: "Booking must be within working hours 08:00-18:00." });
-      setLoading(false);
-      return;
-    }
+    setErrorMessages([]); // clear errors before new attempt
 
     try {
-      const startDateTime = new Date(`${date}T${startTime}:00`);
-      const endDateTime = new Date(`${date}T${endTime}:00`);
-
-      const newBooking = await authFetch("/api/bookings/", {
+      const response = await authFetch("/api/bookings/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          room: roomId,
-          start_time: startDateTime.toISOString(),
-          end_time: endDateTime.toISOString(),
-        }),
+        body: JSON.stringify({ room: roomId, start, end }),
       });
 
-      if (typeof onSuccess === "function") onSuccess(roomId, newBooking);
+      if (!response.ok) {
+        const errorData = await response.json();
+        const collectedErrors = [];
 
-      window.dispatchEvent(new CustomEvent("konfequem:bookingCreated", { detail: { roomId, booking: newBooking } }));
+        if (errorData.non_field_errors) {
+          collectedErrors.push(...errorData.non_field_errors);
+        }
+        Object.keys(errorData).forEach((key) => {
+          if (key !== "non_field_errors") {
+            collectedErrors.push(`${key}: ${errorData[key].join(", ")}`);
+          }
+        });
 
-      setDate("");
-      setStartTime("");
-      setEndTime("");
-      setErrors({});
+        setErrorMessages(collectedErrors);
+        return;
+      }
+
+      const newBooking = await response.json();
+      onBookingCreated(newBooking);
+      setStart("");
+      setEnd("");
     } catch (err) {
-      console.log("Booking error:", err);
-      setErrors({ general: "Error creating booking. Try again." });
-    } finally {
-      setLoading(false);
+      setErrorMessages(["Unexpected error. Please try again."]);
     }
   };
 
-  const inputClass = (field) =>
-    `w-full p-2 border rounded transition-colors duration-200 bg-white ${errors[field] ? "border-red-500" : "border-gray-300"}`;
-
   return (
-    <form onSubmit={handleSubmit} className="mt-2 p-4 border rounded bg-gray-50 relative">
-      {errors.general && <div className="bg-red-100 text-red-700 p-2 mb-2 rounded text-sm font-medium">{errors.general}</div>}
-      <div>
-        <label className="block text-sm font-medium mb-1">Date</label>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass("date")} />
+    <form onSubmit={handleSubmit} className="p-4 border rounded shadow">
+      {/* Global error block */}
+      {errorMessages.length > 0 && (
+        <div className="bg-red-500 text-white p-2 rounded mb-4">
+          {errorMessages.map((msg, i) => (
+            <p key={i}>{msg}</p>
+          ))}
+        </div>
+      )}
+
+      <div className="mb-2">
+        <label className="block">Start:</label>
+        <input
+          type="datetime-local"
+          value={start}
+          onChange={(e) => setStart(e.target.value)}
+          className="border p-1 w-full"
+          required
+        />
       </div>
-      <div className="mt-2">
-        <label className="block text-sm font-medium mb-1">Start Time</label>
-        <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={inputClass("start_time")} min="08:00" max="18:00" />
+
+      <div className="mb-2">
+        <label className="block">End:</label>
+        <input
+          type="datetime-local"
+          value={end}
+          onChange={(e) => setEnd(e.target.value)}
+          className="border p-1 w-full"
+          required
+        />
       </div>
-      <div className="mt-2">
-        <label className="block text-sm font-medium mb-1">End Time</label>
-        <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={inputClass("end_time")} min="08:00" max="18:00" />
-      </div>
-      <button type="submit" disabled={loading} className="mt-4 w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 disabled:bg-gray-400">
-        {loading ? "Booking..." : "Book Now"}
+
+      <button
+        type="submit"
+        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+      >
+        Book
       </button>
     </form>
   );

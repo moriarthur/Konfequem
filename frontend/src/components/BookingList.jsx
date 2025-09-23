@@ -23,8 +23,8 @@ export default function BookingList({ bookings: initialBookings }) {
       {bookings.map((booking) => (
         <div key={booking.id} className="p-4 border rounded bg-white">
           <p><strong>Room:</strong> {booking.room_name}</p>
-          <p><strong>Start:</strong> {new Date(booking.start_time).toLocaleString()}</p>
-          <p><strong>End:</strong> {new Date(booking.end_time).toLocaleString()}</p>
+          <p><strong>Start:</strong> {new Date(booking.start_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+          <p><strong>End:</strong> {new Date(booking.end_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
         </div>
       ))}
     </div>
