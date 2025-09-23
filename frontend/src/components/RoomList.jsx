@@ -126,12 +126,25 @@ export default function RoomList() {
             {/* Bookings List */}
             {room.bookings && room.bookings.length > 0 && (
               <ul className="mt-2 space-y-1">
-                {room.bookings.map((b, idx) => (
-                  <li key={idx} className="text-sm text-gray-700">
-                    {new Date(b.start_time).toLocaleString()} –{" "}
-                    {new Date(b.end_time).toLocaleTimeString()}
-                  </li>
-                ))}
+                {room.bookings.map((b, idx) => {
+                  const start = new Date(b.start_time);
+                  const end = new Date(b.end_time);
+
+                  return (
+                    <li key={idx} className="text-sm text-gray-700">
+                      {start.toLocaleDateString()}{" "}
+                      {start.toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}{" "}
+                      –{" "}
+                      {end.toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>

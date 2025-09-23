@@ -53,4 +53,7 @@ class Booking(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.room.name} — {self.start_time} to {self.end_time}"
+        start_str = self.start_time.strftime("%H:%M")
+        end_str = self.end_time.strftime("%H:%M")
+        return f"{self.room.name} — {start_str} to {end_str}"
+

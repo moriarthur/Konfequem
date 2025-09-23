@@ -99,7 +99,7 @@ const validateField = (field, value) => {
       <div className="w-full max-w-sm p-8 rounded-2xl bg-white shadow-xl border border-gray-200">
         {/* Logo */}
         <div className="flex justify-center mb-6">
-          <img src="/logo_Konfequem.png" alt="Konfequem Logo" className="h-16 w-auto" />
+          <img src="konfequem.svg" alt="Konfequem Logo" className="h-16 w-auto" />
         </div>
 
         {/* General error */}

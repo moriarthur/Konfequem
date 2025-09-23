@@ -9,14 +9,22 @@ class RoomAdmin(admin.ModelAdmin):
 
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
-    list_display = ('room', 'user', 'start_time', 'end_time', 'created_at')
+    list_display = ('room', 'user', 'start_time_display', 'end_time_display', 'created_at')
     search_fields = ('room__name', 'user__username')
     list_filter = (
-        'room', ('start_time', admin.DateFieldListFilter), ('end_time', admin.DateFieldListFilter)  # filters for room and date fields
-    ) 
-    autocomplete_fields = ('room', 'user')                                                          # allows to search for a room or user in the booking form 
-    date_hierarchy = 'start_time'                                                                   # adds a date hierarchy filter
+        'room', ('start_time', admin.DateFieldListFilter), ('end_time', admin.DateFieldListFilter)
+    )
+    autocomplete_fields = ('room', 'user')
+    date_hierarchy = 'start_time'
 
-    def save_model(self, request, obj, form, change):                                               # override save_model method to call clean() method
-        obj.full_clean()                                                                            # call the clean method to validate the booking
+    def start_time_display(self, obj):
+        return obj.start_time.strftime("%H:%M")
+    start_time_display.short_description = 'Start Time'
+
+    def end_time_display(self, obj):
+        return obj.end_time.strftime("%H:%M")
+    end_time_display.short_description = 'End Time'
+
+    def save_model(self, request, obj, form, change):
+        obj.full_clean()
         super().save_model(request, obj, form, change)
