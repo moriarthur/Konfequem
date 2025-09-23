@@ -9,45 +9,49 @@ Docs:
 """
 
 import os
-from decouple import config
 from pathlib import Path
 from dotenv import load_dotenv
+from decouple import config
 import dj_database_url
 
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load environment variables from .env file
-load_dotenv(BASE_DIR / ".env")
+load_dotenv(BASE_DIR / ".env")  # ensure local .env is loaded
 
 # ==== Django core settings ====
 SECRET_KEY = config("DJANGO_SECRET_KEY", default="unsafe-secret-key")
 DEBUG = config("DJANGO_DEBUG", default=False, cast=bool)
 
-# Allowed hosts (read from comma-separated env variable)
+# Allowed hosts from comma-separated .env variable
 ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "").split(",") if host.strip()]
 
-# Check if running in Docker
-IS_DOCKER = os.getenv("DOCKER", "false").lower() == "true"
+# Check if running in Docker (used for conditional logic if needed)
+IS_DOCKER = config("DOCKER", default=False, cast=bool)
 
 # ==== Database configuration ====
+# DATABASE_URL must be defined in .env; fallback handled safely
+db_url = config("DATABASE_URL", default=None)
+if not db_url:
+    raise ValueError("DATABASE_URL is not set in .env!")
 DATABASES = {
-    "default": dj_database_url.config(default=os.getenv("DATABASE_URL"))
+    "default": dj_database_url.config(default=db_url)
 }
 
-# Application definition
+# ==== Application definition ====
 INSTALLED_APPS = [
     "admin_interface",
-    "colorfield",  # For better admin UI
+    "colorfield",  # For enhanced admin UI
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "rest_framework",  # DRF
-    "rest_framework_simplejwt",  # JWT auth
-    "rooms",  # Your app
+    "rest_framework",  # Django REST Framework
+    "rest_framework_simplejwt",  # JWT authentication
+    "rooms",  # Custom app
     "corsheaders",  # CORS
 ]
 
@@ -84,18 +88,10 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
-    },
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
 # Internationalization

@@ -96,7 +96,6 @@ export default function RoomList() {
             className={`relative p-4 bg-white rounded-2xl shadow-sm border border-gray-200 transform transition-all duration-300 ease-in-out cursor-pointer hover:shadow-lg hover:scale-[1.02] hover:bg-gray-50 ${
               fadeIn ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
             }`}
-            style={{ transitionDelay: `${index * 50}ms` }}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => {
