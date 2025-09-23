@@ -14,32 +14,26 @@ from pathlib import Path
 from dotenv import load_dotenv
 import dj_database_url
 
-# Load environment variables from .env file in project root
+# Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env file
 load_dotenv(BASE_DIR / ".env")
 
-# Получаем базовые настройки
+# ==== Django core settings ====
 SECRET_KEY = config("DJANGO_SECRET_KEY", default="unsafe-secret-key")
 DEBUG = config("DJANGO_DEBUG", default=False, cast=bool)
 
-# Проверяем, запускаемся ли в Docker
+# Allowed hosts (read from comma-separated env variable)
+ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "").split(",") if host.strip()]
+
+# Check if running in Docker
 IS_DOCKER = os.getenv("DOCKER", "false").lower() == "true"
 
-# DATABASES — выбираем в зависимости от среды
-if IS_DOCKER:
-    # ---- Docker config ----
-    DATABASES = {
-        "default": dj_database_url.config(
-            default=os.getenv("DATABASE_URL", "postgres://admin:secret@db:5432/booking")
-        )
-    }
-else:
-    # ---- Local (Mac) config ----
-    DATABASES = {
-        "default": dj_database_url.config(
-            default=os.getenv("DATABASE_URL", "postgres://admin:secret@localhost:5432/konfequem")
-        )
-    }
+# ==== Database configuration ====
+DATABASES = {
+    "default": dj_database_url.config(default=os.getenv("DATABASE_URL"))
+}
 
 # Application definition
 INSTALLED_APPS = [
