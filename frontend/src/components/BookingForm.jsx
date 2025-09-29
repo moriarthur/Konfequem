@@ -9,38 +9,40 @@ export default function BookingForm({ roomId, onBookingCreated }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setErrorMessages([]); // clear errors before new attempt
+    setErrorMessages([]); // clear previous errors
 
     try {
-      const response = await authFetch("/api/bookings/", {
+      const newBooking = await authFetch("/api/bookings/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ room: roomId, start, end }),
+        body: JSON.stringify({ room: roomId, start_time: start, end_time: end }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        const collectedErrors = [];
+      if (onBookingCreated) onBookingCreated(newBooking);
 
-        if (errorData.non_field_errors) {
-          collectedErrors.push(...errorData.non_field_errors);
-        }
-        Object.keys(errorData).forEach((key) => {
-          if (key !== "non_field_errors") {
-            collectedErrors.push(`${key}: ${errorData[key].join(", ")}`);
-          }
-        });
-
-        setErrorMessages(collectedErrors);
-        return;
-      }
-
-      const newBooking = await response.json();
-      onBookingCreated(newBooking);
       setStart("");
       setEnd("");
     } catch (err) {
-      setErrorMessages(["Unexpected error. Please try again."]);
+      const collectedErrors = [];
+
+      // DRF serializer 'general' errors
+      if (err.general) collectedErrors.push(...err.general);
+
+      // Field-specific errors
+      ["start_time", "end_time", "room", "user", "non_field_errors"].forEach((key) => {
+        if (err[key]) {
+          collectedErrors.push(
+            `${key}: ${Array.isArray(err[key]) ? err[key].join(", ") : err[key]}`
+          );
+        }
+      });
+
+      // Fallback for unknown errors
+      if (collectedErrors.length === 0) {
+        collectedErrors.push(err.message || "Unexpected error. Please try again.");
+      }
+
+      setErrorMessages(collectedErrors);
     }
   };
 
