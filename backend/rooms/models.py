@@ -24,7 +24,7 @@ class Booking(models.Model):
     end_time = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
 
-    MAX_DAYS_AHEAD = 14
+    MAX_DAYS_AHEAD = 90
 
     def clean(self):
         super().clean()

@@ -43,7 +43,7 @@ class BookingSerializer(serializers.ModelSerializer):
                 errors.append("Booking cannot exceed 8 hours.")
 
             # Max advance booking
-            max_days = getattr(Booking, 'MAX_DAYS_AHEAD', 14)
+            max_days = getattr(Booking, 'MAX_DAYS_AHEAD', 90)
             if start > now + timedelta(days=max_days):
                 errors.append(f"Booking cannot be more than {max_days} days in advance.")
 

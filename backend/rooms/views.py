@@ -21,8 +21,19 @@ class BookingViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Show only bookings for current user
-        return Booking.objects.filter(user=self.request.user)
+        user = self.request.user
+        queryset = Booking.objects.filter(user=user)  
+
+        room_id = self.request.query_params.get('room')
+        date_str = self.request.query_params.get('date')
+
+        if room_id:
+            queryset = queryset.filter(room_id=room_id)
+        if date_str:
+            queryset = queryset.filter(start_time__date=date_str)
+
+        return queryset
+
 
     def perform_create(self, serializer):
         # Attach current user to booking
