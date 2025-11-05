@@ -65,7 +65,7 @@ export default function RoomList() {
             className="relative z-60 w-full max-w-lg mx-auto mt-12 md:mt-0"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="bg-white rounded-2xl shadow-xl p-4 max-h-[90vh]  animate-fadeIn">
+            <div className="bg-white rounded-2xl shadow-xl p-4 max-h-[90vh] animate-fadeIn">
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-lg font-semibold">
                   {rooms.find((r) => r.id === expandedRoom)?.name}
