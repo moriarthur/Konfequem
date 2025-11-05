@@ -11,7 +11,14 @@ class BookingSerializer(serializers.ModelSerializer):
         model = Booking
         fields = ['id', 'room', 'room_name', 'start_time', 'end_time', 'user']
         read_only_fields = ['user']
-
+        
+    def to_representation(self, instance):
+        """Return start and end times in office timezone (Berlin)"""
+        ret = super().to_representation(instance)
+        ret['start_time'] = timezone.localtime(instance.start_time).isoformat()
+        ret['end_time'] = timezone.localtime(instance.end_time).isoformat()
+        return ret
+    
     def validate(self, data):
         errors = []
         start = data.get('start_time')
