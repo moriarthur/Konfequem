@@ -16,3 +16,24 @@
     margin: 0.01rem;
 }
 
+@keyframes fadeInOut {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -10px);
+    }
+
+    10%,
+    80% {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -10px);
+    }
+}
+
+.animate-fadeInOut {
+    animation: fadeInOut 3s ease-in-out forwards;
+}

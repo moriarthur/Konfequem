@@ -27,14 +27,10 @@ export default function RoomList() {
     fetchRooms();
   }, [authFetch]);
 
-  const handleToggle = (roomId) => {
-    setExpandedRoom(expandedRoom === roomId ? null : roomId);
-  };
-
-  const handleBookingSuccess = (roomId, newBooking) => {
+  const handleBookingCreated = (newBooking) => {
     setRooms((prev) =>
       prev.map((room) => {
-        if (room.id === roomId) {
+        if (room.id === newBooking.room) {
           const updatedBookings = room.bookings
             ? [...room.bookings, newBooking]
             : [newBooking];
@@ -43,7 +39,7 @@ export default function RoomList() {
         return room;
       })
     );
-    setExpandedRoom(null);
+    setExpandedRoom(null); // Close the booking form modal
   };
 
   if (loading) return <p>Loading rooms...</p>;
@@ -51,16 +47,13 @@ export default function RoomList() {
 
   return (
     <div className="relative">
-      {/* Modal Overlay */}
       {expandedRoom && (
         <div className="fixed inset-0 z-50 flex items-start md:items-center justify-center p-4">
-          {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/40"
             onClick={() => setExpandedRoom(null)}
             aria-hidden="true"
           />
-          {/* Modal Box */}
           <div
             className="relative z-60 w-full max-w-lg mx-auto mt-12 md:mt-0"
             onClick={(e) => e.stopPropagation()}
@@ -77,70 +70,44 @@ export default function RoomList() {
                   Close
                 </button>
               </div>
-
               <BookingForm
                 roomId={expandedRoom}
-                onSuccess={handleBookingSuccess}
+                onBookingCreated={handleBookingCreated} 
+                onClose={() => setExpandedRoom(null)} 
               />
             </div>
           </div>
         </div>
       )}
 
-      {/* Grid of Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {rooms.map((room, index) => (
+        {rooms.map((room) => (
           <div
             key={room.id}
-            onClick={() => handleToggle(room.id)}
-            className={`relative p-4 bg-white rounded-2xl shadow-sm border border-gray-200 transform transition-all duration-300 ease-in-out cursor-pointer hover:shadow-lg hover:scale-[1.02] hover:bg-gray-50 ${
-              fadeIn ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
-            }`}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") handleToggle(room.id);
-            }}
+            onClick={() => setExpandedRoom(room.id)}
+            className={`relative p-4 bg-white rounded-2xl shadow-sm border border-gray-200 transform transition-all duration-300 ease-in-out cursor-pointer hover:shadow-lg hover:scale-[1.02] hover:bg-gray-50 ${fadeIn ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
           >
-            {/* Card Header */}
             <div className="flex justify-between items-center">
               <div>
                 <h2 className="font-semibold text-lg">{room.name}</h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Capacity: {room.capacity}
-                </p>
-                {room.location && (
-                  <p className="text-sm text-gray-600">
-                    Location: {room.location}
-                  </p>
-                )}
+                <p className="text-sm text-gray-600 mt-1">Capacity: {room.capacity}</p>
+                {room.location && <p className="text-sm text-gray-600">Location: {room.location}</p>}
               </div>
               <ChevronDownIcon
-                className={`w-6 h-6 text-gray-500 transform transition-transform duration-300 ${
-                  expandedRoom === room.id ? "rotate-180" : ""
-                }`}
+                className={`w-6 h-6 text-gray-500 transform transition-transform duration-300 ${expandedRoom === room.id ? "rotate-180" : ""}`}
               />
             </div>
 
-            {/* Bookings List */}
             {room.bookings && room.bookings.length > 0 && (
               <ul className="mt-2 space-y-1">
                 {room.bookings.map((b, idx) => {
                   const start = new Date(b.start_time);
                   const end = new Date(b.end_time);
-
                   return (
                     <li key={idx} className="text-sm text-gray-700">
                       {start.toLocaleDateString()}{" "}
-                      {start.toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}{" "}
-                      –{" "}
-                      {end.toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} –{" "}
+                      {end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </li>
                   );
                 })}

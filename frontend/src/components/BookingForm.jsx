@@ -178,6 +178,7 @@ export default function BookingForm({ roomId, onBookingCreated }) {
 
       // Trigger parent callback
       if (onBookingCreated) onBookingCreated(newBooking);
+      if (onClose) onClose();
 
       // Reset form
       setSelectedDate(null);
