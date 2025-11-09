@@ -8,7 +8,7 @@ const OFFICE_START = 8; // 08:00
 const OFFICE_END = 22;  // 22:00
 const MIN_DURATION = 15; // minutes
 
-export default function BookingForm({ roomId, onBookingCreated }) {
+export default function BookingForm({ roomId, onBookingCreated, onClose }) {
   const { authFetch } = useAuth();
 
   const [selectedDate, setSelectedDate] = useState(null);
@@ -23,16 +23,14 @@ export default function BookingForm({ roomId, onBookingCreated }) {
   const maxDate = new Date();
   maxDate.setDate(maxDate.getDate() + 90);
 
-  // Fetch bookings for the selected date
+  // Fetch bookings for selected date
   useEffect(() => {
     if (!selectedDate) return;
 
     const fetchBookings = async () => {
       try {
         const dateStr = selectedDate.toISOString().split("T")[0];
-        const data = await authFetch(
-          `/api/bookings/?room=${roomId}&date=${dateStr}`
-        );
+        const data = await authFetch(`/api/bookings/?room=${roomId}&date=${dateStr}`);
         setBookings(data);
       } catch (err) {
         console.error(err);
@@ -57,10 +55,7 @@ export default function BookingForm({ roomId, onBookingCreated }) {
     dayEnd.setHours(OFFICE_END, 0, 0, 0);
 
     const sortedBookings = bookings
-      .map((b) => ({
-        start: new Date(b.start_time),
-        end: new Date(b.end_time),
-      }))
+      .map((b) => ({ start: new Date(b.start_time), end: new Date(b.end_time) }))
       .sort((a, b) => a.start - b.start);
 
     let current = new Date(dayStart);
@@ -76,7 +71,7 @@ export default function BookingForm({ roomId, onBookingCreated }) {
     return slots;
   }, [bookings, selectedDate]);
 
-  // Compute allowed durations for the selected start time
+  // Compute allowed durations for selected start time
   const computeDurations = useCallback(() => {
     if (!startTime || !selectedDate) return [];
 
@@ -88,10 +83,7 @@ export default function BookingForm({ roomId, onBookingCreated }) {
     dayEnd.setHours(OFFICE_END, 0, 0, 0);
 
     const sortedBookings = bookings
-      .map((b) => ({
-        start: new Date(b.start_time),
-        end: new Date(b.end_time),
-      }))
+      .map((b) => ({ start: new Date(b.start_time), end: new Date(b.end_time) }))
       .sort((a, b) => a.start - b.start);
 
     const nextBooking = sortedBookings.find((b) => b.start > start);
@@ -140,7 +132,7 @@ export default function BookingForm({ roomId, onBookingCreated }) {
     setSelectedDuration("");
   }, [startTime, computeDurations]);
 
-  // Submit booking with UTC conversion
+  // Submit booking
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedDate || !startTime || !selectedDuration) return;
@@ -149,10 +141,8 @@ export default function BookingForm({ roomId, onBookingCreated }) {
     const localStart = new Date(selectedDate);
     localStart.setHours(hour, minute, 0, 0);
 
-    // Convert to UTC
     const startUTC = new Date(localStart.getTime() - localStart.getTimezoneOffset() * 60000);
 
-    // Compute end time in UTC
     let localEnd = new Date(localStart);
     if (selectedDuration.includes("h")) {
       const parts = selectedDuration.split("h");
@@ -163,6 +153,7 @@ export default function BookingForm({ roomId, onBookingCreated }) {
     } else {
       localEnd.setMinutes(localEnd.getMinutes() + parseInt(selectedDuration));
     }
+
     const endUTC = new Date(localEnd.getTime() - localEnd.getTimezoneOffset() * 60000);
 
     try {
@@ -176,9 +167,11 @@ export default function BookingForm({ roomId, onBookingCreated }) {
         }),
       });
 
-      // Trigger parent callback
+      // Call parent callback to update BookingList
+      // After successful POST
       if (onBookingCreated) onBookingCreated(newBooking);
-      if (onClose) onClose();
+      if (onClose) onClose(); // close form
+;
 
       // Reset form
       setSelectedDate(null);
@@ -212,7 +205,6 @@ export default function BookingForm({ roomId, onBookingCreated }) {
         </div>
       )}
 
-      {/* Date picker */}
       <div className="mb-3">
         <label className="block text-sm font-medium mb-1">Select Date</label>
         <DatePicker
@@ -226,7 +218,6 @@ export default function BookingForm({ roomId, onBookingCreated }) {
         />
       </div>
 
-      {/* Start Time */}
       {availableStartTimes.length > 0 && (
         <div className="mb-3">
           <label className="block text-sm font-medium mb-1">Start Time</label>
@@ -243,7 +234,6 @@ export default function BookingForm({ roomId, onBookingCreated }) {
         </div>
       )}
 
-      {/* Duration */}
       {durationOptions.length > 0 && (
         <div className="mb-3">
           <label className="block text-sm font-medium mb-1">Duration</label>
@@ -260,7 +250,6 @@ export default function BookingForm({ roomId, onBookingCreated }) {
         </div>
       )}
 
-      {/* Submit button */}
       <button
         type="submit"
         disabled={!selectedDate || !startTime || !selectedDuration}

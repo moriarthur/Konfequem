@@ -1,49 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import BookingForm from "./BookingForm.jsx";
-import { useAuth } from "../context/AuthContext.jsx";
 import { ChevronDownIcon } from "@heroicons/react/24/outline";
 
-export default function RoomList() {
-  const { authFetch } = useAuth();
-  const [rooms, setRooms] = useState([]);
+export default function RoomList({ rooms, onBook }) {
   const [expandedRoom, setExpandedRoom] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [fadeIn, setFadeIn] = useState(false);
+  const [fadeIn, setFadeIn] = useState(true);
 
-  useEffect(() => {
-    const fetchRooms = async () => {
-      try {
-        const data = await authFetch("/api/rooms/");
-        setRooms(data);
-      } catch (err) {
-        console.error(err);
-        setError("Failed to load rooms.");
-      } finally {
-        setLoading(false);
-        setFadeIn(true);
-      }
-    };
-    fetchRooms();
-  }, [authFetch]);
-
-  const handleBookingCreated = (newBooking) => {
-    setRooms((prev) =>
-      prev.map((room) => {
-        if (room.id === newBooking.room) {
-          const updatedBookings = room.bookings
-            ? [...room.bookings, newBooking]
-            : [newBooking];
-          return { ...room, bookings: updatedBookings };
-        }
-        return room;
-      })
-    );
-    setExpandedRoom(null); // Close the booking form modal
-  };
-
-  if (loading) return <p>Loading rooms...</p>;
-  if (error) return <p className="text-red-500">{error}</p>;
+  if (!rooms) return <p>Loading rooms...</p>;
 
   return (
     <div className="relative">
@@ -72,8 +35,11 @@ export default function RoomList() {
               </div>
               <BookingForm
                 roomId={expandedRoom}
-                onBookingCreated={handleBookingCreated} 
-                onClose={() => setExpandedRoom(null)} 
+                onBookingCreated={(newBooking) => {
+                  if (onBook) onBook(newBooking); // forward to Home
+                  setExpandedRoom(null);
+                }}
+                onClose={() => setExpandedRoom(null)}
               />
             </div>
           </div>
@@ -85,16 +51,24 @@ export default function RoomList() {
           <div
             key={room.id}
             onClick={() => setExpandedRoom(room.id)}
-            className={`relative p-4 bg-white rounded-2xl shadow-sm border border-gray-200 transform transition-all duration-300 ease-in-out cursor-pointer hover:shadow-lg hover:scale-[1.02] hover:bg-gray-50 ${fadeIn ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
+            className={`relative p-4 bg-white rounded-2xl shadow-sm border border-gray-200 transform transition-all duration-300 ease-in-out cursor-pointer hover:shadow-lg hover:scale-[1.02] hover:bg-gray-50 ${
+              fadeIn ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
+            }`}
           >
             <div className="flex justify-between items-center">
               <div>
                 <h2 className="font-semibold text-lg">{room.name}</h2>
-                <p className="text-sm text-gray-600 mt-1">Capacity: {room.capacity}</p>
-                {room.location && <p className="text-sm text-gray-600">Location: {room.location}</p>}
+                <p className="text-sm text-gray-600 mt-1">
+                  Capacity: {room.capacity}
+                </p>
+                {room.location && (
+                  <p className="text-sm text-gray-600">Location: {room.location}</p>
+                )}
               </div>
               <ChevronDownIcon
-                className={`w-6 h-6 text-gray-500 transform transition-transform duration-300 ${expandedRoom === room.id ? "rotate-180" : ""}`}
+                className={`w-6 h-6 text-gray-500 transform transition-transform duration-300 ${
+                  expandedRoom === room.id ? "rotate-180" : ""
+                }`}
               />
             </div>
 

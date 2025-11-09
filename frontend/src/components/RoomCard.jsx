@@ -1,7 +1,13 @@
 import React from "react";
 import BookingForm from "./BookingForm";
 
-export default function RoomCard({ room, isActive, onToggleBookingForm, onBook, errors, success }) {
+export default function RoomCard({
+  room,
+  isActive,
+  onToggleBookingForm,
+  onBook,
+  errors,
+}) {
   return (
     <div className="bg-white shadow-md rounded-lg p-6">
       <h3 className="text-xl font-bold mb-2">{room.name}</h3>
@@ -10,24 +16,21 @@ export default function RoomCard({ room, isActive, onToggleBookingForm, onBook, 
 
       <button
         onClick={() => onToggleBookingForm(room.id)}
-        className={`px-4 py-2 rounded hover:bg-opacity-90 ${
-          isActive ? "bg-red-600 text-white hover:bg-red-700" : "bg-blue-600 text-white hover:bg-blue-700"
-        }`}
+        className={`px-4 py-2 rounded hover:bg-opacity-90 ${isActive
+            ? "bg-red-600 text-white hover:bg-red-700"
+            : "bg-blue-600 text-white hover:bg-blue-700"
+          }`}
       >
         {isActive ? "Cancel booking" : "Book this room"}
       </button>
 
-      {/* Success message lives in the card, auto-hidden by parent */}
-      {success && (
-        <p className="mt-3 text-green-600 font-semibold">Booking successful!</p>
-      )}
-
+      {/* Show booking form only when card is active */}
       {isActive && (
         <div className="mt-4 border-t pt-4 transition-all duration-300">
           <BookingForm
             roomId={room.id}
-            onSuccess={onBook}
-            errorsFromParent={errors}
+            onBookingCreated={onBook} // call parent callback
+            onClose={() => onToggleBookingForm(null)}
           />
         </div>
       )}
