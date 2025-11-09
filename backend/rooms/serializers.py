@@ -13,10 +13,10 @@ class BookingSerializer(serializers.ModelSerializer):
         read_only_fields = ['user']
         
     def to_representation(self, instance):
-        """Return start and end times in office timezone (Berlin)"""
+        """Return times in UTC for consistency across platforms"""
         ret = super().to_representation(instance)
-        ret['start_time'] = timezone.localtime(instance.start_time).isoformat()
-        ret['end_time'] = timezone.localtime(instance.end_time).isoformat()
+        ret['start_time'] = instance.start_time.astimezone(timezone.utc).isoformat()
+        ret['end_time'] = instance.end_time.astimezone(timezone.utc).isoformat()
         return ret
     
     def validate(self, data):
@@ -38,9 +38,13 @@ class BookingSerializer(serializers.ModelSerializer):
             if start < now:
                 errors.append("Start time cannot be in the past.")
 
-            # Office hours: 08:00 – 20:00
-            if start.hour < 8 or start.hour >= 20 or end.hour > 20 or end.hour <= 8:
-                errors.append("Bookings must be within office hours (08:00–20:00).")
+            # Convert to office timezone (Europe/Berlin) for validation
+            start_local = timezone.localtime(start, timezone=timezone.get_default_timezone())
+            end_local = timezone.localtime(end, timezone=timezone.get_default_timezone())
+            
+            # Office hours: 08:00 – 22:00 (in local time)
+            if start_local.hour < 8 or start_local.hour >= 22 or end_local.hour > 22 or end_local.hour < 8:
+                errors.append("Bookings must be within office hours (08:00–22:00).")
 
             # Duration limits: 15 min – 8 hours
             duration = (end - start).total_seconds() / 60
@@ -73,19 +77,14 @@ class BookingSerializer(serializers.ModelSerializer):
         if user_bookings_week.count() >= 5 and not user.is_staff:
             errors.append("You cannot book more than 5 times in a single week.")
 
-        # --- Resource validation ---
-        if room and data.get('attendees'):
-            if data['attendees'] > room.capacity:
-                errors.append(f"Room capacity exceeded: {room.capacity} people max.")
+        # Resource validation can be added here if needed in the future
 
         if errors:
             raise serializers.ValidationError({"general": errors})
 
         return data
 
-    def create(self, validated_data):
-        validated_data['user'] = self.context['request'].user
-        return super().create(validated_data)
+    # User is assigned in the viewset's perform_create
 
 class RoomSerializer(serializers.ModelSerializer):
     class Meta:

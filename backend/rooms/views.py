@@ -22,17 +22,31 @@ class BookingViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = Booking.objects.filter(user=user)  
+        queryset = Booking.objects.filter(user=user)
 
         room_id = self.request.query_params.get('room')
         date_str = self.request.query_params.get('date')
+        month_str = self.request.query_params.get('month')  # YYYY-MM format
 
         if room_id:
             queryset = queryset.filter(room_id=room_id)
-        if date_str:
+        
+        if month_str:
+            # Parse YYYY-MM format
+            import datetime
+            try:
+                year, month = map(int, month_str.split('-'))
+                # Get all bookings for the month
+                queryset = queryset.filter(
+                    start_time__year=year,
+                    start_time__month=month
+                )
+            except ValueError:
+                pass
+        elif date_str:
             queryset = queryset.filter(start_time__date=date_str)
 
-        return queryset
+        return queryset.select_related('room')
 
 
     def perform_create(self, serializer):

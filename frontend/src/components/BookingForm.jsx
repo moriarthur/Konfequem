@@ -1,207 +1,173 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import DatePicker from "react-datepicker";
+import { DateTime } from "luxon";
 import "react-datepicker/dist/react-datepicker.css";
-
-// Constants for office hours and minimum booking duration
-const OFFICE_START = 8; // 08:00
-const OFFICE_END = 22;  // 22:00
-const MIN_DURATION = 15; // minutes
+import {
+  findAvailableSlots,
+  getAvailableDurations,
+  formatSlot,
+  toOfficeTime,
+  toUTCString,
+} from "../utils/bookingUtils";
+import {
+  fetchMonthBookings,
+  getCachedBookings,
+  isDateFullyBooked,
+  hasTimeSlots,
+  shouldFetchMonth,
+  subscribeToMonth,
+} from "../utils/bookingCache";
 
 export default function BookingForm({ roomId, onBookingCreated, onClose }) {
   const { authFetch } = useAuth();
 
   const [selectedDate, setSelectedDate] = useState(null);
   const [bookings, setBookings] = useState([]);
-  const [availableStartTimes, setAvailableStartTimes] = useState([]);
-  const [startTime, setStartTime] = useState("");
-  const [durationOptions, setDurationOptions] = useState([]);
-  const [selectedDuration, setSelectedDuration] = useState("");
-  const [errorMessages, setErrorMessages] = useState([]);
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [durations, setDurations] = useState([]);
+  const [selectedDuration, setSelectedDuration] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
+  // Calculate date limits
   const minDate = new Date();
-  const maxDate = new Date();
-  maxDate.setDate(maxDate.getDate() + 90);
+  const maxDate = DateTime.now().plus({ days: 90 }).toJSDate();
 
-  // Fetch bookings for selected date
+  // Pre-fetch data for visible month
   useEffect(() => {
-    if (!selectedDate) return;
-
-    const fetchBookings = async () => {
-      try {
-        const dateStr = selectedDate.toISOString().split("T")[0];
-        const data = await authFetch(`/api/bookings/?room=${roomId}&date=${dateStr}`);
-        setBookings(data);
-      } catch (err) {
-        console.error(err);
-        setErrorMessages(["Failed to load bookings."]);
-      }
-    };
-
-    fetchBookings();
-    setStartTime("");
-    setSelectedDuration("");
-    setDurationOptions([]);
+    const date = selectedDate || new Date();
+    if (shouldFetchMonth(date)) {
+      fetchMonthBookings(date, roomId, authFetch);
+    }
   }, [selectedDate, roomId, authFetch]);
 
-  // Generate available start times based on existing bookings
-  const generateStartTimes = useCallback(() => {
-    if (!selectedDate) return [];
-
-    const slots = [];
-    const dayStart = new Date(selectedDate);
-    dayStart.setHours(OFFICE_START, 0, 0, 0);
-    const dayEnd = new Date(selectedDate);
-    dayEnd.setHours(OFFICE_END, 0, 0, 0);
-
-    const sortedBookings = bookings
-      .map((b) => ({ start: new Date(b.start_time), end: new Date(b.end_time) }))
-      .sort((a, b) => a.start - b.start);
-
-    let current = new Date(dayStart);
-    while (current < dayEnd) {
-      const currentEnd = new Date(current.getTime() + MIN_DURATION * 60000);
-      const overlap = sortedBookings.some(
-        (b) => current < b.end && currentEnd > b.start
-      );
-      if (!overlap) slots.push(current.toTimeString().slice(0, 5));
-      current.setMinutes(current.getMinutes() + 15);
-    }
-
-    return slots;
-  }, [bookings, selectedDate]);
-
-  // Compute allowed durations for selected start time
-  const computeDurations = useCallback(() => {
-    if (!startTime || !selectedDate) return [];
-
-    const start = new Date(selectedDate);
-    const [hour, minute] = startTime.split(":").map(Number);
-    start.setHours(hour, minute, 0, 0);
-
-    const dayEnd = new Date(selectedDate);
-    dayEnd.setHours(OFFICE_END, 0, 0, 0);
-
-    const sortedBookings = bookings
-      .map((b) => ({ start: new Date(b.start_time), end: new Date(b.end_time) }))
-      .sort((a, b) => a.start - b.start);
-
-    const nextBooking = sortedBookings.find((b) => b.start > start);
-    const maxEnd = nextBooking ? nextBooking.start : dayEnd;
-
-    const options = [];
-    let dur = MIN_DURATION;
-
-    while (true) {
-      const nextTime = new Date(start.getTime() + dur * 60000);
-      if (nextTime > maxEnd) break;
-
-      // Format duration string
-      if (dur < 60) options.push(`${dur} min`);
-      else {
-        const h = Math.floor(dur / 60);
-        const m = dur % 60;
-        options.push(m === 0 ? `${h}h` : `${h}h${m}`);
-      }
-
-      dur += 15;
-    }
-
-    return options;
-  }, [bookings, startTime, selectedDate]);
-
-  // Update start times when date changes
+  // Update slots when date is selected
   useEffect(() => {
     if (!selectedDate) return;
-    const slots = generateStartTimes();
-    setAvailableStartTimes(slots);
-    setErrorMessages(slots.length === 0 ? ["No available slots for this date."] : []);
-    setStartTime("");
-    setSelectedDuration("");
-    setDurationOptions([]);
-  }, [generateStartTimes, selectedDate]);
 
-  // Update duration options when start time changes
-  useEffect(() => {
-    if (!startTime) return;
-    const durations = computeDurations();
-    setDurationOptions(durations);
-    setErrorMessages(
-      durations.length === 0 ? ["No available durations for this start time."] : []
-    );
-    setSelectedDuration("");
-  }, [startTime, computeDurations]);
+    setLoading(true);
+    setError(null);
 
-  // Submit booking
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedDate || !startTime || !selectedDuration) return;
-
-    const [hour, minute] = startTime.split(":").map(Number);
-    const localStart = new Date(selectedDate);
-    localStart.setHours(hour, minute, 0, 0);
-
-    const startUTC = new Date(localStart.getTime() - localStart.getTimezoneOffset() * 60000);
-
-    let localEnd = new Date(localStart);
-    if (selectedDuration.includes("h")) {
-      const parts = selectedDuration.split("h");
-      const h = parseInt(parts[0]);
-      const m = parts[1] ? parseInt(parts[1]) : 0;
-      localEnd.setHours(localEnd.getHours() + h);
-      localEnd.setMinutes(localEnd.getMinutes() + m);
+    const cachedBookings = getCachedBookings(selectedDate);
+    if (cachedBookings) {
+      const slots = findAvailableSlots(selectedDate, cachedBookings);
+      setBookings(cachedBookings);
+      setAvailableSlots(slots);
+      
+      if (slots.length === 0) {
+        setError("No available slots for this date");
+      }
+      setLoading(false);
     } else {
-      localEnd.setMinutes(localEnd.getMinutes() + parseInt(selectedDuration));
+      // Subscribe to updates for this month
+      const unsubscribe = subscribeToMonth(selectedDate, (monthData) => {
+        const dateBookings = monthData.get(DateTime.fromJSDate(selectedDate)
+          .setZone("Europe/Berlin")
+          .toFormat('yyyy-MM-dd')) || [];
+        
+        const slots = findAvailableSlots(selectedDate, dateBookings);
+        setBookings(dateBookings);
+        setAvailableSlots(slots);
+        
+        if (slots.length === 0) {
+          setError("No available slots for this date");
+        }
+        setLoading(false);
+      });
+
+      return () => unsubscribe();
     }
 
-    const endUTC = new Date(localEnd.getTime() - localEnd.getTimezoneOffset() * 60000);
+    // Reset selections
+    setSelectedSlot(null);
+    setSelectedDuration(null);
+    setDurations([]);
+  }, [selectedDate, roomId]);
+
+  // Update durations when slot is selected
+  useEffect(() => {
+    if (!selectedSlot || !selectedDate) return;
+    
+    const slotDate = new Date(selectedDate);
+    const [hours, minutes] = selectedSlot.split(":").map(Number);
+    slotDate.setHours(hours, minutes, 0, 0);
+    
+    const availableDurations = getAvailableDurations(slotDate, bookings, selectedDate);
+    setDurations(availableDurations);
+    setSelectedDuration(null);
+  }, [selectedSlot, selectedDate, bookings]);
+
+  // Quick filter for DatePicker - only checks basic rules
+  const filterDate = useCallback((date) => {
+    if (!hasTimeSlots(date)) return false;
+    
+    const cachedBookings = getCachedBookings(date);
+    if (cachedBookings) {
+      return !isDateFullyBooked(date, cachedBookings);
+    }
+    
+    // If no cache yet, allow the date and we'll check when selected
+    return true;
+  }, []);
+
+    const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedDate || !selectedSlot || !selectedDuration) return;
 
     try {
+      setLoading(true);
+      setError(null);
+
+      // Create start date in office timezone
+      const [hours, minutes] = selectedSlot.split(":").map(Number);
+      const startLocal = DateTime.fromJSDate(selectedDate)
+        .setZone("Europe/Berlin")
+        .set({ hour: hours, minute: minutes });
+
+      // Calculate end time
+      const endLocal = startLocal.plus({ minutes: selectedDuration.minutes });
+
+      // Convert to UTC for API
+      const startUTC = toUTCString(startLocal);
+      const endUTC = toUTCString(endLocal);
+
       const newBooking = await authFetch("/api/bookings/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           room: roomId,
-          start_time: startUTC.toISOString(),
-          end_time: endUTC.toISOString(),
+          start_time: startUTC,
+          end_time: endUTC,
         }),
       });
 
-      // Call parent callback to update BookingList
-      // After successful POST
       if (onBookingCreated) onBookingCreated(newBooking);
-      if (onClose) onClose(); // close form
-;
+      if (onClose) onClose();
 
       // Reset form
       setSelectedDate(null);
-      setStartTime("");
-      setSelectedDuration("");
-      setAvailableStartTimes([]);
-      setDurationOptions([]);
-      setErrorMessages([]);
+      setSelectedSlot(null);
+      setSelectedDuration(null);
+      setAvailableSlots([]);
+      setDurations([]);
+      setError(null);
     } catch (err) {
-      const collectedErrors = [];
-      if (err.general) collectedErrors.push(...err.general);
-      ["start_time", "end_time", "room", "user", "non_field_errors"].forEach((key) => {
-        if (err[key]) {
-          collectedErrors.push(
-            `${key}: ${Array.isArray(err[key]) ? err[key].join(", ") : err[key]}`
-          );
-        }
-      });
-      if (collectedErrors.length === 0) collectedErrors.push(err.message || "Unexpected error");
-      setErrorMessages(collectedErrors);
+      const errorMessage = err.general 
+        ? err.general.join(", ") 
+        : err.message || "Failed to create booking";
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="p-4 border rounded shadow bg-white max-w-md mx-auto">
-      {errorMessages.length > 0 && (
+      {error && (
         <div className="bg-red-500 text-white p-2 rounded mb-4 text-sm">
-          {errorMessages.map((msg, i) => (
-            <p key={i}>{msg}</p>
-          ))}
+          {error}
         </div>
       )}
 
@@ -210,41 +176,53 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
         <DatePicker
           selected={selectedDate}
           onChange={setSelectedDate}
+          filterDate={filterDate}
           dateFormat="dd.MM.yyyy"
           className="w-full border rounded px-2 py-1 text-sm"
           placeholderText="Select date"
           minDate={minDate}
           maxDate={maxDate}
+          disabled={loading}
         />
       </div>
 
-      {availableStartTimes.length > 0 && (
+      {availableSlots.length > 0 && (
         <div className="mb-3">
           <label className="block text-sm font-medium mb-1">Start Time</label>
           <select
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
+            value={selectedSlot || ""}
+            onChange={(e) => setSelectedSlot(e.target.value)}
             className="w-full border rounded px-2 py-1 text-sm"
+            disabled={loading}
           >
-            <option value="" disabled hidden>Select start time</option>
-            {availableStartTimes.map((t) => (
-              <option key={t} value={t}>{t}</option>
+            <option value="" disabled>Select start time</option>
+            {availableSlots.map((slot) => (
+              <option key={formatSlot(slot)} value={formatSlot(slot)}>
+                {formatSlot(slot)}
+              </option>
             ))}
           </select>
         </div>
       )}
 
-      {durationOptions.length > 0 && (
+      {durations.length > 0 && (
         <div className="mb-3">
           <label className="block text-sm font-medium mb-1">Duration</label>
           <select
-            value={selectedDuration}
-            onChange={(e) => setSelectedDuration(e.target.value)}
+            value={selectedDuration ? selectedDuration.minutes : ""}
+            onChange={(e) => {
+              const minutes = parseInt(e.target.value);
+              const duration = durations.find(d => d.minutes === minutes);
+              setSelectedDuration(duration);
+            }}
             className="w-full border rounded px-2 py-1 text-sm"
+            disabled={loading}
           >
-            <option value="" disabled hidden>Select duration</option>
-            {durationOptions.map((d) => (
-              <option key={d} value={d}>{d}</option>
+            <option value="" disabled>Select duration</option>
+            {durations.map((duration) => (
+              <option key={duration.minutes} value={duration.minutes}>
+                {duration.label}
+              </option>
             ))}
           </select>
         </div>
@@ -252,13 +230,14 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
 
       <button
         type="submit"
-        disabled={!selectedDate || !startTime || !selectedDuration}
-        className={`w-full px-4 py-2 rounded transition ${!selectedDate || !startTime || !selectedDuration
+        disabled={!selectedDate || !selectedSlot || !selectedDuration || loading}
+        className={`w-full px-4 py-2 rounded transition relative ${
+          !selectedDate || !selectedSlot || !selectedDuration || loading
             ? "bg-gray-400 text-gray-700 cursor-not-allowed"
             : "bg-blue-500 text-white hover:bg-blue-600"
-          }`}
+        }`}
       >
-        Book
+        {loading ? "Booking..." : "Book"}
       </button>
     </form>
   );
