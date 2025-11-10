@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { useAuth } from "../../context/AuthContext";
-import BookingList from "../../components/BookingList";
-import RoomList from "../../components/RoomList";
+import { useAuth } from "../context/AuthContext";
+import { error as logError } from "../utils/logger";
+import BookingList from "../components/BookingList";
+import RoomList from "../components/RoomList";
 
 export default function Home() {
     const { authFetch, logout, isAuthenticated, loading, user } = useAuth();
@@ -21,8 +22,8 @@ export default function Home() {
                 setRooms(roomsData);
                 const bookingsData = await authFetch("/api/bookings/");
                 setBookings(bookingsData);
-            } catch (err) {
-                console.error("Error fetching data:", err);
+                } catch (err) {
+                logError("Error fetching data:", err);
             }
         };
 
@@ -30,12 +31,14 @@ export default function Home() {
     }, [authFetch, isAuthenticated]);
 
     // Called when a new booking is created
-    const handleBookingCreated = (newBooking) => {
-        // Add to global bookings list
-        setBookings((prev) => [...prev, newBooking]);
-        // NOTE: Intentionally do NOT mutate `rooms` here. BookingList is the
-        // single source of truth for showing bookings. Keeping room-level
-        // bookings in sync caused duplication and inconsistent rendering.
+    const handleBookingCreated = async () => {
+        try {
+            // Fetch fresh bookings data to ensure we have room names and all fields
+            const bookingsData = await authFetch("/api/bookings/");
+            setBookings(bookingsData);
+        } catch (err) {
+            logError("Error refreshing bookings:", err);
+        }
     };
 
     return (
@@ -71,7 +74,7 @@ export default function Home() {
                                     Your Bookings
                                 </h2>
                                 {bookings.length > 0 ? (
-                                    <BookingList bookings={bookings} />
+                                    <BookingList bookings={bookings} authFetch={authFetch} onRefresh={handleBookingCreated} />
                                 ) : (
                                     <p className="text-gray-600">No bookings found.</p>
                                 )}

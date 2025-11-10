@@ -95,9 +95,5 @@ for _ in range(booking_count):
             end_time=end_time
         )
     except Exception as e:
-        print(f"Skipping booking due to error: {e}")
+        pass
 
-print("✅ Superuser, rooms, users, and bookings created successfully.")
-print("Users login info:")
-for u in users:
-    print(f"Username: {u.username}, Password: 123456")

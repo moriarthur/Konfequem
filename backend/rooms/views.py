@@ -65,14 +65,3 @@ class CurrentUserView(APIView):
             "email": user.email,
             "first_name": user.first_name,
         })
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_user(request):
-    user = request.user
-    return Response({
-        "id": user.id,
-        "username": user.username,
-        "email": user.email
-    })

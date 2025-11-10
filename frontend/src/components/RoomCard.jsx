@@ -6,7 +6,6 @@ export default function RoomCard({
   isActive,
   onToggleBookingForm,
   onBook,
-  errors,
 }) {
   return (
     <div className="bg-white shadow-md rounded-lg p-6">

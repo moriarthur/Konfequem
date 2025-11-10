@@ -4,7 +4,7 @@ import { ChevronDownIcon } from "@heroicons/react/24/outline";
 
 export default function RoomList({ rooms, onBook }) {
   const [expandedRoom, setExpandedRoom] = useState(null);
-  const [fadeIn, setFadeIn] = useState(true);
+  const [fadeIn] = useState(true);
 
   if (!rooms) return <p>Loading rooms...</p>;
 

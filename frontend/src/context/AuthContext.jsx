@@ -1,7 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+/*
+  The react-refresh ESLint rule (only-export-components) can warn when a file
+  exports hooks/constants alongside components which breaks Fast Refresh.
+  We moved non-component constants to `authConfig.js`. Keep this file focused
+  on the AuthProvider component and hook. Disable the rule here to avoid a
+  noisy warning in development.
+*/
+/* eslint-disable react-refresh/only-export-components */
+import { API_URL } from "./authConfig";
 
 const AuthContext = createContext();
-const API_URL = import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:8000";
 
 export function AuthProvider({ children }) {
   const [access, setAccess] = useState(localStorage.getItem("access") || null);
@@ -77,21 +85,53 @@ export function AuthProvider({ children }) {
   const fetchUser = useCallback(
     async (tokenParam) => {
       const token = tokenParam || access;
-      if (!token) return setUser(null);
+      if (!token) {
+        setUser(null);
+        return;
+      }
 
       try {
         const res = await fetch(`${API_URL}/api/users/me/`, {
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+          headers: { 
+            "Content-Type": "application/json", 
+            "Authorization": `Bearer ${token}` 
+          },
         });
-        if (!res.ok) throw new Error("Failed to fetch user");
+
+        if (res.status === 401) {
+          const newToken = await refreshAccessToken();
+          if (!newToken) {
+            setUser(null);
+            return;
+          }
+          // Retry with new token
+          const retryRes = await fetch(`${API_URL}/api/users/me/`, {
+            headers: { 
+              "Content-Type": "application/json", 
+              "Authorization": `Bearer ${newToken}` 
+            },
+          });
+          if (!retryRes.ok) throw new Error("Failed to fetch user data");
+          const data = await retryRes.json();
+          setUser(data);
+          return;
+        }
+
+        if (!res.ok) throw new Error("Failed to fetch user data");
         const data = await res.json();
         setUser(data);
       } catch (error) {
-        console.error("Error fetching user:", error);
-        setUser(null);
+        // Use centralized logger (no-op in production)
+        // import locally to avoid circular module issues during HMR
+        const { error: logError } = await import("../utils/logger");
+        logError("Error fetching user:", error);
+        // Only clear user if it's an auth error
+        if (error.message && error.message.includes("Failed to fetch user")) {
+          setUser(null);
+        }
       }
     },
-    [access]
+    [access, refreshAccessToken]
   );
 
   const login = async (username, password) => {

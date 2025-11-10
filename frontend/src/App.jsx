@@ -1,8 +1,9 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import LoginForm from "./components/LoginForm";
-import Home from "./assets/pages/Home";
+import Home from "./pages/Home";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
+import { AlertProvider } from "./context/AlertContext";
 import './index.css';
 
 // PrivateRoute проверяет авторизацию
@@ -15,20 +16,22 @@ function PrivateRoute({ children }) {
 export default function App() {
   return (
     <AuthProvider>
-      <Router future={{ v7_startTransition: true }}>
-        <Routes>
-          <Route path="/login" element={<LoginForm />} />
-          <Route
-            path="/"
-            element={
-              <PrivateRoute>
-                <Home />
-              </PrivateRoute>
-            }
-          />
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </Router>
+      <AlertProvider>
+        <Router future={{ v7_startTransition: true }}>
+          <Routes>
+            <Route path="/login" element={<LoginForm />} />
+            <Route
+              path="/"
+              element={
+                <PrivateRoute>
+                  <Home />
+                </PrivateRoute>
+              }
+            />
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </Router>
+      </AlertProvider>
     </AuthProvider>
   );
 }

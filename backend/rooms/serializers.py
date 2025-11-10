@@ -13,10 +13,11 @@ class BookingSerializer(serializers.ModelSerializer):
         read_only_fields = ['user']
         
     def to_representation(self, instance):
-        """Return times in UTC for consistency across platforms"""
+        """Convert times to Berlin timezone for consistent display"""
         ret = super().to_representation(instance)
-        ret['start_time'] = instance.start_time.astimezone(timezone.utc).isoformat()
-        ret['end_time'] = instance.end_time.astimezone(timezone.utc).isoformat()
+        berlin_tz = timezone.get_default_timezone()
+        ret['start_time'] = instance.start_time.astimezone(berlin_tz).isoformat()
+        ret['end_time'] = instance.end_time.astimezone(berlin_tz).isoformat()
         return ret
     
     def validate(self, data):
@@ -38,11 +39,14 @@ class BookingSerializer(serializers.ModelSerializer):
             if start < now:
                 errors.append("Start time cannot be in the past.")
 
-            # Convert to office timezone (Europe/Berlin) for validation
-            start_local = timezone.localtime(start, timezone=timezone.get_default_timezone())
-            end_local = timezone.localtime(end, timezone=timezone.get_default_timezone())
+            # Get Berlin timezone
+            berlin_tz = timezone.get_default_timezone()
             
-            # Office hours: 08:00 – 22:00 (in local time)
+            # Ensure times are in Berlin timezone for validation
+            start_local = start.astimezone(berlin_tz)
+            end_local = end.astimezone(berlin_tz)
+            
+            # Office hours: 08:00 – 22:00 (Berlin time)
             if start_local.hour < 8 or start_local.hour >= 22 or end_local.hour > 22 or end_local.hour < 8:
                 errors.append("Bookings must be within office hours (08:00–22:00).")
 
