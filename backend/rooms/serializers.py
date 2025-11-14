@@ -73,14 +73,6 @@ class BookingSerializer(serializers.ModelSerializer):
                 errors.append("This room is already booked for the selected time range.")
 
         # --- Company rules ---
-        user_bookings_week = Booking.objects.filter(
-            user=user,
-            start_time__gte=now,
-            start_time__lt=now + timedelta(days=7)
-        )
-        if user_bookings_week.count() >= 5 and not user.is_staff:
-            errors.append("You cannot book more than 5 times in a single week.")
-
         # Resource validation can be added here if needed in the future
 
         if errors:

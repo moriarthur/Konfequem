@@ -2,9 +2,11 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useAlert } from "../context/AlertContext";
 import { error as logError } from "../utils/logger";
-import DatePicker from "react-datepicker";
+import { DayPicker } from "react-day-picker";
 import { DateTime } from "luxon";
-import "react-datepicker/dist/react-datepicker.css";
+import { motion, AnimatePresence } from "framer-motion";
+import "react-day-picker/dist/style.css";
+import "./DayPickerStyles.css";
 import {
   OFFICE_HOURS,
   OFFICE_TIMEZONE,
@@ -28,6 +30,65 @@ import {
 export default function BookingForm({ roomId, onBookingCreated, onClose }) {
   const { authFetch } = useAuth();
   const { showAlert } = useAlert();
+  
+  // Progressive reveal animation variants
+  const progressiveRevealVariants = {
+    hidden: { 
+      opacity: 0, 
+      scale: 0.8,
+      filter: "blur(2px)"
+    },
+    visible: { 
+      opacity: 1, 
+      scale: 1,
+      filter: "blur(0px)",
+      transition: {
+        duration: 0.6,
+        ease: [0.25, 0.46, 0.45, 0.94]
+      }
+    },
+    exit: { 
+      opacity: 0, 
+      scale: 0.8,
+      filter: "blur(2px)",
+      transition: {
+        duration: 0.3,
+        ease: "easeIn"
+      }
+    }
+  };
+
+  // Container variants with stagger for Available Times
+  const containerVariants = {
+    hidden: {},
+    visible: { 
+      transition: {
+        staggerChildren: 0.03,
+        delayChildren: 0.1
+      }
+    },
+    exit: {}
+  };
+
+  // Item variants for individual time slots
+  const slotVariants = {
+    hidden: { 
+      scale: 0.85,
+      filter: "blur(1px)"
+    },
+    visible: { 
+      scale: 1,
+      filter: "blur(0px)",
+      transition: {
+        duration: 0.4,
+        ease: [0.23, 1, 0.32, 1]
+      }
+    }
+  };
+  
+  // Step-based delay for progressive reveal
+  const getStepDelay = (step) => step * 0.2;
+  
   const [selectedPeriod, setSelectedPeriod] = useState(null); // morning, afternoon, evening
   const [selectedDate, setSelectedDate] = useState(null);
   const [bookings, setBookings] = useState([]);
@@ -45,7 +106,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
   const minDate = new Date();
   const maxDate = DateTime.now().plus({ days: 90 }).toJSDate();
 
-  // Optimize DatePicker performance by caching filtered dates
+  // Optimize date filtering for DayPicker
   useEffect(() => {
     const now = DateTime.now().setZone("Europe/Berlin");
     const startDate = now.startOf('month');
@@ -55,7 +116,8 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
     let current = startDate;
     while (current <= endDate) {
       const dateStr = current.toISODate();
-      const cachedBookings = getCachedBookings(current.toJSDate());
+      const jsDate = current.toJSDate();
+      const cachedBookings = getCachedBookings(jsDate);
       
       // Basic validation
       let isValid = current >= now.startOf('day');
@@ -82,10 +144,10 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
     setFilteredDates(newFilteredDates);
   }, [bookings]);
   
-  // Optimized filter using cached results
-  const filterDate = useCallback((date) => {
+  // Filter function for DayPicker
+  const isDateDisabled = useCallback((date) => {
     const dateStr = DateTime.fromJSDate(date).toISODate();
-    return filteredDates.get(dateStr) ?? true;
+    return !(filteredDates.get(dateStr) ?? true);
   }, [filteredDates]);
 
   // Pre-fetch data for visible month
@@ -132,8 +194,8 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
         isToday ? now : null
       );
 
-  // Update UI state
-  setError(slots.length === 0 ? "No available slots for this day" : null);
+      // Update UI state
+      setError(slots.length === 0 ? "No available slots for this day" : null);
       const grouped = groupSlotsByPeriod(slots);
       setGroupedSlots(grouped);
 
@@ -157,40 +219,42 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
       return;
     }
 
-    try {
-      const startLocal = selectedSlot.start
-        .setZone(OFFICE_TIMEZONE)
-        .set({
-          year: selectedDate.getFullYear(),
-          month: selectedDate.getMonth() + 1,
-          day: selectedDate.getDate(),
-        });
+    // Final validation before submission
+    const selectedDateTime = DateTime.fromJSDate(selectedDate).setZone(OFFICE_TIMEZONE);
+    const relevantBookings = bookings.filter(booking => {
+      const bookingStart = DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE);
+      const bookingRoomId = booking.room?.id || booking.room;
+      return bookingRoomId === roomId && bookingStart.hasSame(selectedDateTime, 'day');
+    });
 
-      const endLocal = startLocal.plus({ minutes: selectedDuration.minutes });
+    // Double-check for overlaps before submission
+    for (const booking of relevantBookings) {
+      const bookingStart = DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE);
+      const bookingEnd = DateTime.fromISO(booking.end_time).setZone(OFFICE_TIMEZONE);
 
-      if (endLocal.diff(startLocal, 'minutes').minutes !== selectedDuration.minutes) {
-        setError("Selected time slot duration does not match the required duration");
+      if (selectedSlot.start < bookingEnd && selectedSlot.end > bookingStart) {
+        setError("This time slot is no longer available. Please select a different time.");
+        setSelectedSlot(null);
         return;
       }
+    }
 
-      const startTime = startLocal.toUTC().toISO();
-      const endTime = endLocal.toUTC().toISO();
-
-      const result = await authFetch("/api/bookings/", {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await authFetch("/api/bookings/", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           room: roomId,
-          start_time: startTime,
-          end_time: endTime,
+          start_time: selectedSlot.start.toISO(),
+          end_time: selectedSlot.end.toISO(),
         }),
       });
 
-      onBookingCreated(result);
-      // Close the modal first, then show a global success toast (matching LoginForm style)
-      onClose();
+      // authFetch already returns parsed JSON data
+      const newBooking = response;
+      
       // Delay slightly to ensure modal has closed before toast appears
       setTimeout(() => showAlert("Your booking was created successfully"), 50);
       setSelectedDate(null);
@@ -198,6 +262,8 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
       setSelectedDuration(null);
       setSelectedPeriod(null);
       setError(null);
+      
+      if (onBookingCreated) onBookingCreated(newBooking);
     } catch (error) {
       logError("Error creating booking:", error);
       if (error.status === 401) {
@@ -207,6 +273,8 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
       } else {
         setError(error.message || "Failed to create booking. Please try again.");
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -215,10 +283,9 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
   };
 
   return (
-    // make form vertically scrollable on small screens so DatePicker and Book button are reachable
     <form
       onSubmit={handleSubmit}
-      className="p-4 border rounded shadow bg-white max-w-md mx-auto max-h-[calc(100vh-6rem)] overflow-auto"
+      className="space-y-4"
     >
       {error && (
         <div className="bg-red-500 text-white p-2 rounded mb-4 text-sm">
@@ -239,35 +306,73 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
       )}
 
       <div className="mb-4">
-        <label className="block text-sm font-medium mb-1">Select Date</label>
-        <DatePicker
-          selected={selectedDate}
-          onChange={(date) => {
-            setSelectedDate(date);
-            setSelectedPeriod(null);
-            setSelectedDuration(null);
-            setSelectedSlot(null);
-          }}
-          filterDate={filterDate}
-          dateFormat="dd.MM.yyyy"
-          className="w-full border rounded px-2 py-1 text-sm"
-          placeholderText="Select date"
-          minDate={minDate}
-          maxDate={maxDate}
-          disabled={loading}
-        />
+        <label className="block text-sm font-medium mb-3">Select Date</label>
+        <div className="flex justify-center">
+          <DayPicker
+            mode="single"
+            selected={selectedDate}
+            onSelect={(date) => {
+              setSelectedDate(date);
+              setSelectedPeriod(null);
+              setSelectedDuration(null);
+              setSelectedSlot(null);
+            }}
+            disabled={isDateDisabled}
+            fromDate={minDate}
+            toDate={maxDate}
+            className="rdp-custom"
+            styles={{
+              caption: { color: '#1f2937' },
+              head_cell: { color: '#6b7280' },
+              nav_button: { color: '#374151' },
+              nav_button_disabled: { color: '#d1d5db' },
+              day: { color: '#374151' },
+              day_disabled: { color: '#d1d5db' },
+              day_selected: { 
+                backgroundColor: '#3b82f6', 
+                color: 'white',
+                fontWeight: 'bold'
+              },
+              day_today: { 
+                backgroundColor: '#eff6ff', 
+                color: '#1d4ed8',
+                fontWeight: 'bold'
+              }
+            }}
+          />
+        </div>
+        {selectedDate && (
+          <div className="mt-3 text-center">
+            <span className="text-sm text-gray-600">
+              Selected: {DateTime.fromJSDate(selectedDate).toFormat('dd.MM.yyyy')}
+            </span>
+          </div>
+        )}
       </div>
 
+    <AnimatePresence mode="wait">
       {selectedDate && (
-        <div className="mb-4">
+        <motion.div
+          key="time-period"
+          variants={progressiveRevealVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          transition={{ delay: getStepDelay(1) }}
+          className="mb-4"
+        >
           <label className="block text-sm font-medium mb-1">Time of Day</label>
           <div className="grid grid-cols-3 gap-2">
-            {Object.entries(TIME_PERIODS).map(([key, period]) => {
+            {Object.entries(TIME_PERIODS).map(([key, period], index) => {
               const hasAvailableSlots = groupedSlots[key] && groupedSlots[key].length > 0;
               return (
-                <button
+                <motion.button
                   key={key}
                   type="button"
+                  variants={progressiveRevealVariants}
+                  initial="hidden"
+                  animate="visible"
+                  transition={{ delay: getStepDelay(1) + index * 0.1 }}
                   onClick={() => {
                     setSelectedPeriod(key);
                     setSelectedDuration(null);
@@ -283,17 +388,32 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
                   }`}
                 >
                   {period.label}
-                </button>
+                </motion.button>
               );
             })}
           </div>
-        </div>
+        </motion.div>
       )}
+    </AnimatePresence>
 
+    <AnimatePresence mode="wait">
       {selectedDate && selectedPeriod && (
-        <div className="mb-4">
+        <motion.div
+          key="duration"
+          variants={progressiveRevealVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          transition={{ delay: getStepDelay(2) }}
+          className="mb-4"
+        >
           <label className="block text-sm font-medium mb-1">Duration</label>
-          <div className="grid grid-cols-3 gap-2">
+          <motion.div 
+            className="grid grid-cols-3 gap-2"
+            variants={progressiveRevealVariants}
+            initial="hidden"
+            animate="visible"
+          >
             {(() => {
               // Get available durations for the selected period only
               const periodSlots = groupedSlots[selectedPeriod] || [];
@@ -312,8 +432,11 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
               // Show only durations that have available slots in this period
               return (
                 <>
-                  <button
+                  <motion.button
+                    key="15min"
                     type="button"
+                    variants={progressiveRevealVariants}
+                    transition={{ delay: getStepDelay(2) + 0.1 }}
                     onClick={() => {
                       const newDuration = { minutes: 15, label: "15 min" };
                       setSelectedDuration(newDuration);
@@ -336,9 +459,12 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
                     }`}
                   >
                     15 min
-                  </button>
-                  <button
+                  </motion.button>
+                  <motion.button
+                    key="30min"
                     type="button"
+                    variants={progressiveRevealVariants}
+                    transition={{ delay: getStepDelay(2) + 0.2 }}
                     onClick={() => {
                       const newDuration = { minutes: 30, label: "30 min" };
                       setSelectedDuration(newDuration);
@@ -361,8 +487,11 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
                     }`}
                   >
                     30 min
-                  </button>
-                  <select
+                  </motion.button>
+                  <motion.select
+                    key="more-options"
+                    variants={progressiveRevealVariants}
+                    transition={{ delay: getStepDelay(2) + 0.3 }}
                     value={selectedDuration?.minutes || ""}
                     onChange={(e) => {
                       const minutes = parseInt(e.target.value);
@@ -393,87 +522,149 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
                           {duration.label}
                         </option>
                       ))}
-                  </select>
+                  </motion.select>
                 </>
               );
             })()}
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
+    </AnimatePresence>
 
+    <AnimatePresence mode="wait">
       {selectedDate && selectedPeriod && selectedDuration && (
-        <div className="mb-4">
+        <motion.div
+          key="available-times"
+          variants={progressiveRevealVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          transition={{ delay: getStepDelay(3) }}
+          className="mb-4"
+        >
           <label className="block text-sm font-medium mb-1">
             Available Times ({TIME_PERIODS[selectedPeriod].label})
           </label>
-          <div className="grid grid-cols-4 gap-2">
-            {(groupedSlots[selectedPeriod] || []).map((slot) => {
-  const formattedTime = slot.format();
-  const slotKey = `${formattedTime.start}-${formattedTime.end}`;
-  // build a potential slot with the currently selected duration
-  const potentialSlot = new TimeSlot(
-    slot.start,
-    slot.start.plus({ minutes: selectedDuration.minutes })
-  );
+          <motion.div 
+            className="grid grid-cols-4 gap-2"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            {(groupedSlots[selectedPeriod] || []).map((slot, index) => {
+              const formattedTime = slot.format();
+              const slotKey = `${formattedTime.start}-${formattedTime.end}`;
+              // build a potential slot with the currently selected duration
+              const potentialSlot = new TimeSlot(
+                slot.start,
+                slot.start.plus({ minutes: selectedDuration.minutes })
+              );
 
-  let isAvailable = true;
-  let overlapBooking = null;
+              let isAvailable = true;
+              let overlapBooking = null;
 
-  // slot too short for selected duration
-  if (slot.duration < selectedDuration.minutes) {
-    isAvailable = false;
-  }
+              // slot too short for selected duration
+              if (slot.duration < selectedDuration.minutes) {
+                isAvailable = false;
+              }
 
-  // check overlaps with existing bookings
-  for (const booking of bookings) {
-    const bookingStart = DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE);
-    const bookingEnd = DateTime.fromISO(booking.end_time).setZone(OFFICE_TIMEZONE);
+              // check overlaps with existing bookings for this room and date
+              const selectedDateTime = DateTime.fromJSDate(selectedDate).setZone(OFFICE_TIMEZONE);
+              const relevantBookings = bookings.filter(booking => {
+                const bookingStart = DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE);
+                const bookingRoomId = booking.room?.id || booking.room;
+                return bookingRoomId === roomId && bookingStart.hasSame(selectedDateTime, 'day');
+              });
 
-    if (potentialSlot.start < bookingEnd && potentialSlot.end > bookingStart) {
-      isAvailable = false;
-      overlapBooking = booking;
-      break;
-    }
-  }
+              for (const booking of relevantBookings) {
+                const bookingStart = DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE);
+                const bookingEnd = DateTime.fromISO(booking.end_time).setZone(OFFICE_TIMEZONE);
 
-  return (
-    <button
-      key={slotKey}
-      type="button"
-      onClick={() => isAvailable && setSelectedSlot(potentialSlot)}
-      disabled={!isAvailable}
-      className={`px-3 py-2 text-sm rounded ${
-        selectedSlot?.start.equals(slot.start)
-          ? "bg-blue-500 text-white"
-          : isAvailable
-            ? "bg-gray-100 hover:bg-gray-200"
-            : "bg-gray-300 text-gray-500 cursor-not-allowed"
-      }`}
-      title={!isAvailable && overlapBooking ? 
-        `Already booked: ${
-          DateTime.fromISO(overlapBooking.start_time).setZone(OFFICE_TIMEZONE).toFormat('HH:mm')
-        } - ${
-          DateTime.fromISO(overlapBooking.end_time).setZone(OFFICE_TIMEZONE).toFormat('HH:mm')
-        }` : undefined}
-    >
-      {formattedTime.start}
-    </button>
-  );
-})}
-          </div>
-        </div>
+                // Check if potential slot overlaps with existing booking
+                // Two slots overlap if: start1 < end2 AND end1 > start2
+                if (potentialSlot.start < bookingEnd && potentialSlot.end > bookingStart) {
+                  isAvailable = false;
+                  overlapBooking = booking;
+                  break;
+                }
+              }
+
+              return (
+                <motion.button
+                  key={slotKey}
+                  type="button"
+                  variants={slotVariants}
+                  onClick={() => {
+                    if (isAvailable) {
+                      setSelectedSlot(potentialSlot);
+                    }
+                  }}
+                  disabled={!isAvailable}
+                  className={`px-3 py-2 text-sm rounded transition-all ${
+                    selectedSlot?.start.equals(slot.start)
+                      ? "bg-blue-500 text-white shadow-md"
+                      : isAvailable
+                        ? "bg-gray-100 hover:bg-gray-200 hover:shadow-sm"
+                        : "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
+                  }`}
+                  title={!isAvailable && overlapBooking ? 
+                    `Already booked: ${
+                      DateTime.fromISO(overlapBooking.start_time).setZone(OFFICE_TIMEZONE).toFormat('HH:mm')
+                    } - ${
+                      DateTime.fromISO(overlapBooking.end_time).setZone(OFFICE_TIMEZONE).toFormat('HH:mm')
+                    }` : (!isAvailable ? "Time slot not available" : "Click to select this time")
+                  }
+                >
+                  <div className="flex flex-col items-center">
+                    <span className="font-medium">{formattedTime.start}</span>
+                    {!isAvailable && overlapBooking && (
+                      <span className="text-xs mt-1">Busy</span>
+                    )}
+                  </div>
+                </motion.button>
+              );
+            })}
+          </motion.div>
+        </motion.div>
       )}
+    </AnimatePresence>
 
+    <AnimatePresence mode="wait">
       {selectedDate && selectedDuration && selectedSlot && (
-        <div className="mb-4 p-3 bg-gray-50 rounded">
-          <h4 className="text-sm font-medium mb-2">Booking Summary</h4>
-          <div className="text-sm space-y-1">
-            <p>Date: {DateTime.fromJSDate(selectedDate).toFormat('dd.MM.yyyy')}</p>
-            <p>Time: {selectedSlot.format().start} - {selectedSlot.format().end}</p>
-            <p>Duration: {selectedDuration.label}</p>
-          </div>
-        </div>
+        <motion.div
+          key="booking-summary"
+          variants={progressiveRevealVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          transition={{ delay: getStepDelay(4) }}
+          className="mb-4 p-3 bg-gray-50 rounded"
+        >
+          <motion.h4 
+            className="text-sm font-medium mb-2"
+            variants={progressiveRevealVariants}
+            transition={{ delay: getStepDelay(4) + 0.1 }}
+          >
+            Booking Summary
+          </motion.h4>
+          <motion.div 
+            className="text-sm space-y-1"
+            variants={progressiveRevealVariants}
+            transition={{ delay: getStepDelay(4) + 0.2 }}
+          >
+            <motion.p variants={progressiveRevealVariants} transition={{ delay: getStepDelay(4) + 0.3 }}>
+              Date: {DateTime.fromJSDate(selectedDate).toFormat('dd.MM.yyyy')}
+            </motion.p>
+            <motion.p variants={progressiveRevealVariants} transition={{ delay: getStepDelay(4) + 0.4 }}>
+              Time: {selectedSlot.format().start} - {selectedSlot.format().end}
+            </motion.p>
+            <motion.p variants={progressiveRevealVariants} transition={{ delay: getStepDelay(4) + 0.5 }}>
+              Duration: {selectedDuration.label}
+            </motion.p>
+          </motion.div>
+        </motion.div>
       )}
+    </AnimatePresence>
 
       <button
         type="submit"
