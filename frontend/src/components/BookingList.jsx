@@ -2,6 +2,9 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import { DateTime } from "luxon";
 import { OFFICE_TIMEZONE } from "../utils/bookingUtils";
 import { useAlert } from "../context/AlertContext";
+import Card from "./ui/Card";
+import Button from "./ui/Button";
+import { Heading, Text, Subheading } from "./ui/Typography";
 
 // BookingList is a controlled component — it renders directly from the `bookings` prop
 // and does not keep its own copy. This ensures it always reflects the parent state.
@@ -36,12 +39,11 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
     
     return initialCollapsed;
   });
-  const [pendingDeletes, setPendingDeletes] = useState({});
-  const deleteTimers = useRef({});
   const [page, setPage] = useState(0);
   const pageSizeDates = 5;
   const { showAlert } = useAlert();
   const scrollPositions = useRef(new Map());
+  const [confirmCancel, setConfirmCancel] = useState(null); // { id, room_name, start_time, end_time }
 
   const handleToggleCollapse = (dateKey) => {
     // Save current scroll position before toggle
@@ -129,25 +131,28 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
     return future.sort((a, b) => new Date(a.start_time) - new Date(b.start_time))[0].id;
   }, [sortedBookings, now, activeTab]);
 
-  // Cleanup timers
+  // Cleanup effect
   useEffect(() => {
     return () => {
-      Object.values(deleteTimers.current).forEach((t) => clearTimeout(t));
-      deleteTimers.current = {};
+      // No cleanup needed
     };
   }, []);
 
   if (!bookings || bookings.length === 0) {
-    return <p className="text-gray-500">No bookings found.</p>;
+    return (
+      <Card className="text-center py-8">
+        <Text variant="muted">No bookings found.</Text>
+      </Card>
+    );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Tabs */}
-      <div className="bg-white border rounded">
+      <Card padding="p-0">
         <div className="flex">
           <button
-            className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex-1 px-6 py-4 text-sm font-medium border-b-2 transition-colors rounded-tl-2xl ${
               activeTab === 'upcoming'
                 ? 'text-blue-600 border-blue-600 bg-blue-50'
                 : 'text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50'
@@ -157,7 +162,7 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
             Upcoming ({bookings.filter(b => DateTime.fromISO(b.start_time).setZone(OFFICE_TIMEZONE) >= now).length})
           </button>
           <button
-            className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex-1 px-6 py-4 text-sm font-medium border-b-2 transition-colors rounded-tr-2xl ${
               activeTab === 'history'
                 ? 'text-blue-600 border-blue-600 bg-blue-50'
                 : 'text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50'
@@ -167,62 +172,74 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
             History ({bookings.filter(b => DateTime.fromISO(b.start_time).setZone(OFFICE_TIMEZONE) < now).length})
           </button>
         </div>
-      </div>
+      </Card>
 
       {/* Sticky sort bar */}
-      <div className="sticky top-4 bg-transparent z-40">
-        <div className="bg-white/80 backdrop-blur-sm border rounded px-3 py-2 flex items-center justify-between shadow-sm max-w-full">
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Sort:</label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="border rounded px-2 py-1 text-sm"
-            >
-              <option value="date_asc">Date (oldest first)</option>
-              <option value="date_desc">Date (newest first)</option>
-              <option value="created_asc">Added (oldest first)</option>
-              <option value="created_desc">Added (newest first)</option>
-            </select>
+      <div className="sticky top-4 z-40">
+        <Card className="bg-white/90 backdrop-blur-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Text variant="default">Sort:</Text>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="date_asc">Date (oldest first)</option>
+                <option value="date_desc">Date (newest first)</option>
+                <option value="created_asc">Added (oldest first)</option>
+                <option value="created_desc">Added (newest first)</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                disabled={page === 0}
+              >
+                Prev
+              </Button>
+              <Text variant="small" className="px-2">
+                Page {page + 1} / {totalPages}
+              </Text>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+              >
+                Next
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPage(p => Math.max(0, p - 1))}
-              disabled={page === 0}
-              className="px-2 py-1 border rounded text-sm disabled:opacity-50"
-            >Prev</button>
-            <span className="text-sm text-gray-600">Page {page + 1} / {totalPages}</span>
-            <button
-              type="button"
-              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-              disabled={page >= totalPages - 1}
-              className="px-2 py-1 border rounded text-sm disabled:opacity-50"
-            >Next</button>
-          </div>
-        </div>
+        </Card>
       </div>
 
       {/* Grouped bookings by date */}
       {filteredBookings.length === 0 ? (
-        <div className="bg-white border rounded p-8 text-center">
-          <p className="text-gray-500">
+        <Card className="text-center py-12">
+          <Text variant="muted">
             {activeTab === 'upcoming' ? 'No upcoming bookings found.' : 'No booking history found.'}
-          </p>
-        </div>
+          </Text>
+        </Card>
       ) : (
         visibleDateKeys.map(dateKey => {
           const items = grouped.get(dateKey) || [];
           const collapsed = collapsedDates.has(dateKey);
           return (
-            <div key={dateKey} className="bg-white border rounded">
+            <Card key={dateKey} padding="p-0" className="overflow-hidden">
               <div 
-                className="flex items-center justify-between px-4 py-2 border-b cursor-pointer hover:bg-gray-50"
+                className="flex items-center justify-between p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors"
                 onClick={() => handleToggleCollapse(dateKey)}
               >
                 <div>
-                  <div className="text-sm font-medium">{DateTime.fromFormat(dateKey, 'yyyy-MM-dd').setZone(OFFICE_TIMEZONE).toFormat('dd.MM.yyyy')}</div>
-                  <div className="text-xs text-gray-500">{items.length} booking{items.length !== 1 ? 's' : ''}</div>
+                  <Subheading className="text-base">
+                    {DateTime.fromFormat(dateKey, 'yyyy-MM-dd').setZone(OFFICE_TIMEZONE).toFormat('dd.MM.yyyy')}
+                  </Subheading>
+                  <Text variant="small" className="mt-1">
+                    {items.length} booking{items.length !== 1 ? 's' : ''}
+                  </Text>
                 </div>
                 <div className="flex items-center gap-2">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon" className={`w-6 h-6 text-gray-500 transform transition-transform duration-300 ${collapsed ? '' : 'rotate-180'}`}>
@@ -240,76 +257,120 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
                   {items.map(booking => {
                     if (!booking || !booking.id) return null;
                     const isNext = booking.id === nextUpcomingId;
-                    const isPending = !!pendingDeletes[booking.id];
                     return (
-                      <div key={booking.id} className={`p-3 border rounded ${isNext ? 'ring-2 ring-green-300 bg-green-50' : 'bg-white'}`}>
+                      <Card 
+                        key={booking.id} 
+                        className={`p-4 ${isNext ? 'ring-2 ring-green-300 bg-green-50 border-green-200' : ''}`}
+                        hover={false}
+                        padding="p-4"
+                        shadow=""
+                      >
                         <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <div className="text-sm font-medium">{booking.room_name || 'Unknown Room'}</div>
-                            <div className="text-xs text-gray-600">{formatTime(booking.start_time)} — {formatTime(booking.end_time)} • {DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE).toRelative()}</div>
+                          <div className="flex-1">
+                            <Subheading className="text-base mb-1">
+                              {booking.room_name || 'Unknown Room'}
+                            </Subheading>
+                            <Text variant="default">
+                              {formatTime(booking.start_time)} — {formatTime(booking.end_time)} • {DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE).toRelative()}
+                            </Text>
                           </div>
                           <div className="flex items-center gap-2">
-                            {!isPending ? (
-                              <button
-                                className="text-sm text-red-600"
-                                onClick={() => {
-                                  // start optimistic pending delete with undo timer
-                                  setPendingDeletes(pd => ({ ...pd, [booking.id]: booking }));
-                                  // start timer to perform delete after 5s
-                                  const t = setTimeout(async () => {
-                                    try {
-                                      if (!authFetch) throw new Error('authFetch not provided');
-                                      await authFetch(`/api/bookings/${booking.id}/`, { method: 'DELETE' });
-                                      setPendingDeletes(pd => {
-                                        const copy = { ...pd };
-                                        delete copy[booking.id];
-                                        return copy;
-                                      });
-                                      if (onRefresh) onRefresh();
-                                      showAlert('Booking cancelled');
-                                    } catch (err) {
-                                      // restore on error
-                                      setPendingDeletes(pd => {
-                                        const copy = { ...pd };
-                                        delete copy[booking.id];
-                                        return copy;
-                                      });
-                                      showAlert('Failed to cancel booking');
-                                    }
-                                  }, 5000);
-                                  deleteTimers.current[booking.id] = t;
-                                }}
-                              >Cancel</button>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm text-gray-500">Cancelling…</span>
-                                <button
-                                  className="text-sm text-blue-600"
-                                  onClick={() => {
-                                    // undo pending delete
-                                    const t = deleteTimers.current[booking.id];
-                                    if (t) clearTimeout(t);
-                                    delete deleteTimers.current[booking.id];
-                                    setPendingDeletes(pd => {
-                                      const copy = { ...pd };
-                                      delete copy[booking.id];
-                                      return copy;
-                                    });
-                                    showAlert('Cancellation undone');
-                                  }}
-                                >Undo</button>
-                              </div>
-                            )}
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => {
+                                setConfirmCancel({
+                                  id: booking.id,
+                                  room_name: booking.room_name || 'Unknown Room',
+                                  start_time: booking.start_time,
+                                  end_time: booking.end_time
+                                });
+                              }}
+                            >
+                              Cancel
+                            </Button>
                           </div>
                         </div>
-                      </div>
+                      </Card>
                     );
                   })}
                 </div>
               </div>
-            </div>
+            </Card>
           );
         })
+      )}
+      
+      {/* Confirmation Modal */}
+      {confirmCancel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setConfirmCancel(null)}
+          />
+          <div className="relative bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
+            <h3 className="text-lg font-medium mb-4">Cancel Booking</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to cancel this booking?
+            </p>
+            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+              <div className="space-y-2 text-sm">
+                <div className="font-medium">
+                  Room: {confirmCancel.room_name}
+                </div>
+                <div>
+                  Date: {DateTime.fromISO(confirmCancel.start_time).setZone(OFFICE_TIMEZONE).toFormat('dd.MM.yyyy')}
+                </div>
+                <div>
+                  Time: {formatTime(confirmCancel.start_time)} — {formatTime(confirmCancel.end_time)}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 transition-all duration-300 border-2 border-gray-300 rounded-xl hover:bg-green-600 hover:border-green-600 hover:text-white"
+                onClick={() => setConfirmCancel(null)}
+              >
+                Keep Booking
+              </button>
+              <button
+                className="flex-1 px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700"
+                onClick={async () => {
+                  try {
+                    if (!authFetch) throw new Error('authFetch not provided');
+                    const response = await authFetch(`/api/bookings/${confirmCancel.id}/`, { method: 'DELETE' });
+                    console.log('Delete response:', response);
+                    
+                    // Handle 204 No Content response (successful deletion)
+                    if (response === null || response === undefined || response === '') {
+                      if (onRefresh) onRefresh();
+                      showAlert('✅ Booking cancelled successfully', { type: 'success' });
+                      setConfirmCancel(null);
+                    } else {
+                      // Handle other response types
+                      if (onRefresh) onRefresh();
+                      showAlert('✅ Booking cancelled successfully', { type: 'success' });
+                      setConfirmCancel(null);
+                    }
+                  } catch (err) {
+                    console.error('Failed to cancel booking:', err);
+                    // Check if it's a JSON parse error (likely 204 response)
+                    if (err.message.includes('JSON.parse') || err.message.includes('unexpected end of data')) {
+                      // If JSON parse fails, it's probably a successful 204 response
+                      if (onRefresh) onRefresh();
+                      showAlert('✅ Booking cancelled successfully', { type: 'success' });
+                      setConfirmCancel(null);
+                    } else {
+                      showAlert('❌ Failed to cancel booking. Please try again.', { type: 'error' });
+                    }
+                  }
+                }}
+              >
+                Cancel Booking
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

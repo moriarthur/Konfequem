@@ -3,6 +3,8 @@ import { useAuth } from "../context/AuthContext";
 import { error as logError } from "../utils/logger";
 import BookingList from "../components/BookingList";
 import RoomList from "../components/RoomList";
+import Button from "../components/ui/Button";
+import { Heading, Text } from "../components/ui/Typography";
 
 export default function Home() {
     const { authFetch, logout, isAuthenticated, loading, user } = useAuth();
@@ -42,48 +44,56 @@ export default function Home() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-100 px-6 py-12 relative">
-            {loading && <p className="text-center mt-20 text-gray-600">Loading...</p>}
+        <div className="min-h-screen bg-gray-50 px-6 py-12 relative">
+            {loading && <div className="text-center mt-20"><Text variant="default">Loading...</Text></div>}
 
             {!loading && (
                 <>
-                    <header className="flex justify-between items-center mb-6">
-                        <h1 className="text-4xl font-bold text-gray-900">
-                            Welcome, {user?.first_name || user?.username} 👋
-                        </h1>
+                    <header className="flex justify-between items-center mb-8">
+                        <div>
+                            <Heading level={1} className="mb-2">
+                                Welcome, {user?.first_name || user?.username} 👋
+                            </Heading>
+                            <Text variant="large" className="text-gray-600">
+                                Manage your rooms and bookings
+                            </Text>
+                        </div>
                         {isAuthenticated && (
-                            <button
+                            <Button
+                                variant="danger"
                                 onClick={logout}
-                                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
                             >
                                 Logout
-                            </button>
+                            </Button>
                         )}
                     </header>
 
-                    <p className="text-lg text-gray-600 mb-4">
-                        Manage your rooms and bookings
-                    </p>
-
                     {isAuthenticated ? (
                         <>
-                            <RoomList rooms={rooms} onBook={handleBookingCreated} />
+                            <section className="mb-12">
+                                <Heading level={2} className="mb-6">
+                                    Available Rooms
+                                </Heading>
+                                <RoomList rooms={rooms} onBook={handleBookingCreated} />
+                            </section>
 
-                            <section className="mt-12">
-                                <h2 className="text-2xl font-semibold mb-2">
+                            <section>
+                                <Heading level={2} className="mb-6">
                                     Your Bookings
-                                </h2>
+                                </Heading>
                                 {bookings.length > 0 ? (
                                     <BookingList bookings={bookings} authFetch={authFetch} onRefresh={handleBookingCreated} />
                                 ) : (
-                                    <p className="text-gray-600">No bookings found.</p>
+                                    <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
+                                        <Text variant="muted">No bookings found.</Text>
+                                    </div>
                                 )}
                             </section>
                         </>
                     ) : (
-                        <p className="text-center text-gray-600">
-                            Please log in to see rooms and bookings.
-                        </p>
+                        <div className="text-center py-12">
+                            <Text variant="large">Please log in to see rooms and bookings.</Text>
+                        </div>
                     )}
                 </>
             )}

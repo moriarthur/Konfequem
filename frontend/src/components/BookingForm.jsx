@@ -26,6 +26,8 @@ import {
   isDayFullyBooked,
   findNextAvailableDay,
 } from "../utils/timeSlots";
+import Button from "./ui/Button";
+import { Text, Label } from "./ui/Typography";
 
 export default function BookingForm({ roomId, onBookingCreated, onClose }) {
   const { authFetch } = useAuth();
@@ -288,25 +290,29 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
       className="space-y-4"
     >
       {error && (
-        <div className="bg-red-500 text-white p-2 rounded mb-4 text-sm">
-          <p>{error}</p>
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl mb-6">
+          <Text className="font-medium">{error}</Text>
           {nextAvailableDay && (
-            <p className="mt-1">
-              Next available day: {DateTime.fromJSDate(nextAvailableDay).toFormat('dd.MM.yyyy')}
-              <button
-                type="button"
-                onClick={() => setSelectedDate(nextAvailableDay)}
-                className="ml-2 text-white underline hover:no-underline"
-              >
-                Select
-              </button>
-            </p>
+            <div className="mt-2">
+              <Text variant="small">
+                Next available day: {DateTime.fromJSDate(nextAvailableDay).toFormat('dd.MM.yyyy')}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  className="ml-2 text-red-600 hover:text-red-700"
+                  onClick={() => setSelectedDate(nextAvailableDay)}
+                >
+                  Select
+                </Button>
+              </Text>
+            </div>
           )}
         </div>
       )}
 
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-3">Select Date</label>
+      <div className="mb-6">
+        <Label>Select Date</Label>
         <div className="flex justify-center">
           <DayPicker
             mode="single"
@@ -342,10 +348,10 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
           />
         </div>
         {selectedDate && (
-          <div className="mt-3 text-center">
-            <span className="text-sm text-gray-600">
+          <div className="mt-4 text-center">
+            <Text variant="small">
               Selected: {DateTime.fromJSDate(selectedDate).toFormat('dd.MM.yyyy')}
-            </span>
+            </Text>
           </div>
         )}
       </div>
@@ -359,36 +365,28 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
           animate="visible"
           exit="exit"
           transition={{ delay: getStepDelay(1) }}
-          className="mb-4"
+          className="mb-6"
         >
-          <label className="block text-sm font-medium mb-1">Time of Day</label>
-          <div className="grid grid-cols-3 gap-2">
+          <Label>Time of Day</Label>
+          <div className="grid grid-cols-3 gap-3">
             {Object.entries(TIME_PERIODS).map(([key, period], index) => {
               const hasAvailableSlots = groupedSlots[key] && groupedSlots[key].length > 0;
               return (
-                <motion.button
+                <Button
                   key={key}
                   type="button"
-                  variants={progressiveRevealVariants}
-                  initial="hidden"
-                  animate="visible"
-                  transition={{ delay: getStepDelay(1) + index * 0.1 }}
+                  variant={!hasAvailableSlots ? "secondary" : selectedPeriod === key ? "primary" : "secondary"}
+                  size="sm"
+                  disabled={!hasAvailableSlots}
+                  className={`${!hasAvailableSlots ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : ''} ${selectedPeriod === key ? 'bg-blue-600 text-white' : ''}`}
                   onClick={() => {
                     setSelectedPeriod(key);
                     setSelectedDuration(null);
                     setSelectedSlot(null);
                   }}
-                  disabled={!hasAvailableSlots}
-                  className={`px-3 py-2 rounded text-sm ${
-                    !hasAvailableSlots 
-                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      : selectedPeriod === key
-                        ? "bg-blue-500 text-white"
-                        : "bg-gray-100 hover:bg-gray-200"
-                  }`}
                 >
                   {period.label}
-                </motion.button>
+                </Button>
               );
             })}
           </div>
@@ -405,11 +403,11 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
           animate="visible"
           exit="exit"
           transition={{ delay: getStepDelay(2) }}
-          className="mb-4"
+          className="mb-6"
         >
-          <label className="block text-sm font-medium mb-1">Duration</label>
+          <Label>Duration</Label>
           <motion.div 
-            className="grid grid-cols-3 gap-2"
+            className="grid grid-cols-3 gap-3"
             variants={progressiveRevealVariants}
             initial="hidden"
             animate="visible"
@@ -432,11 +430,13 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
               // Show only durations that have available slots in this period
               return (
                 <>
-                  <motion.button
+                  <Button
                     key="15min"
                     type="button"
-                    variants={progressiveRevealVariants}
-                    transition={{ delay: getStepDelay(2) + 0.1 }}
+                    variant={selectedDuration?.minutes === 15 ? "primary" : "secondary"}
+                    size="sm"
+                    disabled={!availableDurations.some(d => d.minutes === 15)}
+                    className={`${!availableDurations.some(d => d.minutes === 15) ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : ''} ${selectedDuration?.minutes === 15 ? 'bg-blue-600 text-white' : ''}`}
                     onClick={() => {
                       const newDuration = { minutes: 15, label: "15 min" };
                       setSelectedDuration(newDuration);
@@ -449,22 +449,16 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
                         setSelectedSlot(updatedSlot);
                       }
                     }}
-                    disabled={!availableDurations.some(d => d.minutes === 15)}
-                    className={`px-3 py-2 rounded text-sm ${
-                      !availableDurations.some(d => d.minutes === 15)
-                        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                        : selectedDuration?.minutes === 15
-                          ? "bg-blue-500 text-white"
-                          : "bg-gray-100 hover:bg-gray-200"
-                    }`}
                   >
                     15 min
-                  </motion.button>
-                  <motion.button
+                  </Button>
+                  <Button
                     key="30min"
                     type="button"
-                    variants={progressiveRevealVariants}
-                    transition={{ delay: getStepDelay(2) + 0.2 }}
+                    variant={selectedDuration?.minutes === 30 ? "primary" : "secondary"}
+                    size="sm"
+                    disabled={!availableDurations.some(d => d.minutes === 30)}
+                    className={`${!availableDurations.some(d => d.minutes === 30) ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : ''} ${selectedDuration?.minutes === 30 ? 'bg-blue-600 text-white' : ''}`}
                     onClick={() => {
                       const newDuration = { minutes: 30, label: "30 min" };
                       setSelectedDuration(newDuration);
@@ -477,21 +471,11 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
                         setSelectedSlot(updatedSlot);
                       }
                     }}
-                    disabled={!availableDurations.some(d => d.minutes === 30)}
-                    className={`px-3 py-2 rounded text-sm ${
-                      !availableDurations.some(d => d.minutes === 30)
-                        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                        : selectedDuration?.minutes === 30
-                          ? "bg-blue-500 text-white"
-                          : "bg-gray-100 hover:bg-gray-200"
-                    }`}
                   >
                     30 min
-                  </motion.button>
-                  <motion.select
+                  </Button>
+                  <select
                     key="more-options"
-                    variants={progressiveRevealVariants}
-                    transition={{ delay: getStepDelay(2) + 0.3 }}
                     value={selectedDuration?.minutes || ""}
                     onChange={(e) => {
                       const minutes = parseInt(e.target.value);
@@ -509,7 +493,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
                         }
                       }
                     }}
-                    className={`border rounded px-2 py-1 text-sm ${
+                    className={`border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                       availableDurations.filter(d => ![15, 30].includes(d.minutes)).length === 0 
                         ? "hidden" : ""
                     }`}
@@ -522,7 +506,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
                           {duration.label}
                         </option>
                       ))}
-                  </motion.select>
+                  </select>
                 </>
               );
             })()}
@@ -540,13 +524,13 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
           animate="visible"
           exit="exit"
           transition={{ delay: getStepDelay(3) }}
-          className="mb-4"
+          className="mb-6"
         >
-          <label className="block text-sm font-medium mb-1">
+          <Label>
             Available Times ({TIME_PERIODS[selectedPeriod].label})
-          </label>
+          </Label>
           <motion.div 
-            className="grid grid-cols-4 gap-2"
+            className="grid grid-cols-4 gap-3"
             variants={containerVariants}
             initial="hidden"
             animate="visible"
@@ -590,23 +574,18 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
               }
 
               return (
-                <motion.button
+                <Button
                   key={slotKey}
                   type="button"
-                  variants={slotVariants}
+                  variant={selectedSlot?.start.equals(slot.start) ? "primary" : "secondary"}
+                  size="sm"
+                  disabled={!isAvailable}
+                  className={`${!isAvailable ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60' : ''} ${selectedSlot?.start.equals(slot.start) ? 'bg-blue-600 text-white shadow-md' : ''} ${isAvailable && !selectedSlot?.start.equals(slot.start) ? 'hover:shadow-sm' : ''}`}
                   onClick={() => {
                     if (isAvailable) {
                       setSelectedSlot(potentialSlot);
                     }
                   }}
-                  disabled={!isAvailable}
-                  className={`px-3 py-2 text-sm rounded transition-all ${
-                    selectedSlot?.start.equals(slot.start)
-                      ? "bg-blue-500 text-white shadow-md"
-                      : isAvailable
-                        ? "bg-gray-100 hover:bg-gray-200 hover:shadow-sm"
-                        : "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
-                  }`}
                   title={!isAvailable && overlapBooking ? 
                     `Already booked: ${
                       DateTime.fromISO(overlapBooking.start_time).setZone(OFFICE_TIMEZONE).toFormat('HH:mm')
@@ -618,10 +597,10 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
                   <div className="flex flex-col items-center">
                     <span className="font-medium">{formattedTime.start}</span>
                     {!isAvailable && overlapBooking && (
-                      <span className="text-xs mt-1">Busy</span>
+                      <Text variant="small" className="mt-1">Busy</Text>
                     )}
                   </div>
-                </motion.button>
+                </Button>
               );
             })}
           </motion.div>
@@ -638,41 +617,35 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
           animate="visible"
           exit="exit"
           transition={{ delay: getStepDelay(4) }}
-          className="mb-4 p-3 bg-gray-50 rounded"
+          className="mb-6 p-4 bg-gray-50 rounded-xl"
         >
-          <motion.h4 
-            className="text-sm font-medium mb-2"
-            variants={progressiveRevealVariants}
-            transition={{ delay: getStepDelay(4) + 0.1 }}
-          >
+          <Text className="font-medium text-gray-900 mb-3 block">
             Booking Summary
-          </motion.h4>
-          <motion.div 
-            className="text-sm space-y-1"
-            variants={progressiveRevealVariants}
-            transition={{ delay: getStepDelay(4) + 0.2 }}
-          >
-            <motion.p variants={progressiveRevealVariants} transition={{ delay: getStepDelay(4) + 0.3 }}>
+          </Text>
+          <div className="space-y-2">
+            <Text variant="default">
               Date: {DateTime.fromJSDate(selectedDate).toFormat('dd.MM.yyyy')}
-            </motion.p>
-            <motion.p variants={progressiveRevealVariants} transition={{ delay: getStepDelay(4) + 0.4 }}>
+            </Text>
+            <Text variant="default">
               Time: {selectedSlot.format().start} - {selectedSlot.format().end}
-            </motion.p>
-            <motion.p variants={progressiveRevealVariants} transition={{ delay: getStepDelay(4) + 0.5 }}>
+            </Text>
+            <Text variant="default">
               Duration: {selectedDuration.label}
-            </motion.p>
-          </motion.div>
+            </Text>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>
 
-      <button
+      <Button
+        variant="primary"
+        size="lg"
         type="submit"
-        className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 disabled:bg-gray-400"
         disabled={!isValid() || loading}
+        className="w-full"
       >
         {loading ? "Loading..." : "Book Room"}
-      </button>
+      </Button>
     </form>
   );
 }
