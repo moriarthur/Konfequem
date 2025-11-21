@@ -5,8 +5,9 @@ import { useAlert } from "../context/AlertContext";
 import Card from "./ui/Card";
 import Button from "./ui/Button";
 import { Heading, Text, Subheading } from "./ui/Typography";
+import StatusBadge from "./StatusBadge";
 
-// BookingList is a controlled component — it renders directly from the `bookings` prop
+// BookingList is a controlled component - it renders directly from the `bookings` prop
 // and does not keep its own copy. This ensures it always reflects the parent state.
 export default function BookingList({ bookings = [], authFetch, onRefresh }) {
   const [sortBy, setSortBy] = useState('date_asc');
@@ -77,6 +78,41 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
     }
   };
 
+  // Get booking status based on time
+  const getBookingStatus = (booking) => {
+    const now = DateTime.now().setZone(OFFICE_TIMEZONE);
+    const startTime = DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE);
+    const endTime = DateTime.fromISO(booking.end_time).setZone(OFFICE_TIMEZONE);
+    
+    if (now < startTime) {
+      return 'upcoming';
+    } else if (now >= startTime && now < endTime) {
+      return 'ongoing';
+    } else {
+      return 'completed';
+    }
+  };
+
+  // Get card styling based on status
+  const getCardStyles = (status, isNext) => {
+    const baseStyles = "p-4 transition-all duration-200";
+    
+    if (isNext) {
+      return `${baseStyles} ring-2 ring-green-300 bg-green-50 border-green-200`;
+    }
+    
+    switch (status) {
+      case 'upcoming':
+        return `${baseStyles} border-blue-200 bg-blue-50`;
+      case 'ongoing':
+        return `${baseStyles} border-yellow-200 bg-yellow-50 ring-1 ring-yellow-300`;
+      case 'completed':
+        return `${baseStyles} border-gray-200 bg-gray-50`;
+      default:
+        return baseStyles;
+    }
+  };
+
   // Filter bookings by tab
   const filteredBookings = useMemo(() => {
     const now = DateTime.now().setZone(OFFICE_TIMEZONE);
@@ -92,15 +128,15 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
     const list = [...filteredBookings];
     switch (sortBy) {
       case 'date_asc':
-        return list.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+        return list.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
       case 'date_desc':
-        return list.sort((a, b) => new Date(b.start_time) - new Date(a.start_time));
+        return list.sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
       case 'created_asc':
-        return list.sort((a, b) => new Date(a.created_at || a.start_time) - new Date(b.created_at || b.start_time));
+        return list.sort((a, b) => new Date(a.created_at || a.start_time).getTime() - new Date(b.created_at || b.start_time).getTime());
       case 'created_desc':
-        return list.sort((a, b) => new Date(b.created_at || b.start_time) - new Date(a.created_at || a.start_time));
+        return list.sort((a, b) => new Date(b.created_at || b.start_time).getTime() - new Date(a.created_at || b.start_time).getTime());
       default:
-        return list.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+        return list.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
     }
   }, [filteredBookings, sortBy]);
 
@@ -257,38 +293,44 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
                   {items.map(booking => {
                     if (!booking || !booking.id) return null;
                     const isNext = booking.id === nextUpcomingId;
+                    const status = getBookingStatus(booking);
                     return (
                       <Card 
                         key={booking.id} 
-                        className={`p-4 ${isNext ? 'ring-2 ring-green-300 bg-green-50 border-green-200' : ''}`}
+                        className={getCardStyles(status, isNext)}
                         hover={false}
-                        padding="p-4"
+                        padding=""
                         shadow=""
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1">
-                            <Subheading className="text-base mb-1">
-                              {booking.room_name || 'Unknown Room'}
-                            </Subheading>
+                            <div className="flex items-center gap-2 mb-2">
+                              <Subheading className="text-base">
+                                {booking.room_name || 'Unknown Room'}
+                              </Subheading>
+                              <StatusBadge status={status} size="sm" />
+                            </div>
                             <Text variant="default">
                               {formatTime(booking.start_time)} — {formatTime(booking.end_time)} • {DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE).toRelative()}
                             </Text>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              onClick={() => {
-                                setConfirmCancel({
-                                  id: booking.id,
-                                  room_name: booking.room_name || 'Unknown Room',
-                                  start_time: booking.start_time,
-                                  end_time: booking.end_time
-                                });
-                              }}
-                            >
-                              Cancel
-                            </Button>
+                            {activeTab === 'upcoming' && (
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                onClick={() => {
+                                  setConfirmCancel({
+                                    id: booking.id,
+                                    room_name: booking.room_name || 'Unknown Room',
+                                    start_time: booking.start_time,
+                                    end_time: booking.end_time
+                                  });
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </Card>
@@ -344,12 +386,12 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
                     // Handle 204 No Content response (successful deletion)
                     if (response === null || response === undefined || response === '') {
                       if (onRefresh) onRefresh();
-                      showAlert('✅ Booking cancelled successfully', { type: 'success' });
+                      showAlert('Booking cancelled successfully', { type: 'success' });
                       setConfirmCancel(null);
                     } else {
                       // Handle other response types
                       if (onRefresh) onRefresh();
-                      showAlert('✅ Booking cancelled successfully', { type: 'success' });
+                      showAlert('Booking cancelled successfully', { type: 'success' });
                       setConfirmCancel(null);
                     }
                   } catch (err) {
@@ -358,10 +400,10 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
                     if (err.message.includes('JSON.parse') || err.message.includes('unexpected end of data')) {
                       // If JSON parse fails, it's probably a successful 204 response
                       if (onRefresh) onRefresh();
-                      showAlert('✅ Booking cancelled successfully', { type: 'success' });
+                      showAlert('Booking cancelled successfully', { type: 'success' });
                       setConfirmCancel(null);
                     } else {
-                      showAlert('❌ Failed to cancel booking. Please try again.', { type: 'error' });
+                      showAlert('Failed to cancel booking. Please try again.', { type: 'error' });
                     }
                   }
                 }}

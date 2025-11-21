@@ -31,17 +31,31 @@ export function AlertProvider({ children }) {
               ? 'bg-red-600 text-white' 
               : 'bg-green-600 text-white'
           }`} role="status" aria-live="polite">
-            {/* show SVG if available, otherwise fallback to emoji */}
-            {!useEmoji ? (
-              <img
-                src="/check-symbol.svg"
-                alt="check"
-                className="w-5 h-5 flex-shrink-0 block"
-                onError={() => setUseEmoji(true)}
-                onLoad={() => setUseEmoji(false)}
-              />
+            {/* show different icons based on alert type */}
+            {alert.type === 'error' ? (
+              !useEmoji ? (
+                <img
+                  src="/error-symbol.svg"
+                  alt="error"
+                  className="w-5 h-5 flex-shrink-0 block"
+                  onError={() => setUseEmoji(true)}
+                  onLoad={() => setUseEmoji(false)}
+                />
+              ) : (
+                <span className="w-5 h-5 inline-flex items-center justify-center flex-shrink-0">❌</span>
+              )
             ) : (
-              <span className="w-5 h-5 inline-flex items-center justify-center flex-shrink-0">✅</span>
+              !useEmoji ? (
+                <img
+                  src="/check-symbol.svg"
+                  alt="check"
+                  className="w-5 h-5 flex-shrink-0 block"
+                  onError={() => setUseEmoji(true)}
+                  onLoad={() => setUseEmoji(false)}
+                />
+              ) : (
+                <span className="w-5 h-5 inline-flex items-center justify-center flex-shrink-0">✅</span>
+              )
             )}
             <span className="break-words">{alert.message}</span>
           </div>
