@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { error as logError } from "../utils/logger";
 import BookingList from "../components/BookingList";
@@ -49,23 +50,40 @@ export default function Home() {
 
             {!loading && (
                 <>
-                    <header className="flex justify-between items-center mb-8">
-                        <div>
-                            <Heading level={1} className="mb-2">
-                                Welcome, {user?.first_name || user?.username} 👋
-                            </Heading>
-                            <Text variant="large" className="text-gray-600">
-                                Manage your rooms and bookings
-                            </Text>
+                    <header className="bg-white border border-gray-200 rounded-2xl shadow-sm px-6 py-4 mb-10">
+                        <div className="flex items-center gap-6">
+                            <Link to="/" className="flex items-center gap-3 shrink-0">
+                                <img
+                                    src="/konfequem_logo.svg"
+                                    alt="Konfequem logo"
+                                    className="w-12 h-12 rounded-xl shadow-sm"
+                                />
+                                <div className="leading-tight">
+                                    <p className="text-xs uppercase tracking-wide text-gray-500">Konfequem</p>
+                                    <span className="text-lg font-semibold text-gray-900">Workspace</span>
+                                </div>
+                            </Link>
+
+                            <div className="flex-1 text-center">
+                                <Heading level={1} className="mb-1">
+                                    {user?.first_name || user?.username}
+                                </Heading>
+                                <Text variant="large" className="text-gray-600">
+                                    Meeting Rooms Manager
+                                </Text>
+                            </div>
+
+                            <div className="shrink-0 flex justify-end">
+                                {isAuthenticated && (
+                                    <Button
+                                        variant="danger"
+                                        onClick={logout}
+                                    >
+                                        Logout
+                                    </Button>
+                                )}
+                            </div>
                         </div>
-                        {isAuthenticated && (
-                            <Button
-                                variant="danger"
-                                onClick={logout}
-                            >
-                                Logout
-                            </Button>
-                        )}
                     </header>
 
                     {isAuthenticated ? (
