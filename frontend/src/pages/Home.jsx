@@ -50,38 +50,37 @@ export default function Home() {
 
             {!loading && (
                 <>
-                    <header className="bg-white border border-gray-200 rounded-2xl shadow-sm px-6 py-4 mb-10">
-                        <div className="flex items-center gap-6">
-                            <Link to="/" className="flex items-center gap-3 shrink-0">
-                                <img
-                                    src="/konfequem_logo.svg"
-                                    alt="Konfequem logo"
-                                    className="w-12 h-12 rounded-xl shadow-sm"
-                                />
-                                <div className="leading-tight">
-                                    <p className="text-xs uppercase tracking-wide text-gray-500">Konfequem</p>
-                                    <span className="text-lg font-semibold text-gray-900">Workspace</span>
+                    <div className="flex justify-center items-center gap-3 mb-4">
+                        <span className="text-xs uppercase tracking-[0.3em] text-gray-500 select-none cursor-default">Konfequem</span>
+                        <Link to="/" className="flex-shrink-0">
+                            <img
+                                src="/konfequem_logo.svg"
+                                alt="Konfequem logo"
+                                className="w-10 h-10 select-none"
+                            />
+                        </Link>
+                        <span className="text-xs uppercase tracking-[0.3em] text-gray-500 select-none cursor-default">Workspace</span>
+                    </div>
+
+                    <header className="bg-white rounded-2xl shadow-sm px-6 py-6 mb-10">
+                        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                            <div className="flex flex-col gap-4 w-full md:flex-row md:items-center md:justify-between">
+                                <div className="flex-1 text-center md:text-left">
+                                    <Heading level={1} className="mb-1">
+                                        {user?.first_name || user?.username}
+                                    </Heading>
                                 </div>
-                            </Link>
 
-                            <div className="flex-1 text-center">
-                                <Heading level={1} className="mb-1">
-                                    {user?.first_name || user?.username}
-                                </Heading>
-                                <Text variant="large" className="text-gray-600">
-                                    Meeting Rooms Manager
-                                </Text>
-                            </div>
-
-                            <div className="shrink-0 flex justify-end">
-                                {isAuthenticated && (
-                                    <Button
-                                        variant="danger"
-                                        onClick={logout}
-                                    >
-                                        Logout
-                                    </Button>
-                                )}
+                                <div className="flex justify-center md:justify-end">
+                                    {isAuthenticated && (
+                                        <Button
+                                            variant="danger"
+                                            onClick={logout}
+                                        >
+                                            Logout
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </header>

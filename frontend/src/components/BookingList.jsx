@@ -10,7 +10,8 @@ import StatusBadge from "./StatusBadge";
 // BookingList is a controlled component - it renders directly from the `bookings` prop
 // and does not keep its own copy. This ensures it always reflects the parent state.
 export default function BookingList({ bookings = [], authFetch, onRefresh }) {
-  const [sortBy, setSortBy] = useState('date_asc');
+  const [sortByUpcoming, setSortByUpcoming] = useState('date_asc');
+  const [sortByHistory, setSortByHistory] = useState('date_desc');
   const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming' or 'history'
   const [collapsedDates, setCollapsedDates] = useState(() => {
     const initialCollapsed = new Set();
@@ -126,6 +127,7 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
   // Sorting logic
   const sortedBookings = useMemo(() => {
     const list = [...filteredBookings];
+    const sortBy = activeTab === 'history' ? sortByHistory : sortByUpcoming;
     switch (sortBy) {
       case 'date_asc':
         return list.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
@@ -138,7 +140,7 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
       default:
         return list.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
     }
-  }, [filteredBookings, sortBy]);
+  }, [filteredBookings, sortByUpcoming, sortByHistory, activeTab]);
 
   // Group bookings by date
   const grouped = useMemo(() => {
@@ -217,8 +219,11 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
             <div className="flex items-center gap-3">
               <Text variant="default">Sort:</Text>
               <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
+                value={activeTab === 'history' ? sortByHistory : sortByUpcoming}
+                onChange={(e) => {
+                  if (activeTab === 'history') setSortByHistory(e.target.value);
+                  else setSortByUpcoming(e.target.value);
+                }}
                 className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="date_asc">Date (oldest first)</option>
