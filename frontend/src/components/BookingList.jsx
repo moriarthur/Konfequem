@@ -187,23 +187,23 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
   return (
     <div className="space-y-6">
       {/* Tabs */}
-      <Card padding="p-0">
-        <div className="flex">
+      <Card padding="p-0" className="border border-border-subtle shadow-soft">
+        <div className="flex rounded-2xl overflow-hidden">
           <button
-            className={`flex-1 px-6 py-4 text-sm font-medium border-b-2 transition-colors rounded-tl-2xl ${
+            className={`flex-1 px-6 py-4 text-sm font-medium border-b-2 transition-colors first:rounded-l-2xl ${
               activeTab === 'upcoming'
-                ? 'text-blue-600 border-blue-600 bg-blue-50'
-                : 'text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50'
+                ? 'text-accent-primary border-accent-primary bg-accent-primary/10'
+                : 'text-accent-secondary/60 border-transparent hover:text-accent-secondary hover:bg-surface-muted'
             }`}
             onClick={() => setActiveTab('upcoming')}
           >
             Upcoming ({bookings.filter(b => DateTime.fromISO(b.start_time).setZone(OFFICE_TIMEZONE) >= now).length})
           </button>
           <button
-            className={`flex-1 px-6 py-4 text-sm font-medium border-b-2 transition-colors rounded-tr-2xl ${
+            className={`flex-1 px-6 py-4 text-sm font-medium border-b-2 transition-colors last:rounded-r-2xl ${
               activeTab === 'history'
-                ? 'text-blue-600 border-blue-600 bg-blue-50'
-                : 'text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50'
+                ? 'text-accent-primary border-accent-primary bg-accent-primary/10'
+                : 'text-accent-secondary/60 border-transparent hover:text-accent-secondary hover:bg-surface-muted'
             }`}
             onClick={() => setActiveTab('history')}
           >
@@ -214,7 +214,7 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
 
       {/* Sticky sort bar */}
       <div className="sticky top-4 z-40">
-        <Card className="bg-white/90 backdrop-blur-sm">
+        <Card className="bg-surface-base/95 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Text variant="default">Sort:</Text>
@@ -224,7 +224,7 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
                   if (activeTab === 'history') setSortByHistory(e.target.value);
                   else setSortByUpcoming(e.target.value);
                 }}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="border border-border-subtle rounded-xl px-3 py-2 text-sm bg-surface-base text-accent-secondary focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary"
               >
                 <option value="date_asc">Date (oldest first)</option>
                 <option value="date_desc">Date (newest first)</option>
@@ -259,7 +259,7 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
 
       {/* Grouped bookings by date */}
       {filteredBookings.length === 0 ? (
-        <Card className="text-center py-12">
+        <Card className="text-center py-12 border border-border-subtle">
           <Text variant="muted">
             {activeTab === 'upcoming' ? 'No upcoming bookings found.' : 'No booking history found.'}
           </Text>
@@ -269,9 +269,9 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
           const items = grouped.get(dateKey) || [];
           const collapsed = collapsedDates.has(dateKey);
           return (
-            <Card key={dateKey} padding="p-0" className="overflow-hidden">
+            <Card key={dateKey} padding="p-0" className="overflow-hidden border border-border-subtle">
               <div 
-                className="flex items-center justify-between p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-between p-4 border-b border-border-subtle cursor-pointer hover:bg-surface-muted transition-colors"
                 onClick={() => handleToggleCollapse(dateKey)}
               >
                 <div>
@@ -355,12 +355,12 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
             className="absolute inset-0 bg-black/40"
             onClick={() => setConfirmCancel(null)}
           />
-          <div className="relative bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
+          <div className="relative bg-surface-base border border-border-subtle rounded-2xl shadow-soft p-6 max-w-md w-full">
             <h3 className="text-lg font-medium mb-4">Cancel Booking</h3>
-            <p className="text-gray-600 mb-6">
+            <p className="text-accent-secondary/70 mb-6">
               Are you sure you want to cancel this booking?
             </p>
-            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+            <div className="bg-surface-muted rounded-xl p-4 mb-6">
               <div className="space-y-2 text-sm">
                 <div className="font-medium">
                   Room: {confirmCancel.room_name}
@@ -374,14 +374,16 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
               </div>
             </div>
             <div className="flex gap-3">
-              <button
-                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 transition-all duration-300 border-2 border-gray-300 rounded-xl hover:bg-green-600 hover:border-green-600 hover:text-white"
+              <Button
+                variant="secondary"
+                className="flex-1"
                 onClick={() => setConfirmCancel(null)}
               >
                 Keep Booking
-              </button>
-              <button
-                className="flex-1 px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700"
+              </Button>
+              <Button
+                variant="danger"
+                className="flex-1"
                 onClick={async () => {
                   try {
                     if (!authFetch) throw new Error('authFetch not provided');
@@ -414,7 +416,7 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
                 }}
               >
                 Cancel Booking
-              </button>
+              </Button>
             </div>
           </div>
         </div>

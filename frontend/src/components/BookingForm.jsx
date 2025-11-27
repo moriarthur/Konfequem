@@ -104,15 +104,15 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
   // removed unused states: showExtendedDurations, datePickerLoading
   const [filteredDates, setFilteredDates] = useState(new Map());
 
-  // Calculate date limits
-  const minDate = new Date();
-  const maxDate = DateTime.now().plus({ days: 90 }).toJSDate();
+  // Calculate date limits (persist for session)
+  const [minDate] = useState(() => DateTime.now().setZone(OFFICE_TIMEZONE).startOf('day').toJSDate());
+  const [maxDate] = useState(() => DateTime.now().setZone(OFFICE_TIMEZONE).plus({ months: 6 }).endOf('day').toJSDate());
 
   // Optimize date filtering for DayPicker
   useEffect(() => {
-    const now = DateTime.now().setZone("Europe/Berlin");
-    const startDate = now.startOf('month');
-    const endDate = now.plus({ months: 3 }).endOf('month');
+    const now = DateTime.now().setZone(OFFICE_TIMEZONE);
+    const startDate = DateTime.fromJSDate(minDate).setZone(OFFICE_TIMEZONE).startOf('month');
+    const endDate = DateTime.fromJSDate(maxDate).setZone(OFFICE_TIMEZONE).endOf('month');
     const newFilteredDates = new Map();
     
     let current = startDate;
@@ -144,13 +144,20 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
     }
     
     setFilteredDates(newFilteredDates);
-  }, [bookings]);
-  
+  }, [bookings, minDate, maxDate]);
+
   // Filter function for DayPicker
-  const isDateDisabled = useCallback((date) => {
-    const dateStr = DateTime.fromJSDate(date).toISODate();
-    return !(filteredDates.get(dateStr) ?? true);
+  const isDateDisabledInternal = useCallback((date) => {
+    const dateKey = DateTime.fromJSDate(date).setZone(OFFICE_TIMEZONE).toISODate();
+    return !(filteredDates.get(dateKey) ?? true);
   }, [filteredDates]);
+
+  const isDateDisabled = useCallback((date) => {
+    if (date < minDate || date > maxDate) {
+      return true;
+    }
+    return isDateDisabledInternal(date);
+  }, [minDate, maxDate, isDateDisabledInternal]);
 
   // Pre-fetch data for visible month
   useEffect(() => {
@@ -188,19 +195,15 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
 
       const isToday = now.hasSame(selectedDateTime, 'day');
 
-      // Get all available slots for the selected date
       const slots = getAvailableSlots(
         selectedDateTime,
         cachedBookings,
-        15, // minimum duration
+        15,
         isToday ? now : null
       );
 
-      // Update UI state
       setError(slots.length === 0 ? "No available slots for this day" : null);
-      const grouped = groupSlotsByPeriod(slots);
-      setGroupedSlots(grouped);
-
+      setGroupedSlots(groupSlotsByPeriod(slots));
       setBookings(cachedBookings);
       setLoading(false);
     } else {
@@ -436,7 +439,6 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
                     variant={selectedDuration?.minutes === 15 ? "primary" : "secondary"}
                     size="sm"
                     disabled={!availableDurations.some(d => d.minutes === 15)}
-                    className={`${!availableDurations.some(d => d.minutes === 15) ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : ''} ${selectedDuration?.minutes === 15 ? 'bg-blue-600 text-white' : ''}`}
                     onClick={() => {
                       const newDuration = { minutes: 15, label: "15 min" };
                       setSelectedDuration(newDuration);
@@ -458,7 +460,6 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
                     variant={selectedDuration?.minutes === 30 ? "primary" : "secondary"}
                     size="sm"
                     disabled={!availableDurations.some(d => d.minutes === 30)}
-                    className={`${!availableDurations.some(d => d.minutes === 30) ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : ''} ${selectedDuration?.minutes === 30 ? 'bg-blue-600 text-white' : ''}`}
                     onClick={() => {
                       const newDuration = { minutes: 30, label: "30 min" };
                       setSelectedDuration(newDuration);
@@ -617,9 +618,9 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
           animate="visible"
           exit="exit"
           transition={{ delay: getStepDelay(4) }}
-          className="mb-6 p-4 bg-gray-50 rounded-xl"
+          className="mb-6 p-4 bg-surface-muted rounded-xl"
         >
-          <Text className="font-medium text-gray-900 mb-3 block">
+          <Text className="font-medium text-accent-secondary mb-3 block">
             Booking Summary
           </Text>
           <div className="space-y-2">

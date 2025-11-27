@@ -6,14 +6,15 @@ export default function Badge({
   size = 'md', 
   className = '' 
 }) {
-  const baseClasses = 'inline-flex items-center font-medium rounded-full';
+  const baseClasses = 'inline-flex items-center font-medium rounded-pill border';
   
   const variants = {
-    default: 'bg-blue-100 text-blue-800',
-    success: 'bg-green-100 text-green-800',
-    warning: 'bg-yellow-100 text-yellow-800',
-    danger: 'bg-red-100 text-red-800',
-    gray: 'bg-gray-100 text-gray-800',
+    default: 'bg-status-neutral-soft text-status-neutral-text border-status-neutral-border',
+    success: 'bg-status-success-soft text-status-success-text border-status-success-border',
+    warning: 'bg-status-warning-soft text-status-warning-text border-status-warning-border',
+    danger: 'bg-status-danger-soft text-status-danger-text border-status-danger-border',
+    info: 'bg-status-info-soft text-status-info-text border-status-info-border',
+    gray: 'bg-status-neutral-soft text-status-neutral-text border-status-neutral-border',
   };
   
   const sizes = {

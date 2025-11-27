@@ -112,30 +112,29 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    <div className="relative min-h-screen flex items-center justify-center bg-surface-muted p-4">
       {/* Toast message */}
       {toast && (
         <div
           key={toast}
-          className="fixed top-6 left-1/2 transform -translate-x-1/2 bg-[#61b390]  text-white px-6 py-3 rounded-xl shadow-lg text-sm font-medium backdrop-blur-sm z-50
-    opacity-0 animate-fadeInOut"
+          className="fixed top-6 left-1/2 -translate-x-1/2 bg-status-info-soft text-status-info-text border border-status-info-border px-6 py-3 rounded-2xl shadow-soft text-sm font-medium backdrop-blur-sm z-50 opacity-0 animate-fadeInOut"
         >
           {toast}
         </div>
       )}
 
-      <div className="w-full max-w-sm p-8 rounded-2xl bg-white shadow-xl border border-gray-200">
+      <div className="w-full max-w-sm p-8 rounded-2xl bg-surface-base shadow-soft border border-border-subtle">
         <div className="flex justify-center mb-6">
           <img src="konfequem.svg" alt="Konfequem Logo" className="h-16 w-auto" />
         </div>
 
         {errors.general && (
-          <p className="text-red-500 text-center mb-4 font-medium">{errors.general}</p>
+          <p className="text-status-danger-text text-center mb-4 font-medium">{errors.general}</p>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-accent-secondary mb-1">
               Username
             </label>
             <input
@@ -145,18 +144,18 @@ export default function LoginForm() {
               onChange={(e) => setUsername(e.target.value)}
               onBlur={() => handleBlur("username")}
               placeholder="Your username"
-              className={`w-full px-4 py-3 rounded-xl border transition focus:ring-2 focus:outline-none ${touched.username && errors.username
-                  ? "border-red-500 focus:ring-red-300"
-                  : "border-gray-300 focus:ring-blue-500"
+              className={`w-full px-4 py-3 rounded-xl border transition focus:ring-2 focus:outline-none focus:ring-offset-2 bg-surface-base ${touched.username && errors.username
+                  ? "border-status-danger-border focus:ring-status-danger/40"
+                  : "border-border-subtle text-accent-secondary focus:ring-accent-primary/40"
                 }`}
             />
             {touched.username && errors.username && (
-              <p className="text-red-500 text-sm mt-1">{errors.username}</p>
+              <p className="text-status-danger-text text-sm mt-1">{errors.username}</p>
             )}
           </div>
 
           <div className="relative">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-accent-secondary mb-1">
               Password
             </label>
             <input
@@ -166,38 +165,38 @@ export default function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               onBlur={() => handleBlur("password")}
               placeholder="••••••••"
-              className={`w-full px-4 py-3 rounded-xl border transition focus:ring-2 focus:outline-none ${touched.password && errors.password
-                  ? "border-red-500 focus:ring-red-300"
-                  : "border-gray-300 focus:ring-blue-500"
+              className={`w-full px-4 py-3 rounded-xl border transition focus:ring-2 focus:outline-none focus:ring-offset-2 bg-surface-base ${touched.password && errors.password
+                  ? "border-status-danger-border focus:ring-status-danger/40"
+                  : "border-border-subtle text-accent-secondary focus:ring-accent-primary/40"
                 }`}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-5 top-10 text-gray-500 hover:text-gray-700"
+              className="absolute right-5 top-10 text-accent-secondary/60 hover:text-accent-secondary"
             >
               {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
             </button>
             {touched.password && errors.password && (
-              <p className="text-red-500 text-sm mt-1">{errors.password}</p>
+              <p className="text-status-danger-text text-sm mt-1">{errors.password}</p>
             )}
           </div>
 
           <button
             type="submit"
             disabled={!isFormValid || submitting}
-            className={`w-full text-white font-medium py-3 rounded-xl shadow-md transition transform hover:scale-[1.02] ${isFormValid && !submitting
-                ? "bg-blue-600 hover:bg-blue-700"
-                : "bg-gray-400 cursor-not-allowed"
+            className={`w-full font-medium py-3 rounded-xl shadow-soft transition transform hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-base ${isFormValid && !submitting
+                ? "bg-accent-primary text-white hover:bg-accent-primary/90"
+                : "bg-border-subtle text-white/70 cursor-not-allowed"
               }`}
           >
             {submitting ? "Signing In..." : "Sign In"}
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-500 mt-6">
+        <p className="text-center text-sm text-accent-secondary/60 mt-6">
           Don’t have an account?{" "}
-          <a href="#" onClick={handleSignUpClick} className="text-blue-600 hover:underline">
+          <a href="#" onClick={handleSignUpClick} className="text-accent-primary hover:underline">
             Sign up
           </a>
         </p>

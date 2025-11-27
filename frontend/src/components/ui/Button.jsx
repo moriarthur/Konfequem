@@ -8,13 +8,13 @@ export default function Button({
   className = '', 
   ...props 
 }) {
-  const baseClasses = 'font-medium rounded-xl transition-all duration-200 focus:outline-none focus:ring-2';
+  const baseClasses = 'font-medium rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed';
   
   const variants = {
-    primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed',
-    secondary: 'bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-gray-500 disabled:bg-gray-300 disabled:text-gray-500',
-    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 disabled:bg-gray-400 disabled:cursor-not-allowed',
-    ghost: 'text-gray-600 hover:bg-gray-100 focus:ring-gray-500',
+    primary: 'bg-accent-primary text-white hover:bg-accent-primary/90 focus:ring-accent-primary/40 focus:ring-offset-surface-base disabled:bg-border-subtle disabled:text-white/70',
+    secondary: 'bg-surface-muted text-accent-secondary hover:bg-surface-base focus:ring-border-soft/80 focus:ring-offset-surface-base disabled:bg-border-subtle disabled:text-accent-secondary/40',
+    danger: 'bg-accent-danger text-white hover:bg-accent-danger/90 focus:ring-accent-danger/40 focus:ring-offset-surface-base disabled:bg-border-subtle disabled:text-white/70',
+    ghost: 'text-accent-secondary hover:bg-surface-muted focus:ring-border-subtle focus:ring-offset-surface-base disabled:text-accent-secondary/40',
   };
   
   const sizes = {

@@ -8,13 +8,13 @@ export default function EmptyState({
   action 
 }) {
   return (
-    <div className="text-center py-12">
+    <div className="text-center px-6 py-12 bg-surface-base border border-border-subtle rounded-2xl shadow-soft">
       {icon && (
-        <div className="mx-auto h-12 w-12 text-gray-400 mb-4">
+        <div className="mx-auto h-12 w-12 text-accent-secondary/50 mb-4">
           {icon}
         </div>
       )}
-      <Text className="font-medium text-gray-900 mb-2">
+      <Text className="font-semibold text-accent-secondary mb-2">
         {title}
       </Text>
       <Text variant="muted" className="mb-6 max-w-sm mx-auto">

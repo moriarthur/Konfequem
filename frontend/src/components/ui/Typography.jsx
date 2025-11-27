@@ -1,7 +1,7 @@
 import React from 'react';
 
 export function Heading({ level = 1, children, className = '', ...props }) {
-  const baseClasses = 'font-semibold text-gray-900';
+  const baseClasses = 'font-semibold text-accent-secondary';
   
   const sizes = {
     1: 'text-4xl',
@@ -23,7 +23,7 @@ export function Heading({ level = 1, children, className = '', ...props }) {
 
 export function Subheading({ children, className = '', ...props }) {
   return (
-    <h3 className={`text-lg font-medium text-gray-900 ${className}`} {...props}>
+    <h3 className={`text-lg font-medium text-accent-secondary ${className}`} {...props}>
       {children}
     </h3>
   );
@@ -31,10 +31,10 @@ export function Subheading({ children, className = '', ...props }) {
 
 export function Text({ children, variant = 'default', className = '', ...props }) {
   const variants = {
-    default: 'text-sm text-gray-600',
-    muted: 'text-sm text-gray-500',
-    large: 'text-base text-gray-700',
-    small: 'text-xs text-gray-500',
+    default: 'text-sm text-accent-secondary/80',
+    muted: 'text-sm text-accent-secondary/60',
+    large: 'text-base text-accent-secondary',
+    small: 'text-xs text-accent-secondary/60',
   };
   
   return (
@@ -46,7 +46,7 @@ export function Text({ children, variant = 'default', className = '', ...props }
 
 export function Label({ children, className = '', ...props }) {
   return (
-    <label className={`block text-sm font-medium text-gray-700 mb-1 ${className}`} {...props}>
+    <label className={`block text-sm font-medium text-accent-secondary mb-1 ${className}`} {...props}>
       {children}
     </label>
   );

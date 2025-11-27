@@ -86,14 +86,14 @@ export default function RoomList({ rooms, onBook }) {
                     </Subheading>
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <BuildingOfficeIcon className="w-4 h-4 text-gray-400" />
+                        <BuildingOfficeIcon className="w-4 h-4 text-accent-secondary/50" />
                         <Text variant="default">
                           Capacity: {room.capacity} people
                         </Text>
                       </div>
                       {room.location && (
                         <div className="flex items-center gap-2">
-                          <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg className="w-4 h-4 text-accent-secondary/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                           </svg>
@@ -105,17 +105,17 @@ export default function RoomList({ rooms, onBook }) {
                     </div>
                   </div>
                   <ChevronDownIcon
-                    className={`w-6 h-6 text-gray-500 transform transition-transform duration-300 flex-shrink-0 ml-4 ${
+                    className={`w-6 h-6 text-accent-secondary/50 transform transition-transform duration-300 flex-shrink-0 ml-4 ${
                       expandedRoom === room.id ? "rotate-180" : ""
                     }`}
                   />
                 </div>
 
                 {room.bookings && room.bookings.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-gray-100">
+                  <div className="mt-4 pt-4 border-t border-border-subtle">
                     <div className="flex items-center gap-2 mb-3">
-                      <ClockIcon className="w-4 h-4 text-gray-400" />
-                      <Text variant="small" className="font-medium text-gray-700">
+                      <ClockIcon className="w-4 h-4 text-accent-secondary/50" />
+                      <Text variant="small" className="font-medium text-accent-secondary">
                         Current bookings ({room.bookings.length})
                       </Text>
                     </div>
@@ -125,7 +125,7 @@ export default function RoomList({ rooms, onBook }) {
                         const end = new Date(b.end_time);
                         return (
                           <div key={idx} className="flex items-center justify-between text-sm">
-                            <Text variant="small" className="text-gray-600">
+                            <Text variant="small" className="text-accent-secondary/80">
                               {start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} –{" "}
                               {end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                             </Text>
@@ -136,7 +136,7 @@ export default function RoomList({ rooms, onBook }) {
                         );
                       })}
                       {room.bookings.length > 3 && (
-                        <Text variant="small" className="text-gray-500 italic">
+                        <Text variant="small" className="text-accent-secondary/60 italic">
                           +{room.bookings.length - 3} more booking{room.bookings.length - 3 > 1 ? 's' : ''}
                         </Text>
                       )}
