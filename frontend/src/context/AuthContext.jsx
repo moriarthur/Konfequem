@@ -152,7 +152,11 @@ export function AuthProvider({ children }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
-    } catch { throw new Error("Network error. Please try again."); }
+    } catch {
+      const networkError = new Error("Network error. Please try again.");
+      networkError.status = "network";
+      throw networkError;
+    }
 
     if (!res.ok) {
       const contentType = res.headers.get("content-type") || "";
@@ -169,7 +173,9 @@ export function AuthProvider({ children }) {
         const text = await res.text().catch(() => "");
         if (text) message = text;
       }
-      throw new Error(message);
+      const error = new Error(message);
+      error.status = res.status;
+      throw error;
     }
 
     const data = await res.json();

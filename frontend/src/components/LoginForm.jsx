@@ -1,7 +1,32 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FiEye, FiEyeOff } from "react-icons/fi";
+
+const USERNAME_REGEX = /^[a-zA-ZäöüÄÖÜß0-9._-]+$/;
+
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 30 * 1000;
+
+const validateForm = ({ username = "", password = "" }) => {
+  const nextErrors = {};
+  const trimmedUsername = username.trim();
+  const trimmedPassword = password.trim();
+
+  if (!trimmedUsername) nextErrors.username = "Username is required";
+  else if (/\s/.test(username)) nextErrors.username = "Spaces are not allowed";
+  else if (!USERNAME_REGEX.test(username))
+    nextErrors.username = "Only letters, numbers, ., _ and - are allowed";
+  else if (trimmedUsername.length < 3 || trimmedUsername.length > 20)
+    nextErrors.username = "Username must be 3-20 characters long";
+
+  if (!trimmedPassword) nextErrors.password = "Password is required";
+  else if (/\s/.test(password)) nextErrors.password = "Spaces are not allowed";
+  else if (trimmedPassword.length < 6 || trimmedPassword.length > 50)
+    nextErrors.password = "Password must be 6-50 characters long";
+
+  return nextErrors;
+};
 
 export default function LoginForm() {
   const { login } = useAuth();
@@ -9,92 +34,146 @@ export default function LoginForm() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({ username: false, password: false });
+  const [generalError, setGeneralError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [capsLockOn, setCapsLockOn] = useState(false);
 
   const [toast, setToast] = useState(""); // <-- toast state
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutUntil, setLockoutUntil] = useState(null);
+  const [lockoutRemaining, setLockoutRemaining] = useState(0);
 
   const usernameRef = useRef();
   const passwordRef = useRef();
 
-  const validateField = (field, value) => {
-    let error = "";
-    const trimmed = value.trim();
-
-    if (field === "username") {
-      if (!trimmed) error = "Username is required";
-      else if (/\s/.test(value)) error = "Spaces are not allowed";
-      else if (!/^[a-zA-ZäöüÄÖÜß0-9._-]+$/.test(value))
-        error = "Only letters, numbers, ., _ and - are allowed";
-      else if (trimmed.length < 3 || trimmed.length > 20)
-        error = "Username must be 3-20 characters long";
-    }
-
-    if (field === "password") {
-      if (!trimmed) error = "Password is required";
-      else if (/\s/.test(value)) error = "Spaces are not allowed";
-      else if (trimmed.length < 6 || trimmed.length > 50)
-        error = "Password must be 6-50 characters long";
-    }
-
-    return error;
-  };
-
-  useEffect(() => {
-    if (touched.username)
-      setErrors((prev) => ({
-        ...prev,
-        username: validateField("username", username),
-      }));
-  }, [username, touched.username]);
-
-  useEffect(() => {
-    if (touched.password)
-      setErrors((prev) => ({
-        ...prev,
-        password: validateField("password", password),
-      }));
-  }, [password, touched.password]);
+  const validationErrors = useMemo(
+    () => validateForm({ username, password }),
+    [username, password]
+  );
 
   const isFormValid =
-    !validateField("username", username) &&
-    !validateField("password", password) &&
     username &&
-    password;
+    password &&
+    !validationErrors.username &&
+    !validationErrors.password;
+
+  const isLockedOut = Boolean(lockoutUntil && lockoutUntil > Date.now());
 
   const handleBlur = (field) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
-    setErrors((prev) => ({
-      ...prev,
-      [field]: validateField(field, field === "username" ? username : password),
-    }));
   };
+
+  const handlePasswordBlur = () => {
+    handleBlur("password");
+    setCapsLockOn(false);
+  };
+
+  const handlePasswordKeyEvent = (event) => {
+    if (typeof event.getModifierState === "function") {
+      setCapsLockOn(event.getModifierState("CapsLock"));
+    }
+  };
+
+  useEffect(() => {
+    if (!lockoutUntil) {
+      setLockoutRemaining(0);
+      return;
+    }
+
+    const updateRemaining = () => {
+      const msLeft = lockoutUntil - Date.now();
+      if (msLeft <= 0) {
+        setLockoutUntil(null);
+        setLockoutRemaining(0);
+        setFailedAttempts(0);
+        return true;
+      }
+      setLockoutRemaining(Math.ceil(msLeft / 1000));
+      return false;
+    };
+
+    updateRemaining();
+    const interval = setInterval(() => {
+      if (updateRemaining()) clearInterval(interval);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [lockoutUntil]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setTouched({ username: true, password: true });
+    setGeneralError(null);
 
-    const usernameError = validateField("username", username);
-    const passwordError = validateField("password", password);
-    setErrors({ username: usernameError, password: passwordError });
+    if (isLockedOut) {
+      setGeneralError({
+        tone: "warning",
+        title: "Too many attempts",
+        message: `Please wait ${lockoutRemaining || Math.ceil(
+          (lockoutUntil - Date.now()) / 1000
+        )}s before trying again.`,
+      });
+      return;
+    }
 
-    if (usernameError) usernameRef.current.focus();
-    else if (passwordError) passwordRef.current.focus();
-    else {
-      try {
-        setSubmitting(true);
-        await login(username, password);
-        navigate("/");
-      } catch (err) {
-        setErrors((prev) => ({
-          ...prev,
-          general: err.message || "Something went wrong",
-        }));
-      } finally {
-        setSubmitting(false);
+    if (validationErrors.username) {
+      usernameRef.current?.focus();
+      return;
+    }
+
+    if (validationErrors.password) {
+      passwordRef.current?.focus();
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await login(username, password);
+      navigate("/");
+      setFailedAttempts(0);
+      setLockoutUntil(null);
+      setLockoutRemaining(0);
+    } catch (err) {
+      const status = err?.status;
+      if (status === 401 || status === 403) {
+        const nextAttempts = failedAttempts + 1;
+        setFailedAttempts(nextAttempts);
+        if (nextAttempts >= MAX_FAILED_ATTEMPTS) {
+          const until = Date.now() + LOCKOUT_DURATION_MS;
+          setLockoutUntil(until);
+          setLockoutRemaining(Math.ceil(LOCKOUT_DURATION_MS / 1000));
+          setGeneralError({
+            tone: "warning",
+            title: "Too many attempts",
+            message: "Please wait a moment before trying again.",
+          });
+        } else {
+          setTouched({ username: true, password: true });
+          setGeneralError({
+            tone: "danger",
+            title: "Authentication failed",
+            message: err.message || "Wrong username or password.",
+          });
+          usernameRef.current?.focus();
+        }
+      } else if (status === "network") {
+        setGeneralError({
+          tone: "warning",
+          title: "Network issue",
+          message: err.message || "Please check your connection and try again.",
+        });
+      } else {
+        setGeneralError({
+          tone: "danger",
+          title: "Unexpected error",
+          message: err?.message || "Something went wrong. Try again later.",
+        });
       }
+    } finally {
+      setPassword("");
+      setSubmitting(false);
     }
   };
 
@@ -128,11 +207,32 @@ export default function LoginForm() {
           <img src="konfequem.svg" alt="Konfequem Logo" className="h-16 w-auto" />
         </div>
 
-        {errors.general && (
-          <p className="text-status-danger-text text-center mb-4 font-medium">{errors.general}</p>
+        {generalError && (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className={`flex items-start gap-3 mb-4 rounded-xl border px-4 py-3 text-sm ${
+              generalError.tone === "warning"
+                ? "bg-status-warning-soft border-status-warning-border text-status-warning-text"
+                : "bg-status-danger-soft border-status-danger-border text-status-danger-text"
+            }`}
+          >
+            <div>
+              <p className="font-semibold leading-tight">{generalError.title}</p>
+              <p className="text-sm leading-relaxed">{generalError.message}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setGeneralError(null)}
+              className="ml-auto text-current/70 hover:text-current"
+              aria-label="Dismiss alert"
+            >
+              ×
+            </button>
+          </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5" aria-busy={submitting}>
           <div>
             <label className="block text-sm font-medium text-accent-secondary mb-1">
               Username
@@ -144,13 +244,24 @@ export default function LoginForm() {
               onChange={(e) => setUsername(e.target.value)}
               onBlur={() => handleBlur("username")}
               placeholder="Your username"
-              className={`w-full px-4 py-3 rounded-xl border transition focus:ring-2 focus:outline-none focus:ring-offset-2 bg-surface-base ${touched.username && errors.username
+              autoComplete="username"
+              className={`w-full px-4 py-3 rounded-xl border transition focus:ring-2 focus:outline-none focus:ring-offset-2 bg-surface-base ${touched.username && validationErrors.username
                   ? "border-status-danger-border focus:ring-status-danger/40"
                   : "border-border-subtle text-accent-secondary focus:ring-accent-primary/40"
                 }`}
+              aria-invalid={Boolean(touched.username && validationErrors.username)}
+              aria-describedby={
+                touched.username && validationErrors.username ? "username-error" : undefined
+              }
             />
-            {touched.username && errors.username && (
-              <p className="text-status-danger-text text-sm mt-1">{errors.username}</p>
+            {touched.username && validationErrors.username && (
+              <p
+                id="username-error"
+                className="text-status-danger-text text-sm mt-1"
+                aria-live="polite"
+              >
+                {validationErrors.username}
+              </p>
             )}
           </div>
 
@@ -163,35 +274,67 @@ export default function LoginForm() {
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              onBlur={() => handleBlur("password")}
+              onBlur={handlePasswordBlur}
+              onKeyUp={handlePasswordKeyEvent}
+              onKeyDown={handlePasswordKeyEvent}
               placeholder="••••••••"
-              className={`w-full px-4 py-3 rounded-xl border transition focus:ring-2 focus:outline-none focus:ring-offset-2 bg-surface-base ${touched.password && errors.password
+              autoComplete="current-password"
+              className={`w-full px-4 py-3 rounded-xl border transition focus:ring-2 focus:outline-none focus:ring-offset-2 bg-surface-base ${touched.password && validationErrors.password
                   ? "border-status-danger-border focus:ring-status-danger/40"
                   : "border-border-subtle text-accent-secondary focus:ring-accent-primary/40"
                 }`}
+              aria-invalid={Boolean(touched.password && validationErrors.password)}
+              aria-describedby={
+                touched.password && validationErrors.password ? "password-error" : undefined
+              }
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-5 top-10 text-accent-secondary/60 hover:text-accent-secondary"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
             >
               {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
             </button>
-            {touched.password && errors.password && (
-              <p className="text-status-danger-text text-sm mt-1">{errors.password}</p>
+            {touched.password && validationErrors.password && (
+              <p
+                id="password-error"
+                className="text-status-danger-text text-sm mt-1"
+                aria-live="polite"
+              >
+                {validationErrors.password}
+              </p>
+            )}
+            {capsLockOn && (
+              <p className="mt-2 text-xs text-status-warning-text font-medium" aria-live="polite">
+                <span aria-hidden="true">⇪</span> Caps Lock is on
+              </p>
             )}
           </div>
 
           <button
             type="submit"
-            disabled={!isFormValid || submitting}
+            disabled={!isFormValid || submitting || isLockedOut}
             className={`w-full font-medium py-3 rounded-xl shadow-soft transition transform hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-base ${isFormValid && !submitting
                 ? "bg-accent-primary text-white hover:bg-accent-primary/90"
                 : "bg-border-subtle text-white/70 cursor-not-allowed"
               }`}
           >
-            {submitting ? "Signing In..." : "Sign In"}
+            {submitting ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                Signing In...
+              </span>
+            ) : (
+              "Sign In"
+            )}
           </button>
+          {isLockedOut && (
+            <p className="mt-2 text-xs text-status-warning-text" aria-live="polite">
+              Too many attempts. Please wait {lockoutRemaining}s to try again.
+            </p>
+          )}
         </form>
 
         <p className="text-center text-sm text-accent-secondary/60 mt-6">

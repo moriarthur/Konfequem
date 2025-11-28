@@ -269,7 +269,7 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
           const items = grouped.get(dateKey) || [];
           const collapsed = collapsedDates.has(dateKey);
           return (
-            <Card key={dateKey} padding="p-0" className="overflow-hidden border border-border-subtle">
+            <Card key={dateKey} padding="p-0" className="overflow-hidden border border-border-subtle booking-date-group">
               <div 
                 className="flex items-center justify-between p-4 border-b border-border-subtle cursor-pointer hover:bg-surface-muted transition-colors"
                 onClick={() => handleToggleCollapse(dateKey)}
@@ -294,7 +294,7 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
                   collapsed ? 'max-h-0' : 'max-h-96'
                 }`}
               >
-                <div className="p-4 space-y-3">
+                <div className="p-4 space-y-3 max-h-96 overflow-y-auto pr-1 date-scroll">
                   {items.map(booking => {
                     if (!booking || !booking.id) return null;
                     const isNext = booking.id === nextUpcomingId;
