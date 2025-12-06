@@ -93,7 +93,7 @@ export function getAvailableDurations(startTime, existingBookings, selectedDate)
       minutes: duration,
       label: duration < 60 
         ? `${duration} min` 
-        : `${Math.floor(duration/60)}h${duration%60 ? duration%60 : ''}`
+        : `${Math.floor(duration/60)}h${duration%60 ? ` ${duration%60}m` : ''}`
     });
     
     duration += OFFICE_HOURS.minDuration;

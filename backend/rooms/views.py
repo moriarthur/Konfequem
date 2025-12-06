@@ -3,6 +3,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from datetime import datetime
 
 from .models import Room, Booking
 from .serializers import RoomSerializer, BookingSerializer
@@ -33,7 +34,6 @@ class BookingViewSet(viewsets.ModelViewSet):
         
         if month_str:
             # Parse YYYY-MM format
-            import datetime
             try:
                 year, month = map(int, month_str.split('-'))
                 # Get all bookings for the month

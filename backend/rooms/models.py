@@ -23,6 +23,7 @@ class Booking(models.Model):
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
+    date = models.DateField()
 
     MAX_DAYS_AHEAD = 90
 
@@ -44,8 +45,6 @@ class Booking(models.Model):
             overlapping = overlapping.exclude(pk=self.pk)
         if overlapping.exists():
             raise ValidationError({'non_field_errors': "This room is already booked for the selected time range."})
-
-    date = models.DateField()
 
     def save(self, *args, **kwargs):
         if self.start_time:

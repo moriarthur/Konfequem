@@ -5,6 +5,7 @@ import { useAlert } from "../context/AlertContext";
 import { error as logError } from "../utils/logger";
 import BookingList from "../components/BookingList";
 import RoomList from "../components/RoomList";
+import AvailabilityCalendar from "../components/AvailabilityCalendar";
 import Button from "../components/ui/Button";
 import { Heading, Text } from "../components/ui/Typography";
 import { DateTime } from "luxon";
@@ -81,7 +82,7 @@ export default function Home() {
                 setRooms(roomsData);
                 const bookingsData = await authFetch("/api/bookings/");
                 setBookings(bookingsData);
-                } catch (err) {
+            } catch (err) {
                 logError("Error fetching data:", err);
             }
         };
@@ -89,10 +90,12 @@ export default function Home() {
         fetchData();
     }, [authFetch, isAuthenticated]);
 
-    // Called when a new booking is created
+    /**
+     * Refetch bookings after a new booking is created.
+     * Ensures room names and all fields are up to date.
+     */
     const handleBookingCreated = async () => {
         try {
-            // Fetch fresh bookings data to ensure we have room names and all fields
             const bookingsData = await authFetch("/api/bookings/");
             setBookings(bookingsData);
         } catch (err) {
@@ -287,12 +290,13 @@ export default function Home() {
                                         aria-hidden="true"
                                         className={`text-xs leading-none transition-all duration-200 ${
                                             isMenuOpen
-                                                ? 'rotate-180 translate-y-0 opacity-100'
-                                                : 'rotate-0 -translate-y-0.5 text-accent-secondary/60 opacity-70'
+                                                ? 'rotate-0 opacity-100'
+                                                : 'rotate-[180deg] -translate-y-0px text-accent-secondary/60 opacity-70'
                                         }`}
                                         style={
                                             isMenuOpen
                                                 ? {
+                                                      transform: 'translateY(2px)',
                                                       backgroundImage: 'linear-gradient(120deg, rgba(130,255,214,1), rgba(80,130,255,0.9))',
                                                       WebkitBackgroundClip: 'text',
                                                       color: 'transparent',
@@ -307,9 +311,11 @@ export default function Home() {
                                 </div>
                                 <span className="text-sm uppercase tracking-[0.2em] text-accent-secondary/70 select-none cursor-default">Workspace</span>
                             </div>
-                            <Text variant="small" className="text-center text-accent-secondary/50">
-                                Manage theme, language, and account controls right from here.
-                            </Text>
+                            {!isMenuOpen && (
+                                <Text variant="small" className="text-center text-accent-secondary/50">
+                                    Manage theme, language, and account controls right from here.
+                                </Text>
+                            )}
                         </div>
 
                         <div className="hidden md:block mb-10">
@@ -318,7 +324,7 @@ export default function Home() {
                                 role="region"
                                 aria-label="Workspace controls"
                                 className={`mx-auto w-full max-w-3xl overflow-hidden rounded-3xl border border-border-subtle bg-surface-base shadow-soft transition-[max-height,opacity,transform] duration-300 ease-out ${
-                                    isMenuOpen ? 'max-h-[260px] opacity-100 translate-y-0' : 'max-h-0 opacity-0 -translate-y-2 pointer-events-none'
+                                    isMenuOpen ? 'max-h-[320px] opacity-100 translate-y-0' : 'max-h-0 opacity-0 -translate-y-2 pointer-events-none'
                                 }`}
                             >
                                 <div className="grid gap-6 p-6 md:grid-cols-3">
@@ -334,8 +340,8 @@ export default function Home() {
                                                     onClick={() => handleColorModeChange(mode)}
                                                     className={`flex-1 rounded-2xl border px-4 py-2 text-sm font-semibold transition ${
                                                         colorMode === mode
-                                                            ? 'border-border-subtle bg-surface-muted text-accent-secondary'
-                                                            : 'border-border-subtle text-accent-secondary/70 hover:border-border-soft'
+                                                            ? 'border-border-soft bg-surface-muted text-accent-secondary'
+                                                            : 'border-border-subtle text-accent-secondary/70 hover:border-accent-primary/50 hover:bg-accent-primary/5'
                                                     }`}
                                                 >
                                                     <span className="flex items-center justify-center gap-2">
@@ -361,8 +367,8 @@ export default function Home() {
                                                     onClick={() => handleLanguageChange(lang)}
                                                     className={`flex-1 rounded-2xl border px-4 py-2 text-sm font-semibold transition ${
                                                         language === lang
-                                                            ? 'border-border-subtle bg-surface-muted text-accent-secondary'
-                                                            : 'border-border-subtle text-accent-secondary/70 hover:border-border-soft'
+                                                            ? 'border-border-soft bg-surface-muted text-accent-secondary'
+                                                            : 'border-border-subtle text-accent-secondary/70 hover:border-accent-primary/50 hover:bg-accent-primary/5'
                                                     }`}
                                                 >
                                                     <span className="flex items-center justify-center gap-2">
@@ -394,6 +400,13 @@ export default function Home() {
                                         </div>
                                     </div>
                                 </div>
+                                {isMenuOpen && (
+                                    <div className="px-6 pb-6">
+                                        <Text variant="small" className="text-center text-accent-secondary/50">
+                                            
+                                        </Text>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -404,37 +417,37 @@ export default function Home() {
                                         <div className="lg:col-span-2 bg-surface-base border border-border-subtle rounded-3xl p-6 shadow-soft">
                                             <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                                                 <div>
-                                                    <p className="text-xs uppercase tracking-[0.3em] text-accent-secondary/50 mb-2">Welcome back</p>
-                                                    <Heading level={2} className="mb-2 text-3xl">
+                                                    <p className="text-xs uppercase tracking-[0.3em] text-accent-primary/60 font-semibold mb-2">Welcome back</p>
+                                                    <Heading level={2} className="mb-3 text-4xl font-bold text-accent-secondary">
                                                         Hi, {user?.first_name || user?.username || "there"}!
                                                     </Heading>
-                                                    <Text variant="default">
-                                                        Here’s a quick look at what’s happening across your meeting rooms right now.
+                                                    <Text variant="default" className="text-accent-secondary/80">
+                                                        Here's a quick look at what's happening across your meeting rooms right now.
                                                     </Text>
                                                 </div>
                                                 <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-3">
                                                     {stats.map((item) => (
-                                                        <div key={item.label} className="rounded-2xl border border-border-subtle/70 bg-surface-muted/70 px-4 py-3">
-                                                            <p className="text-xs uppercase tracking-wide text-accent-secondary/60">{item.label}</p>
-                                                            <p className="text-2xl font-semibold text-accent-secondary mt-1">{item.value}</p>
-                                                            <p className="text-xs text-accent-secondary/60 mt-0.5">{item.helper}</p>
+                                                        <div key={item.label} className="rounded-2xl border border-border-subtle/70 bg-surface-muted/70 px-5 py-4 hover:border-accent-primary/30 hover:shadow-md transition-all duration-200">
+                                                            <p className="text-xs uppercase tracking-wider font-semibold text-accent-secondary/70">{item.label}</p>
+                                                            <p className="text-3xl font-bold text-accent-primary mt-2">{item.value}</p>
+                                                            <p className="text-sm text-accent-secondary/70 mt-1">{item.helper}</p>
                                                         </div>
                                                     ))}
                                                 </div>
                                             </div>
                                             {nextBooking && (
-                                                <div className="mt-6 rounded-2xl border border-border-subtle bg-surface-muted/80 px-4 py-3 flex items-center justify-between">
+                                                <div className="mt-6 rounded-2xl border-2 border-accent-primary/40 bg-gradient-to-br from-surface-muted/80 to-accent-primary/5 px-6 py-4 flex items-center justify-between shadow-lg shadow-accent-primary/10">
                                                     <div>
-                                                        <p className="text-xs uppercase tracking-[0.2em] text-accent-secondary/60">Next up</p>
-                                                        <p className="text-sm font-semibold text-accent-secondary mt-1">
+                                                        <p className="text-xs uppercase tracking-[0.3em] text-accent-primary/70 font-semibold">Next up</p>
+                                                        <p className="text-lg font-bold text-accent-primary mt-2">
                                                             {nextBooking.room_name || nextBooking.room || "Room"}
                                                         </p>
                                                     </div>
                                                     <div className="text-right">
-                                                        <p className="text-sm font-medium text-accent-secondary">
+                                                        <p className="text-base font-semibold text-accent-primary">
                                                             {DateTime.fromISO(nextBooking.start_time).toFormat("ccc, dd MMM")}
                                                         </p>
-                                                        <p className="text-xs text-accent-secondary/70">
+                                                        <p className="text-sm font-medium text-accent-primary/80">
                                                             {DateTime.fromISO(nextBooking.start_time).toFormat("HH:mm")} – {DateTime.fromISO(nextBooking.end_time).toFormat("HH:mm")}
                                                         </p>
                                                     </div>
@@ -465,6 +478,10 @@ export default function Home() {
                                         Available Rooms
                                     </Heading>
                                     <RoomList rooms={rooms} onBook={handleBookingCreated} />
+                                </section>
+
+                                <section className="mb-12">
+                                    <AvailabilityCalendar bookings={bookings} />
                                 </section>
 
                                 <section>
@@ -529,13 +546,13 @@ export default function Home() {
                                                     onClick={() => handleColorModeChange(mode, { closeMenu: true })}
                                                     className={`flex-1 rounded-2xl border px-4 py-3 text-base font-semibold transition ${
                                                         colorMode === mode
-                                                            ? 'border-border-subtle bg-surface-muted text-accent-secondary'
-                                                            : 'border-border-subtle text-accent-secondary/80 hover:border-border-soft'
+                                                            ? 'border-border-soft bg-surface-muted text-accent-secondary'
+                                                            : 'border-border-subtle text-accent-secondary/80 hover:border-accent-primary/50 hover:bg-accent-primary/5'
                                                     }`}
                                                 >
                                                     <span className="flex items-center justify-center gap-2">
                                                         {colorMode === mode && (
-                                                            <span className="inline-flex h-2 w-2 rounded-full bg-accent-secondary" aria-hidden="true" />
+                                                            <span className="inline-flex h-1.5 w-1.5 rounded-full bg-accent-secondary" aria-hidden="true" />
                                                         )}
                                                         {mode}
                                                     </span>
@@ -547,22 +564,22 @@ export default function Home() {
                                     <div className="h-px bg-border-subtle" aria-hidden="true" />
 
                                     <div>
-                                        <Text variant="muted" className="mb-3 text-xs uppercase tracking-[0.2em]">Language</Text>
-                                        <div className="flex items-center gap-3 text-base font-semibold">
+                                        <Text variant="muted" className="mb-3 text-xs uppercase tracking-[0.2em]">Color mode</Text>
+                                        <div className="flex items-center gap-3">
                                             {['ENG', 'DE'].map((lang) => (
                                                 <button
                                                     key={lang}
                                                     type="button"
                                                     onClick={() => handleLanguageChange(lang, { closeMenu: true })}
-                                                    className={`flex-1 rounded-2xl border px-4 py-3 transition ${
+                                                    className={`flex-1 rounded-2xl border px-4 py-3 text-base font-semibold transition ${
                                                         language === lang
-                                                            ? 'border-border-subtle bg-surface-muted text-accent-secondary'
-                                                            : 'border-border-subtle text-accent-secondary/80 hover:border-border-soft'
+                                                            ? 'border-border-soft bg-surface-muted text-accent-secondary'
+                                                            : 'border-border-subtle text-accent-secondary/80 hover:border-accent-primary/50 hover:bg-accent-primary/5'
                                                     }`}
                                                 >
                                                     <span className="flex items-center justify-center gap-2">
                                                         {language === lang && (
-                                                            <span className="inline-flex h-2 w-2 rounded-full bg-accent-secondary" aria-hidden="true" />
+                                                            <span className="inline-flex h-1.5 w-1.5 rounded-full bg-accent-secondary" aria-hidden="true" />
                                                         )}
                                                         {lang}
                                                     </span>
@@ -571,6 +588,14 @@ export default function Home() {
                                         </div>
                                     </div>
                                 </div>
+
+                                {isMenuOpen && (
+                                    <div className="mt-6 pt-6 border-t border-border-subtle/70">
+                                        <Text variant="small" className="text-center text-accent-secondary/50">
+                                           
+                                        </Text>
+                                    </div>
+                                )}
 
                                 {isAuthenticated && (
                                     <div className="mt-auto pt-8">
@@ -591,3 +616,6 @@ export default function Home() {
         </div>
     );
 }
+
+
+

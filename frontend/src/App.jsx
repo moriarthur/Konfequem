@@ -6,7 +6,10 @@ import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { AlertProvider } from "./context/AlertContext";
 import './index.css';
 
-// PrivateRoute проверяет авторизацию
+/**
+ * PrivateRoute component to protect routes.
+ * Redirects to login if user is not authenticated.
+ */
 function PrivateRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
   if (loading) return null; 

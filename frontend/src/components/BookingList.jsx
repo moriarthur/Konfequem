@@ -187,23 +187,24 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
   return (
     <div className="space-y-6">
       {/* Tabs */}
-      <Card padding="p-0" className="border border-border-subtle shadow-soft">
-        <div className="flex rounded-2xl overflow-hidden">
+      <Card padding="p-2" className="border border-border-subtle shadow-soft rounded-2xl">
+        <div className="flex gap-0">
           <button
-            className={`flex-1 px-6 py-4 text-sm font-medium border-b-2 transition-colors first:rounded-l-2xl ${
+            className={`flex-1 px-6 py-4 text-sm font-medium rounded-xl transition-all ${
               activeTab === 'upcoming'
-                ? 'text-accent-primary border-accent-primary bg-accent-primary/10'
-                : 'text-accent-secondary/60 border-transparent hover:text-accent-secondary hover:bg-surface-muted'
+                ? 'text-accent-primary border-2 border-accent-primary bg-accent-primary/10'
+                : 'text-accent-secondary/60 border-2 border-transparent hover:text-accent-secondary hover:bg-surface-muted'
             }`}
             onClick={() => setActiveTab('upcoming')}
           >
             Upcoming ({bookings.filter(b => DateTime.fromISO(b.start_time).setZone(OFFICE_TIMEZONE) >= now).length})
           </button>
+          <div className="w-px bg-border-subtle/30 mx-2" />
           <button
-            className={`flex-1 px-6 py-4 text-sm font-medium border-b-2 transition-colors last:rounded-r-2xl ${
+            className={`flex-1 px-6 py-4 text-sm font-medium rounded-xl transition-all ${
               activeTab === 'history'
-                ? 'text-accent-primary border-accent-primary bg-accent-primary/10'
-                : 'text-accent-secondary/60 border-transparent hover:text-accent-secondary hover:bg-surface-muted'
+                ? 'text-accent-primary border-2 border-accent-primary bg-accent-primary/10'
+                : 'text-accent-secondary/60 border-2 border-transparent hover:text-accent-secondary hover:bg-surface-muted'
             }`}
             onClick={() => setActiveTab('history')}
           >
