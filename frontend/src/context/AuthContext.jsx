@@ -196,8 +196,8 @@ export function AuthProvider({ children }) {
     setLoading(false);
     if (access) localStorage.setItem("access", access);
     if (refresh) localStorage.setItem("refresh", refresh);
-    if (access) fetchUser();
-  }, [access, refresh, fetchUser]);
+    if (access && !user) fetchUser();
+  }, [access, refresh]); // Removed fetchUser from dependencies
 
   return (
     <AuthContext.Provider value={{ access, refresh, isAuthenticated, loading, login, logout, authFetch, user }}>

@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Smooth scrolling for the entire page */
+html {
+  scroll-behavior: smooth;
+}
+
 .react-datepicker {
     font-size: 0.85rem;
     border-radius: 0.5rem;

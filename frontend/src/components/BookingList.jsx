@@ -97,18 +97,18 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
   // Get card styling based on status
   const getCardStyles = (status, isNext) => {
     const baseStyles = "p-4 transition-all duration-200";
-    
+
     if (isNext) {
-      return `${baseStyles} ring-2 ring-green-300 bg-green-50 border-green-200`;
+      return `${baseStyles} ring-2 ring-status-success/50 bg-status-success/10 border-status-success/20`;
     }
-    
+
     switch (status) {
       case 'upcoming':
-        return `${baseStyles} border-blue-200 bg-blue-50`;
+        return `${baseStyles} border-status-info/20 bg-status-info/10`;
       case 'ongoing':
-        return `${baseStyles} border-yellow-200 bg-yellow-50 ring-1 ring-yellow-300`;
+        return `${baseStyles} border-status-warning/20 bg-status-warning/10 ring-1 ring-status-warning/50`;
       case 'completed':
-        return `${baseStyles} border-gray-200 bg-gray-50`;
+        return `${baseStyles} border-status-neutral/20 bg-status-neutral/10`;
       default:
         return baseStyles;
     }

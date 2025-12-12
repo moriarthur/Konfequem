@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from "react";
 import BookingForm from "./BookingForm.jsx";
-import { ChevronDownIcon, FunnelIcon } from "@heroicons/react/24/outline";
-import { BuildingOfficeIcon, ClockIcon } from "@heroicons/react/24/outline";
+import { FunnelIcon } from "@heroicons/react/24/outline";
+import { BuildingOfficeIcon } from "@heroicons/react/24/outline";
 import Card from "./ui/Card";
 import Button from "./ui/Button";
-import Badge from "./ui/Badge";
-import { Heading, Text, Subheading } from "./ui/Typography";
+import { Heading, Text } from "./ui/Typography";
 import EmptyState from "./ui/EmptyState";
+import RoomCard from "./RoomCard";
 
 export default function RoomList({ rooms, onBook }) {
   const [expandedRoom, setExpandedRoom] = useState(null);
@@ -15,6 +15,7 @@ export default function RoomList({ rooms, onBook }) {
   const [locationFilter, setLocationFilter] = useState("all");
   const [sortBy, setSortBy] = useState("popularity");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const bookingFormRef = React.useRef(null);
 
   if (!rooms) {
     return (
@@ -62,45 +63,24 @@ export default function RoomList({ rooms, onBook }) {
     return list;
   }, [rooms, searchTerm, minCapacity, locationFilter, sortBy]);
 
+  // Smooth scroll to booking form when it opens
+  React.useEffect(() => {
+    if (expandedRoom && bookingFormRef.current) {
+      // Small delay to ensure the form is rendered
+      const timeoutId = setTimeout(() => {
+        bookingFormRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+          inline: 'nearest'
+        });
+      }, 100);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [expandedRoom]);
+
   return (
     <div className="relative">
-      {expandedRoom && (
-        <div className="fixed inset-0 z-50 flex items-start md:items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setExpandedRoom(null)}
-            aria-hidden="true"
-          />
-          <div
-            className="relative z-60 w-full max-w-lg mx-auto mt-12 md:mt-0"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Card className="max-h-[90vh] overflow-y-auto animate-fadeIn p-6">
-              <div className="flex justify-between items-center mb-4">
-                <Heading level={3} className="text-lg">
-                  {rooms.find((r) => r.id === expandedRoom)?.name}
-                </Heading>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setExpandedRoom(null)}
-                >
-                  Close
-                </Button>
-              </div>
-              <BookingForm
-                roomId={expandedRoom}
-                onBookingCreated={(newBooking) => {
-                  if (onBook) onBook(newBooking); // forward to Home
-                  setExpandedRoom(null);
-                }}
-                onClose={() => setExpandedRoom(null)}
-              />
-            </Card>
-          </div>
-        </div>
-      )}
-
       {rooms.length === 0 ? (
         <EmptyState
           icon={<BuildingOfficeIcon />}
@@ -143,7 +123,7 @@ export default function RoomList({ rooms, onBook }) {
                 }`}
                 aria-expanded={showAdvancedFilters}
               >
-                <FunnelIcon className="w-4 h-4" /> Filters
+                <FunnelIcon className="w-4 h-4 -ml-1" /> Filters
               </button>
             </div>
           </div>
@@ -151,7 +131,7 @@ export default function RoomList({ rooms, onBook }) {
           <div
             className={`grid gap-4 md:grid-cols-2 lg:grid-cols-3 transition-[max-height,opacity,margin] duration-300 overflow-hidden ${
               showAdvancedFilters ? "max-h-[320px] opacity-100 mb-6" : "max-h-0 opacity-0 mb-0"}
-          `}
+            `}
           >
             <div>
               <label className="text-xs uppercase tracking-[0.2em] text-accent-secondary/60 block mb-2 pl-1">Min capacity</label>
@@ -205,90 +185,71 @@ export default function RoomList({ rooms, onBook }) {
               description="Try adjusting capacity or search query."
             />
           ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredRooms.map((room) => (
-              <Card
-                key={room.id}
-                hover={true}
-                className="w-full border border-border-subtle/80 transition-shadow hover:border-accent-primary/40 focus-within:ring-2 focus-within:ring-accent-primary/30"
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex-1">
-                    <Subheading className="text-lg mb-2">
-                      {room.name}
-                    </Subheading>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <BuildingOfficeIcon className="w-4 h-4 text-accent-secondary/50" />
-                        <Text variant="default">
-                          Capacity: {room.capacity} people
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredRooms.map((room) => (
+                <RoomCard
+                  key={room.id}
+                  room={room}
+                  isActive={expandedRoom === room.id}
+                  onToggleBookingForm={(roomId) => setExpandedRoom(expandedRoom === roomId ? null : roomId)}
+                  onBook={onBook}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Expanded booking form below the grid */}
+          {expandedRoom && (
+            <div ref={bookingFormRef} className="mt-8 scroll-mt-20">
+              {(() => {
+                const selectedRoom = rooms.find((r) => r.id === expandedRoom);
+                return selectedRoom ? (
+                  <Card className="p-6 max-w-2xl mx-auto animate-fadeIn">
+                    <div className="flex justify-between items-center mb-4">
+                      <Heading level={3} className="text-xl">
+                        Book {selectedRoom.name}
+                      </Heading>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setExpandedRoom(null)}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </Button>
+                    </div>
+                    <div className="flex gap-4 mb-6 text-sm">
+                      <div className="flex items-center gap-1.5">
+                        <svg className="w-4 h-4 text-accent-secondary/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <Text variant="muted">
+                          {selectedRoom.location || "No location"}
                         </Text>
                       </div>
-                      {room.location && (
-                        <div className="flex items-center gap-2">
-                          <svg className="w-4 h-4 text-accent-secondary/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          <Text variant="default">
-                            {room.location}
-                          </Text>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {room.bookings && room.bookings.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-border-subtle">
-                    <div className="flex items-center gap-2 mb-3">
-                      <ClockIcon className="w-4 h-4 text-accent-secondary/50" />
-                      <Text variant="small" className="font-medium text-accent-secondary">
-                        Current bookings ({room.bookings.length})
-                      </Text>
-                    </div>
-                    <div className="space-y-2">
-                      {room.bookings.slice(0, 3).map((b, idx) => {
-                        const start = new Date(b.start_time);
-                        const end = new Date(b.end_time);
-                        return (
-                          <div key={idx} className="flex items-center justify-between text-sm">
-                            <Text variant="small" className="text-accent-secondary/80">
-                              {start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} –{" "}
-                              {end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                            </Text>
-                            <Badge variant="gray" size="sm">
-                              {start.toLocaleDateString()}
-                            </Badge>
-                          </div>
-                        );
-                      })}
-                      {room.bookings.length > 3 && (
-                        <Text variant="small" className="text-accent-secondary/60 italic">
-                          +{room.bookings.length - 3} more booking{room.bookings.length - 3 > 1 ? 's' : ''}
+                      <div className="flex items-center gap-1.5">
+                        <svg className="w-4 h-4 text-accent-secondary/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                        <Text variant="muted">
+                          {selectedRoom.capacity} people
                         </Text>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                )}
-
-                <div className="mt-4 flex items-center justify-end">
-                  <Button
-                    variant="secondary"
-                    onClick={() => setExpandedRoom(room.id)}
-                    aria-label={`View details for ${room.name}`}
-                    className="inline-flex items-center gap-2"
-                  >
-                    View details
-                    <ChevronDownIcon
-                      className={`w-4 h-4 transition-transform duration-300 ${expandedRoom === room.id ? "-rotate-90" : "rotate-0"}`}
-                      aria-hidden="true"
+                    <BookingForm
+                      roomId={expandedRoom}
+                      onBookingCreated={(newBooking) => {
+                        if (onBook) onBook(newBooking);
+                        setExpandedRoom(null);
+                      }}
+                      onClose={() => setExpandedRoom(null)}
                     />
-                  </Button>
-                </div>
-              </Card>
-          ))}
-        </div>
+                  </Card>
+                ) : null;
+              })()}
+            </div>
           )}
         </>
       )}

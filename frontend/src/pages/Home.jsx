@@ -234,7 +234,33 @@ export default function Home() {
             {!loading && (
                 <>
                     <div ref={contentRef}>
-                        <div className="flex flex-col items-center gap-4 mb-8">
+                        <div className={`relative flex flex-col items-center gap-4 z-20 transition-all duration-500 ${
+                                isMenuOpen ? 'mb-4' : 'mb-20'
+                            }`}>
+                            {/* Helper text */}
+                            <div className={`transition-all duration-500 overflow-hidden ${
+                                isMenuOpen ? 'max-h-0 opacity-0' : 'max-h-8 opacity-100'
+                            }`}>
+                                <Text variant="small" className="text-center text-accent-secondary/50">
+                                    Manage theme, language, and account controls right from here.
+                                </Text>
+                            </div>
+
+                            {/* Arrow */}
+                            <div className="flex justify-center">
+                                <span
+                                    aria-hidden="true"
+                                    className={`text-xs leading-none transition-all duration-200 ${
+                                        isMenuOpen
+                                            ? 'opacity-0'
+                                            : 'text-accent-secondary/60 opacity-70'
+                                    }`}
+                                >
+                                    ▼
+                                </span>
+                            </div>
+
+                            {/* Logo and workspace text */}
                             <div className="flex items-center gap-6">
                                 <span className="text-sm uppercase tracking-[0.2em] text-accent-secondary/70 select-none cursor-default">Konfequem</span>
                                 <div className="flex flex-col items-center gap-2">
@@ -286,45 +312,20 @@ export default function Home() {
                                             </span>
                                         </button>
                                     </div>
-                                    <span
-                                        aria-hidden="true"
-                                        className={`text-xs leading-none transition-all duration-200 ${
-                                            isMenuOpen
-                                                ? 'rotate-0 opacity-100'
-                                                : 'rotate-[180deg] -translate-y-0px text-accent-secondary/60 opacity-70'
-                                        }`}
-                                        style={
-                                            isMenuOpen
-                                                ? {
-                                                      transform: 'translateY(2px)',
-                                                      backgroundImage: 'linear-gradient(120deg, rgba(130,255,214,1), rgba(80,130,255,0.9))',
-                                                      WebkitBackgroundClip: 'text',
-                                                      color: 'transparent',
-                                                      WebkitTextStroke: '0.5px rgba(12,24,32,0.2)',
-                                                      textShadow: '0 0 8px rgba(99,255,214,0.45)'
-                                                  }
-                                                : undefined
-                                        }
-                                    >
-                                        &#x25BD;
-                                    </span>
                                 </div>
                                 <span className="text-sm uppercase tracking-[0.2em] text-accent-secondary/70 select-none cursor-default">Workspace</span>
                             </div>
-                            {!isMenuOpen && (
-                                <Text variant="small" className="text-center text-accent-secondary/50">
-                                    Manage theme, language, and account controls right from here.
-                                </Text>
-                            )}
                         </div>
 
-                        <div className="hidden md:block mb-10">
+                        <div className="hidden md:block">
                             <div
                                 id="workspace-menu-panel"
                                 role="region"
                                 aria-label="Workspace controls"
-                                className={`mx-auto w-full max-w-3xl overflow-hidden rounded-3xl border border-border-subtle bg-surface-base shadow-soft transition-[max-height,opacity,transform] duration-300 ease-out ${
-                                    isMenuOpen ? 'max-h-[320px] opacity-100 translate-y-0' : 'max-h-0 opacity-0 -translate-y-2 pointer-events-none'
+                                className={`mx-auto w-full max-w-3xl overflow-hidden rounded-3xl border border-border-subtle bg-surface-base shadow-soft transition-all duration-500 ease-out ${
+                                    isMenuOpen
+                                        ? 'max-h-[320px] opacity-100 translate-y-0 mb-12'
+                                        : 'max-h-0 opacity-0 pointer-events-none'
                                 }`}
                             >
                                 <div className="grid gap-6 p-6 md:grid-cols-3">

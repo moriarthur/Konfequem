@@ -8,6 +8,6 @@ export default function LoadingSpinner({ size = 'md', className = '' }) {
   };
 
   return (
-    <div className={`animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 ${sizes[size]} ${className}`} />
+    <div className={`animate-spin rounded-full border-2 border-border-subtle border-t-accent-primary ${sizes[size]} ${className}`} />
   );
 }

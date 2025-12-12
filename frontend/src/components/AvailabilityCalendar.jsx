@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { DateTime } from "luxon";
 import { OFFICE_TIMEZONE, OFFICE_HOURS } from "../utils/bookingUtils";
-import { Text } from "./ui/Typography";
+import { Text, Heading } from "./ui/Typography";
 import Card from "./ui/Card";
 
 export default function AvailabilityCalendar({ bookings = [], selectedRoom = null, onDaySelect = null }) {
@@ -92,16 +92,40 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
     weekDays.push(weekStart.plus({ days: i }));
   }
 
-  const getStatusColor = (status) => {
+  const getStatusStyles = (status) => {
     switch (status) {
       case "available":
-        return "bg-green-500/80 hover:bg-green-500";
+        return {
+          bg: "bg-status-success/10",
+          border: "border-status-success/20",
+          text: "text-status-success",
+          fill: "bg-status-success/30",
+          fillHover: "hover:bg-status-success/40",
+        };
       case "busy":
-        return "bg-yellow-500/80 hover:bg-yellow-500";
+        return {
+          bg: "bg-status-warning/10",
+          border: "border-status-warning/20",
+          text: "text-status-warning",
+          fill: "bg-status-warning/30",
+          fillHover: "hover:bg-status-warning/40",
+        };
       case "full":
-        return "bg-red-500/80 hover:bg-red-500";
+        return {
+          bg: "bg-status-danger/10",
+          border: "border-status-danger/20",
+          text: "text-status-danger",
+          fill: "bg-status-danger/30",
+          fillHover: "hover:bg-status-danger/40",
+        };
       default:
-        return "bg-gray-300";
+        return {
+          bg: "bg-status-neutral/10",
+          border: "border-status-neutral/20",
+          text: "text-status-neutral",
+          fill: "bg-status-neutral/30",
+          fillHover: "hover:bg-status-neutral/40",
+        };
     }
   };
 
@@ -119,171 +143,192 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
   };
 
   return (
-    <div className="space-y-4">
-      <div>
-        <Text variant="small" className="uppercase tracking-[0.2em] text-accent-secondary/60 mb-4">
-          This Week's Availability - Click to see free slots
+    <Card className="p-6">
+      <div className="mb-6">
+        <Text variant="small" className="uppercase tracking-[0.2em] text-accent-secondary/60">
+          This Week's Availability
         </Text>
-        <div className="grid grid-cols-7 gap-2">
-          {weekDays.map((day) => {
-            const dateKey = day.toFormat("yyyy-MM-dd");
-            const dayData = dayAvailability[dateKey];
-            const isToday = day.hasSame(today, "day");
-            const isSelected = selectedDay === dateKey;
+        <Text variant="muted" className="mt-1">
+          Click any day to see detailed availability
+        </Text>
+      </div>
 
-            if (!dayData) return null;
+      <div className="grid grid-cols-7 gap-3 mb-8">
+        {weekDays.map((day) => {
+          const dateKey = day.toFormat("yyyy-MM-dd");
+          const dayData = dayAvailability[dateKey];
+          const isToday = day.hasSame(today, "day");
+          const isSelected = selectedDay === dateKey;
+          const statusStyles = getStatusStyles(dayData?.status);
 
-            return (
+          if (!dayData) return null;
+
+          return (
+            <div
+              key={dateKey}
+              className="relative group"
+            >
               <div
-                key={dateKey}
-                className="relative"
+                className={`
+                  relative flex flex-col items-center p-4 rounded-xl border-2 cursor-pointer
+                  transition-all duration-300 transform hover:scale-105
+                  ${isSelected
+                    ? "border-accent-primary bg-accent-primary/5 shadow-soft"
+                    : isToday
+                    ? `border-accent-primary/50 bg-surface-muted/30 ${statusStyles.fillHover}`
+                    : `border-border-subtle bg-surface-base ${statusStyles.fillHover}`
+                  }
+                `}
+                onClick={() => handleDayClick(dateKey)}
+                onMouseEnter={(e) => handleMouseEnter(dateKey, e)}
+                onMouseLeave={handleMouseLeave}
               >
-                <div
-                  className={`relative group flex flex-col items-center justify-center p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
-                    isSelected
-                      ? "border-accent-primary ring-2 ring-accent-primary/50 bg-accent-primary/5"
-                      : isToday
-                      ? "border-accent-primary/50 ring-1 ring-accent-primary/30 hover:bg-surface-muted/30"
-                      : "border-border-subtle hover:border-accent-primary/30 hover:bg-surface-muted/20"
-                  }`}
-                  onClick={() => handleDayClick(dateKey)}
-                  onMouseEnter={(e) => handleMouseEnter(dateKey, e)}
-                  onMouseLeave={handleMouseLeave}
-                >
-                  {/* Day of week */}
-                  <p className="text-xs font-semibold text-accent-secondary/70">
-                    {day.toFormat("EEE")}
-                  </p>
+                {/* Day label */}
+                <Text variant="small" className="font-medium text-accent-secondary/70 mb-1">
+                  {day.toFormat("EEE")}
+                </Text>
 
-                  {/* Date */}
-                  <p className="text-sm font-bold text-accent-secondary my-1">
-                    {day.toFormat("d")}
-                  </p>
+                {/* Date number */}
+                <Heading level={3} className="text-2xl text-accent-secondary mb-3">
+                  {day.toFormat("d")}
+                </Heading>
 
-                  {/* Status indicator */}
+                {/* Availability progress bar */}
+                <div className="w-full h-1.5 bg-surface-muted rounded-full overflow-hidden mb-3">
                   <div
-                    className={`w-8 h-8 rounded-full ${getStatusColor(dayData.status)} transition-colors duration-200 flex items-center justify-center`}
-                  >
-                    <span className="text-xs font-bold text-white">
-                      {dayData.occupancyPercent}%
-                    </span>
-                  </div>
-
-                  {/* Month indicator for clarity */}
-                  <p className="text-xs text-accent-secondary/50 mt-1">
-                    {day.toFormat("MMM")}
-                  </p>
-
-                  {/* Selected indicator */}
-                  {isSelected && (
-                    <div className="absolute top-1 right-1 w-2 h-2 bg-accent-primary rounded-full" />
-                  )}
+                    className={`h-full transition-all duration-500 ${statusStyles.fill}`}
+                    style={{ width: `${dayData.occupancyPercent}%` }}
+                  />
                 </div>
 
-                {/* Tooltip */}
-                {tooltipDay === dateKey && dayData && (
-                  <div
-                    className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none"
-                    style={{
-                      animation: "fadeIn 0.2s ease-in-out",
-                    }}
-                  >
-                    <div className="bg-surface-base border border-border-subtle rounded-lg shadow-lg p-3 whitespace-nowrap">
-                      <p className="text-sm font-semibold text-accent-secondary mb-1">
-                        {day.toFormat("EEEE, dd MMMM")}
-                      </p>
-                      <p className="text-xs text-accent-secondary/70">
-                        Status: <span className="font-semibold text-accent-primary">{getStatusLabel(dayData.status)}</span>
-                      </p>
-                      <p className="text-xs text-accent-secondary/70">
-                        Free slots: <span className="font-semibold">{dayData.freeSlots}</span>
-                      </p>
-                      <p className="text-xs text-accent-secondary/70">
-                        Occupancy: <span className="font-semibold">{dayData.occupancyPercent}%</span>
-                      </p>
-                      <p className="text-xs text-accent-primary/70 mt-2 italic">
-                        Click to view free slots
-                      </p>
-                    </div>
-                    {/* Arrow */}
-                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-2 h-2 bg-surface-base border-r border-b border-border-subtle rotate-45" />
-                  </div>
+                {/* Occupancy percentage */}
+                <Text
+                  variant="small"
+                  className={`font-semibold ${statusStyles.text}`}
+                >
+                  {dayData.occupancyPercent}%
+                </Text>
+
+                {/* Month indicator */}
+                <Text variant="muted" className="text-xs mt-1">
+                  {day.toFormat("MMM")}
+                </Text>
+
+                {/* Selected indicator */}
+                {isSelected && (
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-accent-primary rounded-full border-2 border-surface-base shadow-soft" />
+                )}
+
+                {/* Today indicator */}
+                {isToday && !isSelected && (
+                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-accent-secondary/40 rounded-full" />
                 )}
               </div>
-            );
-          })}
-        </div>
+
+              {/* Enhanced tooltip */}
+              {tooltipDay === dateKey && dayData && (
+                <div
+                  className="absolute bottom-full left-1/2 transform -translate-x-1/2 z-50 mb-3 pointer-events-none animate-fadeIn"
+                >
+                  <Card className="p-4 shadow-lift min-w-[200px]">
+                    <Text variant="small" className="font-semibold text-accent-secondary mb-3">
+                      {day.toFormat("EEEE, MMMM d")}
+                    </Text>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <Text variant="muted">Status:</Text>
+                        <Text variant="small" className={`font-medium ${statusStyles.text}`}>
+                          {getStatusLabel(dayData.status)}
+                        </Text>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <Text variant="muted">Free slots:</Text>
+                        <Text variant="small" className="font-medium">
+                          {dayData.freeSlots}
+                        </Text>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <Text variant="muted">Occupancy:</Text>
+                        <Text variant="small" className="font-medium">
+                          {dayData.occupancyPercent}%
+                        </Text>
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-border-subtle">
+                      <Text variant="muted" className="text-xs text-center">
+                        Click for details
+                      </Text>
+                    </div>
+                  </Card>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Selected day details */}
       {selectedDay && dayAvailability[selectedDay] && (
-        <Card className="p-6 border-accent-primary/30 bg-accent-primary/5">
+        <Card className={`border-2 ${getStatusStyles(dayAvailability[selectedDay].status).border} ${getStatusStyles(dayAvailability[selectedDay].status).bg} p-6 animate-fadeIn`}>
           <div className="mb-4">
             <Text variant="small" className="uppercase tracking-[0.2em] text-accent-secondary/60 mb-2">
-              Selected Date
+              Selected Date Details
             </Text>
             <h3 className="text-xl font-bold text-accent-secondary">
-              {dayAvailability[selectedDay].date.toFormat("EEEE, dd MMMM yyyy")}
+              {dayAvailability[selectedDay].date.toFormat("EEEE, MMMM d, yyyy")}
             </h3>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mb-4">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-accent-secondary/60 mb-1">Status</p>
-              <p className="text-lg font-bold text-accent-primary">
-                {getStatusLabel(dayAvailability[selectedDay].status)}
-              </p>
+          <div className="grid grid-cols-3 gap-6 mb-4">
+            <div className="text-center">
+              <div className={`inline-flex items-center justify-center w-12 h-12 rounded-full ${getStatusStyles(dayAvailability[selectedDay].status).bg} mb-2`}>
+                <Heading level={2} className={`text-3xl ${getStatusStyles(dayAvailability[selectedDay].status).text}`}>
+                  {dayAvailability[selectedDay].occupancyPercent}%
+                </Heading>
+              </div>
+              <Text variant="muted" className="text-sm">Occupancy</Text>
             </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-accent-secondary/60 mb-1">Free Slots</p>
-              <p className="text-lg font-bold text-green-600">
-                {dayAvailability[selectedDay].freeSlots}
-              </p>
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-surface-muted mb-2">
+                <Heading level={2} className="text-3xl text-accent-primary">
+                  {dayAvailability[selectedDay].freeSlots}
+                </Heading>
+              </div>
+              <Text variant="muted" className="text-sm">Free Slots</Text>
             </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-accent-secondary/60 mb-1">Occupancy</p>
-              <p className="text-lg font-bold text-accent-secondary">
-                {dayAvailability[selectedDay].occupancyPercent}%
-              </p>
+            <div className="text-center">
+              <div className={`inline-flex items-center justify-center px-4 py-2 rounded-full border ${getStatusStyles(dayAvailability[selectedDay].status).border} ${getStatusStyles(dayAvailability[selectedDay].status).bg}`}>
+                <Text variant="small" className={`font-semibold ${getStatusStyles(dayAvailability[selectedDay].status).text}`}>
+                  {getStatusLabel(dayAvailability[selectedDay].status)}
+                </Text>
+              </div>
+              <Text variant="muted" className="text-sm mt-2">Status</Text>
             </div>
           </div>
 
-          <Text variant="small" className="text-accent-secondary/70">
+          <Text variant="muted" className="text-center">
             {dayAvailability[selectedDay].freeSlots > 0
-              ? `There are ${dayAvailability[selectedDay].freeSlots} available 15-minute slots on this day. Click "Book this room" to reserve a time.`
-              : "This day is fully booked. Please select another day."}
+              ? `${dayAvailability[selectedDay].freeSlots} time slots available. Continue to booking to reserve your preferred time.`
+              : "All time slots are booked for this day. Please select another date."}
           </Text>
         </Card>
       )}
 
-      {/* Legend */}
-      <div className="flex items-center gap-6 mt-6 p-4 bg-surface-muted/50 rounded-xl">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-green-500/80" />
-          <Text variant="small" className="text-accent-secondary/70">Available (0-50%)</Text>
+      {/* Redesigned legend */}
+      <div className="grid grid-cols-3 gap-4 p-4 bg-surface-muted/30 rounded-xl">
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-status-success/5 border border-status-success/10">
+          <div className="w-3 h-3 rounded-full bg-status-success" />
+          <Text variant="small" className="text-status-success-text font-medium">Available (0-50%)</Text>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-yellow-500/80" />
-          <Text variant="small" className="text-accent-secondary/70">Busy (50-80%)</Text>
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-status-warning/5 border border-status-warning/10">
+          <div className="w-3 h-3 rounded-full bg-status-warning" />
+          <Text variant="small" className="text-status-warning-text font-medium">Busy (50-80%)</Text>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-red-500/80" />
-          <Text variant="small" className="text-accent-secondary/70">Full (80-100%)</Text>
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-status-danger/5 border border-status-danger/10">
+          <div className="w-3 h-3 rounded-full bg-status-danger" />
+          <Text variant="small" className="text-status-danger-text font-medium">Full (80-100%)</Text>
         </div>
       </div>
-
-      <style>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translate(-50%, 4px);
-          }
-          to {
-            opacity: 1;
-            transform: translate(-50%, 0);
-          }
-        }
-      `}</style>
-    </div>
+    </Card>
   );
 }

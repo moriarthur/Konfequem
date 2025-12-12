@@ -293,17 +293,17 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
       className="space-y-4"
     >
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl mb-6">
-          <Text className="font-medium">{error}</Text>
+        <Card className="p-4 mb-6 border-status-danger/20 bg-status-danger/10">
+          <Text className="font-medium text-status-danger-text">{error}</Text>
           {nextAvailableDay && (
             <div className="mt-2">
-              <Text variant="small">
+              <Text variant="small" className="text-status-danger-text">
                 Next available day: {DateTime.fromJSDate(nextAvailableDay).toFormat('dd.MM.yyyy')}
                 <Button
                   variant="ghost"
                   size="sm"
                   type="button"
-                  className="ml-2 text-red-600 hover:text-red-700"
+                  className="ml-2 text-status-danger"
                   onClick={() => setSelectedDate(nextAvailableDay)}
                 >
                   Select
@@ -311,7 +311,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
               </Text>
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       <div className="mb-6">
@@ -495,7 +495,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
                       }
                     }}
                     className={`border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                      availableDurations.filter(d => ![15, 30].includes(d.minutes)).length === 0 
+                      availableDurations.filter(d => ![15, 30].includes(d.minutes)).length === 0
                         ? "hidden" : ""
                     }`}
                   >
