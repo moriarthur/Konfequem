@@ -9,6 +9,13 @@ import AvailabilityCalendar from "../components/AvailabilityCalendar";
 import Button from "../components/ui/Button";
 import { Heading, Text } from "../components/ui/Typography";
 import { DateTime } from "luxon";
+import {
+  BuildingOfficeIcon,
+  CalendarIcon,
+  ClockIcon,
+  SparklesIcon,
+  CheckCircleIcon
+} from "@heroicons/react/24/outline";
 
 export default function Home() {
     const { authFetch, logout, isAuthenticated, loading, user } = useAuth();
@@ -80,6 +87,14 @@ export default function Home() {
         if (closeMenu) {
             setTimeout(() => setIsMenuOpen(false), 150);
         }
+    };
+
+    // Get time-based greeting
+    const getTimeBasedGreeting = () => {
+        const hour = DateTime.now().hour;
+        if (hour < 12) return "Good morning";
+        if (hour < 17) return "Good afternoon";
+        return "Good evening";
     };
 
     useEffect(() => {
@@ -190,6 +205,26 @@ export default function Home() {
             contentEl.removeAttribute("aria-hidden");
             contentEl.removeAttribute("inert");
         }
+    }, [isMenuOpen, isMobileViewport]);
+
+    // Close menu when clicking outside on desktop
+    useEffect(() => {
+        if (!isMenuOpen || isMobileViewport) return;
+
+        const handleClickOutside = (event) => {
+            const menuPanel = document.getElementById('workspace-menu-panel');
+            const logoButton = event.target.closest('[aria-label="Toggle workspace menu"]');
+
+            // Don't close if clicking on the menu panel or the logo button
+            if (menuPanel && !menuPanel.contains(event.target) && !logoButton) {
+                setIsMenuOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
     }, [isMenuOpen, isMobileViewport]);
 
     useEffect(() => {
@@ -435,40 +470,64 @@ export default function Home() {
                             <>
                                 <section className="mb-10">
                                     <div className="grid gap-6 lg:grid-cols-3">
-                                        <div className="lg:col-span-2 bg-surface-base border border-border-subtle rounded-3xl p-6 shadow-soft">
-                                            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                                        <div className="lg:col-span-2 bg-gradient-to-br from-surface-base to-surface-base/95 border border-border-subtle rounded-3xl p-6 shadow-soft relative overflow-hidden">
+                                            {/* Subtle background decoration */}
+                                            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-accent-primary/5 to-transparent rounded-full -translate-y-1/2 translate-x-1/2" />
+
+                                            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between relative">
                                                 <div>
-                                                    <p className="text-xs uppercase tracking-[0.3em] text-accent-primary/60 font-semibold mb-2">Welcome back</p>
+                                                    <p className="text-xs uppercase tracking-[0.3em] text-accent-primary/60 font-semibold mb-2 flex items-center gap-2">
+                                                        <SparklesIcon className="w-4 h-4" />
+                                                        {getTimeBasedGreeting()}
+                                                    </p>
                                                     <Heading level={2} className="mb-3 text-4xl font-bold text-accent-secondary">
                                                         Hi, {user?.first_name || user?.username || "there"}!
                                                     </Heading>
                                                     <Text variant="default" className="text-accent-secondary/80">
-                                                        Here's a quick look at what's happening across your meeting rooms right now.
+                                                        Here's your workspace overview for today.
                                                     </Text>
                                                 </div>
                                                 <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-3">
-                                                    {stats.map((item) => (
-                                                        <div key={item.label} className="rounded-2xl border border-border-subtle/70 bg-surface-muted/70 px-5 py-4 hover:border-accent-primary/30 hover:shadow-md transition-all duration-200">
-                                                            <p className="text-xs uppercase tracking-wider font-semibold text-accent-secondary/70">{item.label}</p>
-                                                            <p className="text-3xl font-bold text-accent-primary mt-2">{item.value}</p>
+                                                    {stats.map((item, index) => (
+                                                        <div
+                                                            key={item.label}
+                                                            className="group rounded-2xl border border-border-subtle/50 bg-gradient-to-br from-surface-muted/80 to-surface-muted/40 px-5 py-4 hover:border-accent-primary/40 hover:shadow-md transition-all duration-300 relative overflow-hidden"
+                                                        >
+                                                            {/* Subtle gradient overlay on hover */}
+                                                            <div className="absolute inset-0 bg-gradient-to-br from-accent-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                                                            {/* Icon for each stat */}
+                                                            <div className="flex items-center justify-between mb-2">
+                                                                <p className="text-xs uppercase tracking-wider font-semibold text-accent-secondary/70">{item.label}</p>
+                                                                {index === 0 && <BuildingOfficeIcon className="w-4 h-4 text-accent-secondary/50" />}
+                                                                {index === 1 && <CalendarIcon className="w-4 h-4 text-accent-secondary/50" />}
+                                                                {index === 2 && <ClockIcon className="w-4 h-4 text-accent-secondary/50" />}
+                                                            </div>
+                                                            <p className="text-3xl font-bold bg-gradient-to-br from-accent-primary to-accent-primary/80 bg-clip-text text-transparent mt-2">{item.value}</p>
                                                             <p className="text-sm text-accent-secondary/70 mt-1">{item.helper}</p>
                                                         </div>
                                                     ))}
                                                 </div>
                                             </div>
                                             {nextBooking && (
-                                                <div className="mt-6 rounded-2xl border-2 border-accent-primary/40 bg-gradient-to-br from-surface-muted/80 to-accent-primary/5 px-6 py-4 flex items-center justify-between shadow-lg shadow-accent-primary/10">
-                                                    <div>
-                                                        <p className="text-xs uppercase tracking-[0.3em] text-accent-primary/70 font-semibold">Next up</p>
-                                                        <p className="text-lg font-bold text-accent-primary mt-2">
-                                                            {nextBooking.room_name || nextBooking.room || "Room"}
-                                                        </p>
+                                                <div className="mt-6 rounded-2xl border border-accent-primary/30 bg-gradient-to-r from-accent-primary/10 via-accent-primary/5 to-transparent px-6 py-4 flex items-center justify-between shadow-lg shadow-accent-primary/5 hover:shadow-accent-primary/10 transition-all duration-300 group">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-accent-primary/20 to-accent-primary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                                            <CheckCircleIcon className="w-6 h-6 text-accent-primary" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs uppercase tracking-[0.3em] text-accent-primary/70 font-semibold">Next meeting</p>
+                                                            <p className="text-lg font-bold text-accent-primary mt-1">
+                                                                {nextBooking.room_name || nextBooking.room || "Room"}
+                                                            </p>
+                                                        </div>
                                                     </div>
                                                     <div className="text-right">
                                                         <p className="text-base font-semibold text-accent-primary">
                                                             {DateTime.fromISO(nextBooking.start_time).toFormat("ccc, dd MMM")}
                                                         </p>
-                                                        <p className="text-sm font-medium text-accent-primary/80">
+                                                        <p className="text-sm font-medium text-accent-primary/80 flex items-center gap-1 justify-end">
+                                                            <ClockIcon className="w-4 h-4" />
                                                             {DateTime.fromISO(nextBooking.start_time).toFormat("HH:mm")} – {DateTime.fromISO(nextBooking.end_time).toFormat("HH:mm")}
                                                         </p>
                                                     </div>

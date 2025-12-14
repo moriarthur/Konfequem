@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import BookingForm from "./BookingForm.jsx";
 import { FunnelIcon } from "@heroicons/react/24/outline";
 import { BuildingOfficeIcon } from "@heroicons/react/24/outline";
@@ -78,6 +79,36 @@ export default function RoomList({ rooms, onBook }) {
       return () => clearTimeout(timeoutId);
     }
   }, [expandedRoom]);
+
+  // Animation variants for booking form
+  const bookingFormVariants = {
+    hidden: {
+      opacity: 0,
+      scale: 0.95,
+      y: -20,
+      filter: "blur(2px)"
+    },
+    visible: {
+      opacity: 1,
+      scale: 1,
+      y: 0,
+      filter: "blur(0px)",
+      transition: {
+        duration: 0.4,
+        ease: [0.25, 0.46, 0.45, 0.94]
+      }
+    },
+    exit: {
+      opacity: 0,
+      scale: 0.98,
+      y: -10,
+      filter: "blur(1px)",
+      transition: {
+        duration: 0.2,
+        ease: "easeInOut"
+      }
+    }
+  };
 
   return (
     <div className="relative">
@@ -199,58 +230,70 @@ export default function RoomList({ rooms, onBook }) {
           )}
 
           {/* Expanded booking form below the grid */}
-          {expandedRoom && (
-            <div ref={bookingFormRef} className="mt-8 scroll-mt-20">
-              {(() => {
-                const selectedRoom = rooms.find((r) => r.id === expandedRoom);
-                return selectedRoom ? (
-                  <Card className="p-6 max-w-2xl mx-auto animate-fadeIn">
-                    <div className="flex justify-between items-center mb-4">
-                      <Heading level={3} className="text-xl">
-                        Book {selectedRoom.name}
-                      </Heading>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setExpandedRoom(null)}
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </Button>
-                    </div>
-                    <div className="flex gap-4 mb-6 text-sm">
-                      <div className="flex items-center gap-1.5">
-                        <svg className="w-4 h-4 text-accent-secondary/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        <Text variant="muted">
-                          {selectedRoom.location || "No location"}
-                        </Text>
+          <AnimatePresence mode="wait">
+            {expandedRoom && (
+              <motion.div
+                ref={bookingFormRef}
+                className="mt-8 scroll-mt-20"
+                variants={bookingFormVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                {(() => {
+                  const selectedRoom = rooms.find((r) => r.id === expandedRoom);
+                  return selectedRoom ? (
+                    <Card className="p-6 max-w-2xl mx-auto">
+                      <div className="flex justify-between items-center mb-4">
+                        <Heading level={3} className="text-xl">
+                          Book {selectedRoom.name}
+                        </Heading>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setExpandedRoom(null)}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </Button>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <svg className="w-4 h-4 text-accent-secondary/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                        </svg>
-                        <Text variant="muted">
-                          {selectedRoom.capacity} people
-                        </Text>
+                      <div className="flex gap-4 mb-6 text-sm">
+                        <div className="flex items-center gap-1.5">
+                          <svg className="w-4 h-4 text-accent-secondary/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <Text variant="muted">
+                            {selectedRoom.location || "No location"}
+                          </Text>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <svg className="w-4 h-4 text-accent-secondary/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                          </svg>
+                          <Text variant="muted">
+                            {selectedRoom.capacity} people
+                          </Text>
+                        </div>
                       </div>
-                    </div>
-                    <BookingForm
-                      roomId={expandedRoom}
-                      onBookingCreated={(newBooking) => {
-                        if (onBook) onBook(newBooking);
-                        setExpandedRoom(null);
-                      }}
-                      onClose={() => setExpandedRoom(null)}
-                    />
-                  </Card>
-                ) : null;
-              })()}
-            </div>
-          )}
+                      <BookingForm
+                        roomId={expandedRoom}
+                        onBookingCreated={(newBooking) => {
+                          if (onBook) onBook(newBooking);
+                          // Reduced delay for faster closing
+                          setTimeout(() => {
+                            setExpandedRoom(null);
+                          }, 400);
+                        }}
+                        onClose={() => setExpandedRoom(null)}
+                      />
+                    </Card>
+                  ) : null;
+                })()}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </>
       )}
     </div>

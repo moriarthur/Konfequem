@@ -32,16 +32,17 @@ import { Text, Label } from "./ui/Typography";
 export default function BookingForm({ roomId, onBookingCreated, onClose }) {
   const { authFetch } = useAuth();
   const { showAlert } = useAlert();
+  const [isBookingSuccessful, setIsBookingSuccessful] = useState(false);
   
   // Progressive reveal animation variants
   const progressiveRevealVariants = {
-    hidden: { 
-      opacity: 0, 
+    hidden: {
+      opacity: 0,
       scale: 0.8,
       filter: "blur(2px)"
     },
-    visible: { 
-      opacity: 1, 
+    visible: {
+      opacity: 1,
       scale: 1,
       filter: "blur(0px)",
       transition: {
@@ -49,13 +50,20 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
         ease: [0.25, 0.46, 0.45, 0.94]
       }
     },
-    exit: { 
-      opacity: 0, 
+    exit: {
+      opacity: 0,
       scale: 0.8,
       filter: "blur(2px)",
       transition: {
         duration: 0.3,
         ease: "easeIn"
+      }
+    },
+    success: {
+      scale: [1, 1.05, 1],
+      transition: {
+        duration: 0.4,
+        ease: [0.68, -0.55, 0.265, 1.55]
       }
     }
   };
@@ -259,15 +267,21 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
 
       // authFetch already returns parsed JSON data
       const newBooking = response;
-      
-      // Delay slightly to ensure modal has closed before toast appears
-      setTimeout(() => showAlert("Your booking was created successfully"), 50);
+
+      // Trigger success animation
+      setIsBookingSuccessful(true);
+
+      // Show success message after a brief delay
+      setTimeout(() => showAlert("Your booking was created successfully"), 300);
+
+      // Reset form state
       setSelectedDate(null);
       setSelectedSlot(null);
       setSelectedDuration(null);
       setSelectedPeriod(null);
       setError(null);
-      
+
+      // Notify parent component
       if (onBookingCreated) onBookingCreated(newBooking);
     } catch (error) {
       logError("Error creating booking:", error);
@@ -288,9 +302,11 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
   };
 
   return (
-    <form
+    <motion.form
       onSubmit={handleSubmit}
       className="space-y-4"
+      animate={isBookingSuccessful ? "success" : "visible"}
+      variants={progressiveRevealVariants}
     >
       {error && (
         <Card className="p-4 mb-6 border-status-danger/20 bg-status-danger/10">
@@ -638,15 +654,26 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
       )}
     </AnimatePresence>
 
-      <Button
-        variant="primary"
-        size="lg"
-        type="submit"
-        disabled={!isValid() || loading}
-        className="w-full"
+      <motion.div
+        animate={isBookingSuccessful ? {
+          scale: [1, 1.02, 1],
+          transition: { duration: 0.3 }
+        } : {}}
       >
-        {loading ? "Loading..." : "Book Room"}
-      </Button>
-    </form>
+        <Button
+          variant="primary"
+          size="lg"
+          type="submit"
+          disabled={!isValid() || loading || isBookingSuccessful}
+          className={`w-full ${
+            isBookingSuccessful
+              ? 'bg-status-success hover:bg-status-success focus:ring-status-success/40'
+              : ''
+          }`}
+        >
+          {loading ? "Loading..." : isBookingSuccessful ? "✓ Booking Confirmed" : "Book Room"}
+        </Button>
+      </motion.div>
+    </motion.form>
   );
 }
