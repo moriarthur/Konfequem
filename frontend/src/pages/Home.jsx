@@ -18,6 +18,11 @@ export default function Home() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [colorMode, setColorMode] = useState("Light");
     const [language, setLanguage] = useState("ENG");
+    const [showHelper, setShowHelper] = useState(() => {
+        if (typeof window === "undefined") return true;
+        const hasSeenHelper = localStorage.getItem('hasSeenMenuHelper');
+        return !hasSeenHelper;
+    });
     const menuPanelRef = useRef(null);
     const contentRef = useRef(null);
     const previouslyFocusedElementRef = useRef(null);
@@ -34,6 +39,14 @@ export default function Home() {
         mediaQuery.addEventListener("change", handleChange);
         return () => mediaQuery.removeEventListener("change", handleChange);
     }, []);
+
+    useEffect(() => {
+        // Hide helper permanently after menu is opened for the first time
+        if (isMenuOpen && showHelper) {
+            localStorage.setItem('hasSeenMenuHelper', 'true');
+            setShowHelper(false);
+        }
+    }, [isMenuOpen, showHelper]);
 
     const handleColorModeChange = (mode, { closeMenu = false } = {}) => {
         if (mode === colorMode) {
@@ -233,32 +246,35 @@ export default function Home() {
 
             {!loading && (
                 <>
-                    <div ref={contentRef}>
-                        <div className={`relative flex flex-col items-center gap-4 z-20 transition-all duration-500 ${
-                                isMenuOpen ? 'mb-4' : 'mb-20'
-                            }`}>
-                            {/* Helper text */}
-                            <div className={`transition-all duration-500 overflow-hidden ${
-                                isMenuOpen ? 'max-h-0 opacity-0' : 'max-h-8 opacity-100'
-                            }`}>
-                                <Text variant="small" className="text-center text-accent-secondary/50">
-                                    Manage theme, language, and account controls right from here.
-                                </Text>
-                            </div>
+                    <div ref={contentRef} className="relative">
+                        {/* Logo and helper - positioned to be above menu */}
+                        <div className="relative flex flex-col items-center gap-4 z-20 mb-8">
+                            {/* Helper text - only shown to new users */}
+                            {showHelper && (
+                                <div className={`transition-all duration-500 overflow-hidden ${
+                                    isMenuOpen ? 'max-h-0 opacity-0' : 'max-h-8 opacity-100'
+                                }`}>
+                                    <Text variant="small" className="text-center text-accent-secondary/50">
+                                        Manage theme, language, and account controls right from here.
+                                    </Text>
+                                </div>
+                            )}
 
-                            {/* Arrow */}
-                            <div className="flex justify-center">
-                                <span
-                                    aria-hidden="true"
-                                    className={`text-xs leading-none transition-all duration-200 ${
-                                        isMenuOpen
-                                            ? 'opacity-0'
-                                            : 'text-accent-secondary/60 opacity-70'
-                                    }`}
-                                >
-                                    ▼
-                                </span>
-                            </div>
+                            {/* Arrow - only shown to new users */}
+                            {showHelper && (
+                                <div className="flex justify-center">
+                                    <span
+                                        aria-hidden="true"
+                                        className={`text-xs leading-none transition-all duration-200 inline-block animate-bounce-gentle ${
+                                            isMenuOpen
+                                                ? 'opacity-0'
+                                                : 'text-accent-secondary/60 opacity-70'
+                                        }`}
+                                    >
+                                        ▼
+                                    </span>
+                                </div>
+                            )}
 
                             {/* Logo and workspace text */}
                             <div className="flex items-center gap-6">
@@ -317,15 +333,16 @@ export default function Home() {
                             </div>
                         </div>
 
+                        {/* Menu - positioned to appear from under the logo */}
                         <div className="hidden md:block">
                             <div
                                 id="workspace-menu-panel"
                                 role="region"
                                 aria-label="Workspace controls"
-                                className={`mx-auto w-full max-w-3xl overflow-hidden rounded-3xl border border-border-subtle bg-surface-base shadow-soft transition-all duration-500 ease-out ${
+                                className={`mx-auto w-full max-w-3xl overflow-hidden rounded-3xl border border-border-subtle bg-surface-base shadow-soft transition-all duration-500 ease-out z-10 ${
                                     isMenuOpen
-                                        ? 'max-h-[320px] opacity-100 translate-y-0 mb-12'
-                                        : 'max-h-0 opacity-0 pointer-events-none'
+                                        ? 'opacity-100 max-h-[320px] mt-4'
+                                        : 'opacity-0 max-h-0 -translate-y-2 pointer-events-none'
                                 }`}
                             >
                                 <div className="grid gap-6 p-6 md:grid-cols-3">
@@ -404,12 +421,15 @@ export default function Home() {
                                 {isMenuOpen && (
                                     <div className="px-6 pb-6">
                                         <Text variant="small" className="text-center text-accent-secondary/50">
-                                            
+
                                         </Text>
                                     </div>
                                 )}
                             </div>
                         </div>
+
+                        {/* Spacing between menu and content when menu is open */}
+                        {isMenuOpen && <div className="mb-8"></div>}
 
                         {isAuthenticated ? (
                             <>
