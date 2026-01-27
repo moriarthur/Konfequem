@@ -1,0 +1,117 @@
+import React, { useMemo } from "react";
+import { DateTime } from "luxon";
+import { OFFICE_TIMEZONE, OFFICE_HOURS } from "../utils/bookingUtils";
+import { Text } from "./ui/Typography";
+
+export default function RoomMiniAvailability({ bookings = [], roomId = null }) {
+  // Calculate availability for the next 7 days
+  const weeklyAvailability = useMemo(() => {
+    const availability = [];
+    const today = DateTime.now().setZone(OFFICE_TIMEZONE);
+
+    for (let i = 0; i < 7; i++) {
+      const date = today.plus({ days: i });
+      const dateKey = date.toFormat("yyyy-MM-dd");
+
+      // Filter bookings for this room and this day
+      const dayBookings = bookings.filter((booking) => {
+        const bookingDate = DateTime.fromISO(booking.start_time)
+          .setZone(OFFICE_TIMEZONE)
+          .toFormat("yyyy-MM-dd");
+        return bookingDate === dateKey && booking.room === roomId;
+      });
+
+      // Calculate total booked minutes
+      const totalBookedMinutes = dayBookings.reduce((sum, booking) => {
+        const start = DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE);
+        const end = DateTime.fromISO(booking.end_time).setZone(OFFICE_TIMEZONE);
+        return sum + end.diff(start, "minutes").minutes;
+      }, 0);
+
+      // Calculate total available minutes (office hours)
+      const officeHoursMinutes = (OFFICE_HOURS.end - OFFICE_HOURS.start) * 60;
+      const occupancyPercent = Math.round((totalBookedMinutes / officeHoursMinutes) * 100);
+
+      availability.push({
+        date,
+        day: date.toFormat("EEE"),
+        occupancyPercent,
+        status: occupancyPercent >= 80 ? "full" : occupancyPercent >= 50 ? "busy" : "available"
+      });
+    }
+
+    return availability;
+  }, [bookings, roomId]);
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "available":
+        return "bg-status-success";
+      case "busy":
+        return "bg-status-warning";
+      case "full":
+        return "bg-status-danger";
+      default:
+        return "bg-surface-muted";
+    }
+  };
+
+  const getProgressColor = (status) => {
+    switch (status) {
+      case "available":
+        return "bg-status-success/20";
+      case "busy":
+        return "bg-status-warning/20";
+      case "full":
+        return "bg-status-danger/20";
+      default:
+        return "bg-surface-muted";
+    }
+  };
+
+  return (
+    <div className="mt-4">
+      <Text variant="small" className="font-medium text-accent-secondary/70 mb-2">
+        This Week's Availability:
+      </Text>
+      <div className="space-y-1.5">
+        {weeklyAvailability.map((day, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <span className="text-xs font-medium text-accent-secondary/60 w-8">
+              {day.day}
+            </span>
+            <div className="flex-1 relative">
+              <div className={`h-4 rounded-full overflow-hidden ${getProgressColor(day.status)}`}>
+                <div
+                  className={`h-full transition-all duration-500 ${getStatusColor(day.status)}`}
+                  style={{ width: `${day.occupancyPercent}%` }}
+                />
+              </div>
+            </div>
+            <span className="text-xs font-medium text-accent-secondary/60 w-10 text-right">
+              {day.occupancyPercent}%
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 pt-2 border-t border-border-subtle/50">
+        <div className="flex items-center justify-between text-xs text-accent-secondary/50">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-status-success" />
+              <span>Available</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-status-warning" />
+              <span>Busy</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-status-danger" />
+              <span>Full</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

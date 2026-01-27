@@ -9,7 +9,7 @@ import { Heading, Text } from "./ui/Typography";
 import EmptyState from "./ui/EmptyState";
 import RoomCard from "./RoomCard";
 
-export default function RoomList({ rooms, onBook }) {
+export default function RoomList({ rooms, onBook, bookings = [] }) {
   const [expandedRoom, setExpandedRoom] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [minCapacity, setMinCapacity] = useState("all");
@@ -224,6 +224,7 @@ export default function RoomList({ rooms, onBook }) {
                   isActive={expandedRoom === room.id}
                   onToggleBookingForm={(roomId) => setExpandedRoom(expandedRoom === roomId ? null : roomId)}
                   onBook={onBook}
+                  bookings={bookings}
                 />
               ))}
             </div>

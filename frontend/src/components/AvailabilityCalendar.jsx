@@ -53,6 +53,7 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
         occupancyPercent: Math.round(occupancyPercent),
         freeSlots: Math.floor(freeMinutes / OFFICE_HOURS.minDuration),
         date: d,
+        bookings: dayBookings, // Store the actual bookings for the selected day
       };
     }
 
@@ -101,6 +102,7 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
           text: "text-status-success",
           fill: "bg-status-success/30",
           fillHover: "hover:bg-status-success/40",
+          dot: "bg-status-success",
         };
       case "busy":
         return {
@@ -109,6 +111,7 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
           text: "text-status-warning",
           fill: "bg-status-warning/30",
           fillHover: "hover:bg-status-warning/40",
+          dot: "bg-status-warning",
         };
       case "full":
         return {
@@ -117,6 +120,7 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
           text: "text-status-danger",
           fill: "bg-status-danger/30",
           fillHover: "hover:bg-status-danger/40",
+          dot: "bg-status-danger",
         };
       default:
         return {
@@ -225,41 +229,24 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
                 )}
               </div>
 
-              {/* Enhanced tooltip */}
-              {tooltipDay === dateKey && dayData && (
+              {/* Simplified tooltip - only show quick status */}
+              {tooltipDay === dateKey && dayData && !isSelected && (
                 <div
-                  className="absolute bottom-full left-1/2 transform -translate-x-1/2 z-50 mb-3 pointer-events-none animate-fadeIn"
+                  className="absolute bottom-full left-1/2 transform -translate-x-1/2 z-50 mb-2 pointer-events-none animate-fadeIn"
                 >
-                  <Card className="p-4 shadow-lift min-w-[200px]">
-                    <Text variant="small" className="font-semibold text-accent-secondary mb-3">
-                      {day.toFormat("EEEE, MMMM d")}
-                    </Text>
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <Text variant="muted">Status:</Text>
-                        <Text variant="small" className={`font-medium ${statusStyles.text}`}>
-                          {getStatusLabel(dayData.status)}
-                        </Text>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <Text variant="muted">Free slots:</Text>
-                        <Text variant="small" className="font-medium">
-                          {dayData.freeSlots}
-                        </Text>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <Text variant="muted">Occupancy:</Text>
-                        <Text variant="small" className="font-medium">
-                          {dayData.occupancyPercent}%
-                        </Text>
-                      </div>
-                    </div>
-                    <div className="mt-3 pt-3 border-t border-border-subtle">
-                      <Text variant="muted" className="text-xs text-center">
-                        Click for details
+                  <div className={`px-3 py-2 rounded-lg shadow-md border ${statusStyles.border} ${statusStyles.bg} backdrop-blur-sm`}>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${statusStyles.dot}`} />
+                      <Text variant="small" className={`font-medium ${statusStyles.text} whitespace-nowrap`}>
+                        {getStatusLabel(dayData.status)}
                       </Text>
+                      {dayData.freeSlots > 0 && (
+                        <Text variant="small" className="text-accent-secondary/60 whitespace-nowrap">
+                          {dayData.freeSlots} slots
+                        </Text>
+                      )}
                     </div>
-                  </Card>
+                  </div>
                 </div>
               )}
             </div>
@@ -270,7 +257,7 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
       {/* Selected day details */}
       {selectedDay && dayAvailability[selectedDay] && (
         <Card className={`border-2 ${getStatusStyles(dayAvailability[selectedDay].status).border} ${getStatusStyles(dayAvailability[selectedDay].status).bg} p-6 animate-fadeIn`}>
-          <div className="mb-4">
+          <div className="mb-6">
             <Text variant="small" className="uppercase tracking-[0.2em] text-accent-secondary/60 mb-2">
               Selected Date Details
             </Text>
@@ -279,7 +266,36 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
             </h3>
           </div>
 
-          <div className="grid grid-cols-3 gap-6 mb-4">
+          {/* Time-based visualization */}
+          <div className="mb-6">
+            <Text variant="small" className="font-semibold text-accent-secondary mb-3">Hourly Availability</Text>
+            <div className="grid grid-cols-8 gap-1 mb-2">
+              {(() => {
+                const hours = [];
+                for (let hour = OFFICE_HOURS.start; hour < OFFICE_HOURS.end; hour++) {
+                  const hourStr = `${hour.toString().padStart(2, '0')}:00`;
+                  const isBooked = dayAvailability[selectedDay].bookings.some(booking => {
+                    const bookingStart = DateTime.fromISO(booking.start_time).hour;
+                    const bookingEnd = DateTime.fromISO(booking.end_time).hour;
+                    return hour >= bookingStart && hour < bookingEnd;
+                  });
+                  hours.push(
+                    <div key={hour} className="relative">
+                      <div className={`h-12 rounded ${isBooked ? 'bg-status-danger/30 border border-status-danger/50' : 'bg-status-success/30 border border-status-success/50'} hover:opacity-80 transition-opacity`}>
+                        <Text variant="small" className="text-xs text-center mt-1 font-medium">
+                          {hourStr}
+                        </Text>
+                      </div>
+                    </div>
+                  );
+                }
+                return hours;
+              })()}
+            </div>
+          </div>
+
+          {/* Stats overview */}
+          <div className="grid grid-cols-3 gap-6 mb-6">
             <div className="text-center">
               <div className={`inline-flex items-center justify-center w-12 h-12 rounded-full ${getStatusStyles(dayAvailability[selectedDay].status).bg} mb-2`}>
                 <Heading level={2} className={`text-3xl ${getStatusStyles(dayAvailability[selectedDay].status).text}`}>
@@ -306,29 +322,52 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
             </div>
           </div>
 
-          <Text variant="muted" className="text-center">
+          {/* Existing bookings */}
+          {dayAvailability[selectedDay].bookings && dayAvailability[selectedDay].bookings.length > 0 && (
+            <div className="mb-6">
+              <Text variant="small" className="font-semibold text-accent-secondary mb-3">Existing Bookings</Text>
+              <div className="space-y-2">
+                {dayAvailability[selectedDay].bookings.map((booking, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-surface-muted/30 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full bg-status-danger"></div>
+                      <Text variant="small" className="font-medium">
+                        {DateTime.fromISO(booking.start_time).toFormat("HH:mm")} - {DateTime.fromISO(booking.end_time).toFormat("HH:mm")}
+                      </Text>
+                    </div>
+                    <Text variant="small" className="text-accent-secondary/70">
+                      {booking.room_name || booking.room || 'Room'}
+                    </Text>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <Text variant="muted" className="text-center mb-4">
             {dayAvailability[selectedDay].freeSlots > 0
               ? `${dayAvailability[selectedDay].freeSlots} time slots available. Continue to booking to reserve your preferred time.`
               : "All time slots are booked for this day. Please select another date."}
           </Text>
+
+          {/* Legend moved inside the selected card */}
+          <div className="grid grid-cols-3 gap-4 p-4 bg-surface-muted/30 rounded-xl">
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-status-success/5 border border-status-success/10">
+              <div className="w-3 h-3 rounded-full bg-status-success" />
+              <Text variant="small" className="text-status-success-text font-medium">Available (0-50%)</Text>
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-status-warning/5 border border-status-warning/10">
+              <div className="w-3 h-3 rounded-full bg-status-warning" />
+              <Text variant="small" className="text-status-warning-text font-medium">Busy (50-80%)</Text>
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-status-danger/5 border border-status-danger/10">
+              <div className="w-3 h-3 rounded-full bg-status-danger" />
+              <Text variant="small" className="text-status-danger-text font-medium">Full (80-100%)</Text>
+            </div>
+          </div>
         </Card>
       )}
 
-      {/* Redesigned legend */}
-      <div className="grid grid-cols-3 gap-4 p-4 bg-surface-muted/30 rounded-xl">
-        <div className="flex items-center gap-3 p-3 rounded-lg bg-status-success/5 border border-status-success/10">
-          <div className="w-3 h-3 rounded-full bg-status-success" />
-          <Text variant="small" className="text-status-success-text font-medium">Available (0-50%)</Text>
-        </div>
-        <div className="flex items-center gap-3 p-3 rounded-lg bg-status-warning/5 border border-status-warning/10">
-          <div className="w-3 h-3 rounded-full bg-status-warning" />
-          <Text variant="small" className="text-status-warning-text font-medium">Busy (50-80%)</Text>
-        </div>
-        <div className="flex items-center gap-3 p-3 rounded-lg bg-status-danger/5 border border-status-danger/10">
-          <div className="w-3 h-3 rounded-full bg-status-danger" />
-          <Text variant="small" className="text-status-danger-text font-medium">Full (80-100%)</Text>
-        </div>
-      </div>
-    </Card>
+      </Card>
   );
 }

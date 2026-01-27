@@ -2,20 +2,22 @@ import React from "react";
 import Card from "./ui/Card";
 import { Heading, Text } from "./ui/Typography";
 import Button from "./ui/Button";
+import RoomMiniAvailability from "./RoomMiniAvailability";
 
 export default function RoomCard({
   room,
   isActive,
   onToggleBookingForm,
   onBook,
+  bookings = [],
 }) {
   return (
     <Card className="relative h-full flex flex-col">
       {/* Status indicator */}
       {isActive && (
         <div className="absolute top-4 right-4 z-10">
-          <div className="px-2.5 py-1 bg-status-info/10 border border-status-info/20 rounded-full">
-            <Text variant="small" className="text-status-info-text font-medium">
+          <div className="px-2.5 py-1 bg-accent-primary/10 border border-accent-primary/20 rounded-full">
+            <Text variant="small" className="text-accent-primary font-medium">
               Selected
             </Text>
           </div>
@@ -49,9 +51,12 @@ export default function RoomCard({
           </div>
         </div>
 
-        <Text variant="muted" className="mt-4 mb-6 text-sm leading-relaxed">
+        <Text variant="muted" className="mt-4 mb-4 text-sm leading-relaxed">
           Perfect for meetings and collaborative sessions. This space offers a comfortable environment for productive work.
         </Text>
+
+        {/* Mini Availability */}
+        <RoomMiniAvailability bookings={bookings} roomId={room.id} />
       </div>
 
       {/* Action Button */}

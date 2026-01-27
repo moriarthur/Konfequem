@@ -131,6 +131,7 @@ export default function Home() {
         }
     };
 
+  
     const { upcomingCount, nextBooking } = useMemo(() => {
         if (!bookings || bookings.length === 0) {
             return { upcomingCount: 0, nextBooking: null };
@@ -557,7 +558,7 @@ export default function Home() {
                                     <Heading level={2} className="mb-6">
                                         Available Rooms
                                     </Heading>
-                                    <RoomList rooms={rooms} onBook={handleBookingCreated} />
+                                    <RoomList rooms={rooms} onBook={handleBookingCreated} bookings={bookings} />
                                 </section>
 
                                 <section className="mb-12">
