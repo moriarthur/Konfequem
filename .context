@@ -1,0 +1,67 @@
+# Quick Context Reference
+
+## Project: Konfequem - Room Booking System
+Type: Django + React room booking application
+
+### Stack
+- Backend: Django 4.2 + Django REST Framework
+- Frontend: React 19 + Vite + Tailwind CSS
+- Database: PostgreSQL (prod) / SQLite (dev)
+- Auth: JWT tokens
+
+### Key Features
+✓ Room listing with capacity/location
+✓ Time-based booking system (08:00-22:00 Berlin time)
+✓ Booking validation (15 min - 8 hours, max 90 days ahead)
+✓ JWT authentication
+✓ Responsive UI with card components
+
+### Business Rules
+• No overlapping bookings
+• Office hours only: 08:00-22:00 (Berlin timezone)
+• Min duration: 15 minutes
+• Max duration: 8 hours
+• Max advance booking: 90 days
+
+### Ports
+- Local backend: 8000
+- Local frontend: 5173
+- Local DB: 5432
+- Docker DB: 5433
+
+### Important Files
+• Backend: backend/rooms/ (models, views, serializers)
+• Frontend: frontend/src/ (components, context, pages)
+• Config: docker-compose.yml, .env
+
+### Recent Changes
+- Unified design system (Card, Button, Typography)
+- Enhanced room cards with badges
+- Improved booking list UI
+- Alert system added
+- Header UX improvements
+
+### DB Models
+- Room: name, location, capacity (1-50)
+- Booking: room, user, start_time, end_time
+
+### API Structure
+- /api/rooms/ (read-only, public)
+- /api/bookings/ (auth CRUD)
+
+### Quick Commands
+```bash
+# Start with Docker
+docker-compose up --build
+
+# Backend (local)
+cd backend && pip install -r requirements.txt
+python manage.py migrate && runserver
+
+# Frontend (local)
+cd frontend && npm install && npm run dev
+```
+
+### Note
+- Use .claude file for full details
+- Use DEV_GUIDE.md for development procedures

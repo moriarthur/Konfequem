@@ -1,0 +1,101 @@
+# Konfequem Project Context
+
+## Overview
+Konfequem is a room booking system with a Django REST Framework backend and React 19 frontend.
+
+## Architecture
+- **Backend**: Django 4.2 with Django REST Framework
+- **Frontend**: React 19 with Vite
+- **Database**: PostgreSQL (production) / SQLite (development)
+- **Authentication**: JWT tokens with Django REST SimpleJWT
+
+## Directory Structure
+```
+/Konfequem
+├── backend/              # Django backend
+│   ├── config/          # Django project config
+│   ├── rooms/           # Main app (rooms & bookings)
+│   ├── admin-interface/ # Custom admin
+│   ├── migrations/      # Database migrations
+│   └── .venv/           # Python virtual env
+├── frontend/            # React frontend
+│   ├── src/
+│   │   ├── components/  # React components
+│   │   ├── context/     # Auth & Alert contexts
+│   │   ├── pages/       # Page components
+│   │   └── utils/       # Utilities
+│   └── public/          # Public files
+└── docker-compose.yml   # Docker setup
+```
+
+## Core Features
+1. **Room Management**: Listing, capacity (1-50), location
+2. **Booking System**:
+   - CRUD operations
+   - Time validation (08:00-22:00 Berlin time)
+   - Duration limits (15 min - 8 hours)
+   - Advanced booking (max 90 days ahead)
+   - Overlap prevention
+3. **Authentication**: JWT login/logout, token refresh
+4. **UI**: Card-based design, enhanced UX from recent commits
+
+## Database Models
+- **Room**: name, location, capacity
+- **Booking**: room, user, start_time, end_time
+- Unique constraint on (room, start_time, end_time)
+
+## API Endpoints
+- Rooms: `/api/rooms/` (read-only)
+- Bookings: `/api/bookings/` (authenticated CRUD)
+
+## Environment Setup
+### Local Development
+- Backend runs on port 8000
+- Frontend runs on port 5173
+- Database: PostgreSQL on port 5432 (local setup)
+
+### Docker Development
+- Backend: http://localhost:8000
+- Frontend: http://localhost:5173
+- Database: postgresql://admin:secret@localhost:5433/booking
+
+## Key Dependencies
+### Backend
+- Django 4.2+, djangorestframework
+- psycopg2-binary, dj-database-url
+- djangorestframework-simplejwt (JWT)
+- django-cors-headers, django-admin-interface
+
+### Frontend
+- React 19, react-router-dom
+- Vite, Tailwind CSS
+- date-fns/luxon (dates)
+- framer-motion (animations)
+- react-day-picker (date picker)
+
+## Configuration
+- **Docker**: Toggle with DOCKER=true/false in .env
+- **Database URL**: Changes based on Docker mode
+- **Backend URL**: http://localhost:8000 (development)
+- **Timezone**: Berlin for display, UTC for storage
+
+## Recent Changes
+- Unified design system with Card, Button, Typography components
+- Enhanced room cards with icons and badges
+- Improved booking list with card-based design
+- Alert system for user feedback
+- Header UX improvements
+- Modal confirmation for booking cancellations
+
+## Business Rules
+- Office hours: 08:00-22:00 (Berlin time)
+- Minimum booking: 15 minutes
+- Maximum booking: 8 hours
+- Maximum advance booking: 90 days
+- No overlapping bookings allowed
+
+## Development Workflow
+1. Docker-compose for full stack
+2. Separate local PostgreSQL support
+3. Environment-specific configuration
+4. Git-friendly settings (no .env commits)
