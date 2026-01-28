@@ -22,9 +22,16 @@ class BookingSerializer(serializers.ModelSerializer):
     
     def validate(self, data):
         errors = []
-        start = data.get('start_time')
-        end = data.get('end_time')
-        room = data.get('room')
+        # For partial updates, use instance values for missing fields
+        if self.partial and self.instance:
+            start = data.get('start_time', self.instance.start_time)
+            end = data.get('end_time', self.instance.end_time)
+            room = data.get('room', self.instance.room)
+        else:
+            start = data.get('start_time')
+            end = data.get('end_time')
+            room = data.get('room')
+
         user = self.context['request'].user
 
         now = timezone.now()
@@ -41,11 +48,11 @@ class BookingSerializer(serializers.ModelSerializer):
 
             # Get Berlin timezone
             berlin_tz = timezone.get_default_timezone()
-            
+
             # Ensure times are in Berlin timezone for validation
             start_local = start.astimezone(berlin_tz)
             end_local = end.astimezone(berlin_tz)
-            
+
             # Office hours: 08:00 – 22:00 (Berlin time)
             if start_local.hour < 8 or start_local.hour >= 22 or end_local.hour > 22 or end_local.hour < 8:
                 errors.append("Bookings must be within office hours (08:00–22:00).")
