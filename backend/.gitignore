@@ -1,0 +1,4 @@
+.serena/
+.coverage
+coverage.xml
+htmlcov/
