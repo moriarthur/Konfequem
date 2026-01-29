@@ -1,10 +1,11 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import RoomViewSet, BookingViewSet, CurrentUserView
+from .views import RoomViewSet, BookingViewSet, CurrentUserView, RoomFeatureViewSet
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 router = DefaultRouter()
 router.register(r'rooms', RoomViewSet)
+router.register(r'room-features', RoomFeatureViewSet, basename='room-feature')
 router.register(r'bookings', BookingViewSet, basename='booking')
 
 urlpatterns = [

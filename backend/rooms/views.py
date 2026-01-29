@@ -5,14 +5,21 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from datetime import datetime
 
-from .models import Room, Booking
-from .serializers import RoomSerializer, BookingSerializer
+from .models import Room, Booking, RoomFeature
+from .serializers import RoomSerializer, BookingSerializer, RoomFeatureSerializer
 
 
 class RoomViewSet(viewsets.ReadOnlyModelViewSet):
     """Read-only view for rooms."""
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
+    permission_classes = [AllowAny]
+
+
+class RoomFeatureViewSet(viewsets.ReadOnlyModelViewSet):
+    """Read-only view for room features."""
+    queryset = RoomFeature.objects.all()
+    serializer_class = RoomFeatureSerializer
     permission_classes = [AllowAny]
 
 

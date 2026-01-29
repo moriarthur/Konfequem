@@ -4,7 +4,7 @@ import { OFFICE_TIMEZONE } from "../utils/bookingUtils";
 import { useAlert } from "../context/AlertContext";
 import Card from "./ui/Card";
 import Button from "./ui/Button";
-import { Heading, Text, Subheading } from "./ui/Typography";
+import { Text, Subheading } from "./ui/Typography";
 import StatusBadge from "./StatusBadge";
 
 // BookingList is a controlled component - it renders directly from the `bookings` prop
@@ -15,7 +15,7 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
   const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming' or 'history'
   const [collapsedDates, setCollapsedDates] = useState(() => {
     const initialCollapsed = new Set();
-    
+
     // Find the date with the next upcoming booking
     if (bookings.length > 0) {
       const now = DateTime.now().setZone(OFFICE_TIMEZONE);
@@ -23,14 +23,14 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
       if (future.length > 0) {
         const nextBooking = future.sort((a, b) => new Date(a.start_time) - new Date(b.start_time))[0];
         const nextBookingDate = DateTime.fromISO(nextBooking.start_time).setZone(OFFICE_TIMEZONE).toFormat('yyyy-MM-dd');
-        
+
         // Collapse all dates except the one with next booking
         const allDates = new Set();
         bookings.forEach(b => {
           const dateKey = DateTime.fromISO(b.start_time).setZone(OFFICE_TIMEZONE).toFormat('yyyy-MM-dd');
           allDates.add(dateKey);
         });
-        
+
         allDates.forEach(date => {
           if (date !== nextBookingDate) {
             initialCollapsed.add(date);
@@ -38,30 +38,61 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
         });
       }
     }
-    
+
     return initialCollapsed;
   });
-  const [page, setPage] = useState(0);
-  const pageSizeDates = 5;
+
+  // Infinite scroll state
+  const [displayedCount, setDisplayedCount] = useState(10); // Number of bookings to show
+  const loadMoreRef = useRef(null); // Ref for the intersection observer target
   const { showAlert } = useAlert();
   const scrollPositions = useRef(new Map());
   const [confirmCancel, setConfirmCancel] = useState(null); // { id, room_name, start_time, end_time }
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting) {
+          setDisplayedCount(prev => Math.min(prev + 10, sortedBookings.length));
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentRef = loadMoreRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, [sortedBookings.length]);
+
+  // Reset displayed count when tab changes
+  useEffect(() => {
+    setDisplayedCount(10);
+  }, [activeTab]);
 
   const handleToggleCollapse = (dateKey) => {
     // Save current scroll position before toggle
     const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
     scrollPositions.current.set(dateKey, currentScroll);
-    
+
     const s = new Set(collapsedDates);
     const isCollapsing = !s.has(dateKey);
-    
+
     if (s.has(dateKey)) {
       s.delete(dateKey);
     } else {
       s.add(dateKey);
     }
     setCollapsedDates(s);
-    
+
     // If collapsing, restore scroll position after animation
     if (isCollapsing) {
       setTimeout(() => {
@@ -84,7 +115,7 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
     const now = DateTime.now().setZone(OFFICE_TIMEZONE);
     const startTime = DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE);
     const endTime = DateTime.fromISO(booking.end_time).setZone(OFFICE_TIMEZONE);
-    
+
     if (now < startTime) {
       return 'upcoming';
     } else if (now >= startTime && now < endTime) {
@@ -136,29 +167,25 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
       case 'created_asc':
         return list.sort((a, b) => new Date(a.created_at || a.start_time).getTime() - new Date(b.created_at || b.start_time).getTime());
       case 'created_desc':
-        return list.sort((a, b) => new Date(b.created_at || b.start_time).getTime() - new Date(a.created_at || b.start_time).getTime());
+        return list.sort((a, b) => new Date(b.created_at || a.start_time).getTime() - new Date(a.created_at || b.start_time).getTime());
       default:
         return list.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
     }
   }, [filteredBookings, sortByUpcoming, sortByHistory, activeTab]);
 
-  // Group bookings by date
+  // Group bookings by date (only for displayed bookings)
+  const displayedBookings = sortedBookings.slice(0, displayedCount);
   const grouped = useMemo(() => {
     const map = new Map();
-    for (const b of sortedBookings) {
+    for (const b of displayedBookings) {
       const key = DateTime.fromISO(b.start_time).setZone(OFFICE_TIMEZONE).toFormat('yyyy-MM-dd');
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(b);
     }
     return map;
-  }, [sortedBookings]);
+  }, [displayedBookings]);
 
   const dateKeys = useMemo(() => Array.from(grouped.keys()), [grouped]);
-  const totalPages = Math.max(1, Math.ceil(dateKeys.length / pageSizeDates));
-  useEffect(() => {
-    if (page >= totalPages) setPage(Math.max(0, totalPages - 1));
-  }, [totalPages, page]);
-  const visibleDateKeys = dateKeys.slice(page * pageSizeDates, (page + 1) * pageSizeDates);
 
   // Next upcoming booking (only for upcoming tab)
   const now = DateTime.now().setZone(OFFICE_TIMEZONE);
@@ -169,12 +196,8 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
     return future.sort((a, b) => new Date(a.start_time) - new Date(b.start_time))[0].id;
   }, [sortedBookings, now, activeTab]);
 
-  // Cleanup effect
-  useEffect(() => {
-    return () => {
-      // No cleanup needed
-    };
-  }, []);
+  // Check if there are more bookings to load
+  const hasMore = displayedCount < sortedBookings.length;
 
   if (!bookings || bookings.length === 0) {
     return (
@@ -185,26 +208,26 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Tabs */}
-      <Card padding="p-2" className="border border-border-subtle shadow-soft rounded-2xl">
+      <Card padding="p-1" className="border border-border-subtle shadow-soft rounded-xl">
         <div className="flex gap-0">
           <button
-            className={`flex-1 px-6 py-4 text-sm font-medium rounded-xl transition-all ${
+            className={`flex-1 px-4 py-3 text-sm font-medium rounded-lg transition-all ${
               activeTab === 'upcoming'
-                ? 'text-accent-primary border-2 border-accent-primary bg-accent-primary/10'
-                : 'text-accent-secondary/60 border-2 border-transparent hover:text-accent-secondary hover:bg-surface-muted'
+                ? 'text-accent-primary border border-accent-primary bg-accent-primary/10'
+                : 'text-accent-secondary/60 border border-transparent hover:text-accent-secondary hover:bg-surface-muted'
             }`}
             onClick={() => setActiveTab('upcoming')}
           >
             Upcoming ({bookings.filter(b => DateTime.fromISO(b.start_time).setZone(OFFICE_TIMEZONE) >= now).length})
           </button>
-          <div className="w-px bg-border-subtle/30 mx-2" />
+          <div className="w-px bg-border-subtle/30 mx-1" />
           <button
-            className={`flex-1 px-6 py-4 text-sm font-medium rounded-xl transition-all ${
+            className={`flex-1 px-4 py-3 text-sm font-medium rounded-lg transition-all ${
               activeTab === 'history'
-                ? 'text-accent-primary border-2 border-accent-primary bg-accent-primary/10'
-                : 'text-accent-secondary/60 border-2 border-transparent hover:text-accent-secondary hover:bg-surface-muted'
+                ? 'text-accent-primary border border-accent-primary bg-accent-primary/10'
+                : 'text-accent-secondary/60 border border-transparent hover:text-accent-secondary hover:bg-surface-muted'
             }`}
             onClick={() => setActiveTab('history')}
           >
@@ -213,49 +236,24 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
         </div>
       </Card>
 
-      {/* Sticky sort bar */}
-      <div className="sticky top-4 z-40">
-        <Card className="bg-surface-base/95 backdrop-blur-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Text variant="default">Sort:</Text>
-              <select
-                value={activeTab === 'history' ? sortByHistory : sortByUpcoming}
-                onChange={(e) => {
-                  if (activeTab === 'history') setSortByHistory(e.target.value);
-                  else setSortByUpcoming(e.target.value);
-                }}
-                className="border border-border-subtle rounded-xl px-3 py-2 text-sm bg-surface-base text-accent-secondary focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary"
-              >
-                <option value="date_asc">Date (oldest first)</option>
-                <option value="date_desc">Date (newest first)</option>
-                <option value="created_asc">Added (oldest first)</option>
-                <option value="created_desc">Added (newest first)</option>
-              </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setPage(p => Math.max(0, p - 1))}
-                disabled={page === 0}
-              >
-                Prev
-              </Button>
-              <Text variant="small" className="px-2">
-                Page {page + 1} / {totalPages}
-              </Text>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                disabled={page >= totalPages - 1}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        </Card>
+      {/* Sort bar - simplified for mobile */}
+      <div className="flex items-center justify-between px-2">
+        <select
+          value={activeTab === 'history' ? sortByHistory : sortByUpcoming}
+          onChange={(e) => {
+            if (activeTab === 'history') setSortByHistory(e.target.value);
+            else setSortByUpcoming(e.target.value);
+          }}
+          className="border border-border-subtle rounded-lg px-3 py-2 text-sm bg-surface-base text-accent-secondary focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary"
+        >
+          <option value="date_asc">Date (oldest first)</option>
+          <option value="date_desc">Date (newest first)</option>
+          <option value="created_asc">Added (oldest first)</option>
+          <option value="created_desc">Added (newest first)</option>
+        </select>
+        <Text variant="small" className="text-accent-secondary/60">
+          Showing {displayedBookings.length} of {sortedBookings.length}
+        </Text>
       </div>
 
       {/* Grouped bookings by date */}
@@ -266,89 +264,111 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
           </Text>
         </Card>
       ) : (
-        visibleDateKeys.map(dateKey => {
-          const items = grouped.get(dateKey) || [];
-          const collapsed = collapsedDates.has(dateKey);
-          return (
-            <Card key={dateKey} padding="p-0" className="overflow-hidden border border-border-subtle booking-date-group">
-              <div 
-                className="flex items-center justify-between p-4 border-b border-border-subtle cursor-pointer hover:bg-surface-muted transition-colors"
-                onClick={() => handleToggleCollapse(dateKey)}
-              >
-                <div>
-                  <Subheading className="text-base">
-                    {DateTime.fromFormat(dateKey, 'yyyy-MM-dd').setZone(OFFICE_TIMEZONE).toFormat('dd.MM.yyyy')}
-                  </Subheading>
-                  <Text variant="small" className="mt-1">
-                    {items.length} booking{items.length !== 1 ? 's' : ''}
-                  </Text>
-                </div>
-                <div className="flex items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon" className={`w-6 h-6 text-gray-500 transform transition-transform duration-300 ${collapsed ? '' : 'rotate-180'}`}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"></path>
+        <>
+          {dateKeys.map(dateKey => {
+            const items = grouped.get(dateKey) || [];
+            const collapsed = collapsedDates.has(dateKey);
+            return (
+              <Card key={dateKey} padding="p-0" className="overflow-hidden border border-border-subtle booking-date-group">
+                <div
+                  className="flex items-center justify-between p-4 border-b border-border-subtle cursor-pointer hover:bg-surface-muted transition-colors"
+                  onClick={() => handleToggleCollapse(dateKey)}
+                >
+                  <div>
+                    <Subheading className="text-base">
+                      {DateTime.fromFormat(dateKey, 'yyyy-MM-dd').setZone(OFFICE_TIMEZONE).toFormat('dd.MM.yyyy')}
+                    </Subheading>
+                    <Text variant="small" className="mt-1">
+                      {items.length} booking{items.length !== 1 ? 's' : ''}
+                    </Text>
+                  </div>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true" className={`w-5 h-5 text-accent-secondary/60 transform transition-transform duration-300 ${collapsed ? '' : 'rotate-180'}`}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                   </svg>
                 </div>
-              </div>
 
-              <div 
-                className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                  collapsed ? 'max-h-0' : 'max-h-96'
-                }`}
-              >
-                <div className="p-4 space-y-3 max-h-96 overflow-y-auto pr-1 date-scroll">
-                  {items.map(booking => {
-                    if (!booking || !booking.id) return null;
-                    const isNext = booking.id === nextUpcomingId;
-                    const status = getBookingStatus(booking);
-                    return (
-                      <Card 
-                        key={booking.id} 
-                        className={getCardStyles(status, isNext)}
-                        hover={false}
-                        padding=""
-                        shadow=""
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Subheading className="text-base">
-                                {booking.room_name || 'Unknown Room'}
-                              </Subheading>
-                              <StatusBadge status={status} size="sm" />
+                <div
+                  className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                    collapsed ? 'max-h-0' : 'max-h-96'
+                  }`}
+                >
+                  <div className="p-4 space-y-3 max-h-96 overflow-y-auto pr-1 date-scroll">
+                    {items.map(booking => {
+                      if (!booking || !booking.id) return null;
+                      const isNext = booking.id === nextUpcomingId;
+                      const status = getBookingStatus(booking);
+                      return (
+                        <Card
+                          key={booking.id}
+                          className={getCardStyles(status, isNext)}
+                          hover={false}
+                          padding=""
+                          shadow=""
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Subheading className="text-base">
+                                  {booking.room_name || 'Unknown Room'}
+                                </Subheading>
+                                <StatusBadge status={status} size="sm" />
+                              </div>
+                              <Text variant="default">
+                                {formatTime(booking.start_time)} — {formatTime(booking.end_time)} • {DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE).toRelative()}
+                              </Text>
                             </div>
-                            <Text variant="default">
-                              {formatTime(booking.start_time)} — {formatTime(booking.end_time)} • {DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE).toRelative()}
-                            </Text>
+                            <div className="flex items-center gap-2">
+                              {activeTab === 'upcoming' && (
+                                <Button
+                                  variant="danger"
+                                  size="sm"
+                                  onClick={() => {
+                                    setConfirmCancel({
+                                      id: booking.id,
+                                      room_name: booking.room_name || 'Unknown Room',
+                                      start_time: booking.start_time,
+                                      end_time: booking.end_time
+                                    });
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            {activeTab === 'upcoming' && (
-                              <Button
-                                variant="danger"
-                                size="sm"
-                                onClick={() => {
-                                  setConfirmCancel({
-                                    id: booking.id,
-                                    room_name: booking.room_name || 'Unknown Room',
-                                    start_time: booking.start_time,
-                                    end_time: booking.end_time
-                                  });
-                                }}
-                              >
-                                Cancel
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </Card>
-                    );
-                  })}
+                        </Card>
+                      );
+                    })}
+                  </div>
                 </div>
+              </Card>
+            );
+          })}
+
+          {/* Load more trigger */}
+          {hasMore && (
+            <div
+              ref={loadMoreRef}
+              className="py-4 text-center"
+            >
+              <div className="inline-flex items-center gap-2 text-accent-secondary/60">
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                <Text variant="small">Loading more...</Text>
               </div>
-            </Card>
-          );
-        })
+            </div>
+          )}
+
+          {/* End of list indicator */}
+          {!hasMore && sortedBookings.length > 0 && (
+            <div className="py-4 text-center">
+              <Text variant="small" className="text-accent-secondary/40">
+                You've seen all bookings
+              </Text>
+            </div>
+          )}
+        </>
       )}
-      
+
       {/* Confirmation Modal */}
       {confirmCancel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -389,24 +409,20 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
                   try {
                     if (!authFetch) throw new Error('authFetch not provided');
                     const response = await authFetch(`/api/bookings/${confirmCancel.id}/`, { method: 'DELETE' });
-                    console.log('Delete response:', response);
-                    
-                    // Handle 204 No Content response (successful deletion)
+
+                    // Handle successful deletion
                     if (response === null || response === undefined || response === '') {
                       if (onRefresh) onRefresh();
                       showAlert('Booking cancelled successfully', { type: 'success' });
                       setConfirmCancel(null);
                     } else {
-                      // Handle other response types
                       if (onRefresh) onRefresh();
                       showAlert('Booking cancelled successfully', { type: 'success' });
                       setConfirmCancel(null);
                     }
                   } catch (err) {
-                    console.error('Failed to cancel booking:', err);
                     // Check if it's a JSON parse error (likely 204 response)
                     if (err.message.includes('JSON.parse') || err.message.includes('unexpected end of data')) {
-                      // If JSON parse fails, it's probably a successful 204 response
                       if (onRefresh) onRefresh();
                       showAlert('Booking cancelled successfully', { type: 'success' });
                       setConfirmCancel(null);

@@ -71,45 +71,39 @@ export default function RoomMiniAvailability({ bookings = [], roomId = null }) {
 
   return (
     <div className="mt-4">
-      <Text variant="small" className="font-medium text-accent-secondary/70 mb-2">
-        This Week's Availability:
+      <Text variant="small" className="font-medium text-accent-secondary/70 mb-3 block">
+        This Week
       </Text>
-      <div className="space-y-1.5">
+      <div className="space-y-2 mb-3">
         {weeklyAvailability.map((day, index) => (
           <div key={index} className="flex items-center gap-2">
-            <span className="text-xs font-medium text-accent-secondary/60 w-8">
+            <span className="text-xs font-medium text-accent-secondary/60 w-8 flex-shrink-0">
               {day.day}
             </span>
-            <div className="flex-1 relative">
-              <div className={`h-4 rounded-full overflow-hidden ${getProgressColor(day.status)}`}>
-                <div
-                  className={`h-full transition-all duration-500 ${getStatusColor(day.status)}`}
-                  style={{ width: `${day.occupancyPercent}%` }}
-                />
-              </div>
+            <div className="flex-1 h-2 bg-surface-muted rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-300 ${getStatusColor(day.status)}`}
+                style={{ width: `${Math.min(day.occupancyPercent, 100)}%` }}
+              />
             </div>
-            <span className="text-xs font-medium text-accent-secondary/60 w-10 text-right">
+            <span className="text-xs font-medium text-accent-secondary/60 w-8 text-right flex-shrink-0">
               {day.occupancyPercent}%
             </span>
           </div>
         ))}
       </div>
-      <div className="mt-2 pt-2 border-t border-border-subtle/50">
-        <div className="flex items-center justify-between text-xs text-accent-secondary/50">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-status-success" />
-              <span>Available</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-status-warning" />
-              <span>Busy</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-status-danger" />
-              <span>Full</span>
-            </div>
-          </div>
+      <div className="flex items-center gap-4 text-xs text-accent-secondary/50">
+        <div className="flex items-center gap-1.5">
+          <div className="w-2 h-2 rounded-full bg-status-success flex-shrink-0" />
+          <span className="whitespace-nowrap">Available</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-2 h-2 rounded-full bg-status-warning flex-shrink-0" />
+          <span className="whitespace-nowrap">Busy</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-2 h-2 rounded-full bg-status-danger flex-shrink-0" />
+          <span className="whitespace-nowrap">Full</span>
         </div>
       </div>
     </div>

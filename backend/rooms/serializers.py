@@ -1,8 +1,13 @@
 from rest_framework import serializers
 from django.utils import timezone
 from datetime import timedelta
-from .models import Booking, Room
+from .models import Booking, Room, RoomFeature
 from django.db.models import Q
+
+class RoomFeatureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RoomFeature
+        fields = ['id', 'name', 'icon']
 
 class BookingSerializer(serializers.ModelSerializer):
     room_name = serializers.CharField(source="room.name", read_only=True)
@@ -90,6 +95,8 @@ class BookingSerializer(serializers.ModelSerializer):
     # User is assigned in the viewset's perform_create
 
 class RoomSerializer(serializers.ModelSerializer):
+    features = RoomFeatureSerializer(many=True, read_only=True)
+
     class Meta:
         model = Room
-        fields = ['id', 'name', 'location', 'capacity']
+        fields = ['id', 'name', 'location', 'capacity', 'features']

@@ -7,79 +7,110 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Focus visible styles for accessibility */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #3f3f46;
+  outline-offset: 2px;
+}
+
+/* Minimum touch target sizes for mobile */
+button,
+a,
+[role="button"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Small buttons can have smaller touch targets if surrounded by padding */
+button.btn-sm,
+a.btn-sm {
+  min-height: 36px;
+  min-width: 36px;
+}
+
+/* React DatePicker overrides */
 .react-datepicker {
-    font-size: 0.85rem;
-    border-radius: 0.5rem;
-    width: auto;
-    min-width: 220px;
-    max-width: 260px;
+  font-size: 0.85rem;
+  border-radius: 0.75rem;
+  width: auto;
+  min-width: 220px;
+  max-width: 260px;
 }
 
 .react-datepicker__day {
-    width: 1.8rem;
-    line-height: 1.8rem;
-    margin: 0.01rem;
+  width: 1.8rem;
+  line-height: 1.8rem;
+  margin: 0.01rem;
 }
 
+/* Toast animation (used by LoginForm) */
 @keyframes fadeInOut {
-    0% {
-        opacity: 0;
-        transform: translate(-50%, -10px);
-    }
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
 
-    10%,
-    80% {
-        opacity: 1;
-        transform: translate(-50%, 0);
-    }
+  10%,
+  80% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 
-    100% {
-        opacity: 0;
-        transform: translate(-50%, -10px);
-    }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
 }
 
 .animate-fadeInOut {
-    animation: fadeInOut 3s ease-in-out forwards;
+  animation: fadeInOut 3s ease-in-out forwards;
 }
 
-@keyframes bounce-gentle {
-    0%, 100% {
-        transform: translateY(0);
-    }
-    50% {
-        transform: translateY(4px);
-    }
-}
-
-.animate-bounce-gentle {
-    animation: bounce-gentle 2s ease-in-out infinite;
-}
-
+/* Booking list scrollbar styles */
 .booking-date-group .date-scroll {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .booking-date-group .date-scroll::-webkit-scrollbar {
-    width: 0;
-    height: 0;
+  width: 0;
+  height: 0;
 }
 
 .booking-date-group:hover .date-scroll {
-    scrollbar-width: thin;
+  scrollbar-width: thin;
 }
 
 .booking-date-group:hover .date-scroll::-webkit-scrollbar {
-    width: 6px;
+  width: 6px;
 }
 
 .booking-date-group:hover .date-scroll::-webkit-scrollbar-track {
-    background: rgba(148, 163, 184, 0.2);
-    border-radius: 9999px;
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 9999px;
 }
 
 .booking-date-group:hover .date-scroll::-webkit-scrollbar-thumb {
-    background: rgba(71, 85, 105, 0.4);
-    border-radius: 9999px;
+  background: rgba(71, 85, 105, 0.4);
+  border-radius: 9999px;
+}
+
+/* Safe area inset for mobile devices with notches */
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Hide scrollbar for horizontal scrolling elements */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

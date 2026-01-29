@@ -269,34 +269,36 @@ export default function LoginForm() {
             <label className="block text-sm font-medium text-accent-secondary mb-1">
               Password
             </label>
-            <input
-              ref={passwordRef}
-              type={showPassword ? "text" : "password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onBlur={handlePasswordBlur}
-              onKeyUp={handlePasswordKeyEvent}
-              onKeyDown={handlePasswordKeyEvent}
-              placeholder="••••••••"
-              autoComplete="current-password"
-              className={`w-full px-4 py-3 rounded-xl border transition focus:ring-2 focus:outline-none focus:ring-offset-2 bg-surface-base ${touched.password && validationErrors.password
-                  ? "border-status-danger-border focus:ring-status-danger/40"
-                  : "border-border-subtle text-accent-secondary focus:ring-accent-primary/40"
-                }`}
-              aria-invalid={Boolean(touched.password && validationErrors.password)}
-              aria-describedby={
-                touched.password && validationErrors.password ? "password-error" : undefined
-              }
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-5 top-10 text-accent-secondary/60 hover:text-accent-secondary"
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              aria-pressed={showPassword}
-            >
-              {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
-            </button>
+            <div className="relative">
+              <input
+                ref={passwordRef}
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onBlur={handlePasswordBlur}
+                onKeyUp={handlePasswordKeyEvent}
+                onKeyDown={handlePasswordKeyEvent}
+                placeholder="••••••••"
+                autoComplete="current-password"
+                className={`w-full px-4 py-3 pr-12 rounded-xl border transition focus:ring-2 focus:outline-none focus:ring-offset-2 bg-surface-base ${touched.password && validationErrors.password
+                    ? "border-status-danger-border focus:ring-status-danger/40"
+                    : "border-border-subtle text-accent-secondary focus:ring-accent-primary/40"
+                  }`}
+                aria-invalid={Boolean(touched.password && validationErrors.password)}
+                aria-describedby={
+                  touched.password && validationErrors.password ? "password-error" : undefined
+                }
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-accent-secondary/60 hover:text-accent-secondary flex items-center justify-center"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+              >
+                {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
+              </button>
+            </div>
             {touched.password && validationErrors.password && (
               <p
                 id="password-error"

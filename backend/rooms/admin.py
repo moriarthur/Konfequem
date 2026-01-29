@@ -1,11 +1,18 @@
 from django.contrib import admin
-from .models import Room, Booking
+from .models import Room, Booking, RoomFeature
+
+@admin.register(RoomFeature)
+class RoomFeatureAdmin(admin.ModelAdmin):
+    list_display = ('name', 'icon')
+    search_fields = ('name',)
+
 # Register model Room in admin panel
 @admin.register(Room)
 class RoomAdmin(admin.ModelAdmin):
     list_display = ('name', 'capacity', 'location')  # what to display in the table
     search_fields = ('name', 'location')             # search fields
-    list_filter = ('capacity',)                      # filters on the right
+    list_filter = ('capacity', 'features')           # filters on the right
+    filter_horizontal = ('features',)                # many-to-many filter widget
 
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):

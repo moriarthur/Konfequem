@@ -7,11 +7,34 @@ from django.db.models import Q
 
 User = get_user_model()
 
+class RoomFeature(models.Model):
+    """Features/amenities that rooms can have."""
+    name = models.CharField(max_length=100)
+    icon = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Icon name for UI (e.g., 'projector', 'wifi', 'coffee', 'capacity', 'whiteboard', 'phone', 'tv')"
+    )
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Room Feature"
+        verbose_name_plural = "Room Features"
+        ordering = ["name"]
+
 class Room(models.Model):
     """Room model."""
     name = models.CharField(max_length=100)
     location = models.CharField(max_length=100, blank=True)
     capacity = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(50)])
+    features = models.ManyToManyField(
+        RoomFeature,
+        blank=True,
+        related_name="rooms",
+        help_text="Amenities and equipment available in this room"
+    )
 
     def __str__(self):
         return self.name

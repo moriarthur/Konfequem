@@ -1,702 +1,473 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useAlert } from "../context/AlertContext";
+import { useNavigate } from "react-router-dom";
 import { error as logError } from "../utils/logger";
-import BookingList from "../components/BookingList";
-import RoomList from "../components/RoomList";
-import AvailabilityCalendar from "../components/AvailabilityCalendar";
+import BottomNav from "../components/BottomNav";
 import Button from "../components/ui/Button";
+import BookingForm from "../components/BookingForm";
 import { Heading, Text } from "../components/ui/Typography";
 import { DateTime } from "luxon";
-import {
-  BuildingOfficeIcon,
-  CalendarIcon,
-  ClockIcon,
-  SparklesIcon,
-  CheckCircleIcon
-} from "@heroicons/react/24/outline";
+import { PlusIcon, ClockIcon, CheckCircleIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 export default function Home() {
-    const { authFetch, logout, isAuthenticated, loading, user } = useAuth();
-    const { showAlert } = useAlert();
-    const [rooms, setRooms] = useState([]);
-    const [bookings, setBookings] = useState([]);
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [colorMode, setColorMode] = useState("Light");
-    const [language, setLanguage] = useState("ENG");
-    const [showHelper, setShowHelper] = useState(() => {
-        if (typeof window === "undefined") return true;
-        const hasSeenHelper = localStorage.getItem('hasSeenMenuHelper');
-        return !hasSeenHelper;
+  const { authFetch, isAuthenticated, loading, user } = useAuth();
+  const navigate = useNavigate();
+  const [rooms, setRooms] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [showQuickBook, setShowQuickBook] = useState(false);
+  const [selectedRoomId, setSelectedRoomId] = useState(null);
+  const quickBookRef = useRef(null);
+
+  // Close modal when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (quickBookRef.current && !quickBookRef.current.contains(event.target)) {
+        setShowQuickBook(false);
+        setSelectedRoomId(null);
+      }
+    };
+
+    if (showQuickBook) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showQuickBook]);
+
+  // Get time-based greeting
+  const getTimeBasedGreeting = () => {
+    const hour = DateTime.now().hour;
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+  };
+
+  // Get today's date in German format
+  const getTodayDate = () => {
+    return DateTime.now().setZone("Europe/Berlin").toFormat("EEEE, dd. MMMM yyyy");
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setRooms([]);
+      setBookings([]);
+      return;
+    }
+
+    const fetchData = async () => {
+      try {
+        const roomsData = await authFetch("/api/rooms/");
+        setRooms(roomsData);
+        const bookingsData = await authFetch("/api/bookings/");
+        setBookings(bookingsData);
+      } catch (err) {
+        logError("Error fetching data:", err);
+      }
+    };
+
+    fetchData();
+  }, [authFetch, isAuthenticated]);
+
+  // Group today's bookings by time period
+  const todaySchedule = useMemo(() => {
+    if (!bookings || bookings.length === 0) return { morning: [], afternoon: [], current: null, next: null };
+
+    const now = DateTime.now().setZone("Europe/Berlin");
+    const todayStart = now.startOf("day");
+    const todayEnd = now.endOf("day");
+
+    const todayBookings = bookings
+      .filter((booking) => {
+        if (!booking?.start_time) return false;
+        const start = DateTime.fromISO(booking.start_time).setZone("Europe/Berlin");
+        return start >= todayStart && start <= todayEnd;
+      })
+      .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+
+    // Split into morning (before 13:00) and afternoon (13:00+)
+    const morning = [];
+    const afternoon = [];
+
+    todayBookings.forEach((booking) => {
+      const start = DateTime.fromISO(booking.start_time).setZone("Europe/Berlin");
+      if (start.hour < 13) {
+        morning.push(booking);
+      } else {
+        afternoon.push(booking);
+      }
     });
-    const menuPanelRef = useRef(null);
-    const contentRef = useRef(null);
-    const previouslyFocusedElementRef = useRef(null);
-    const [isMobileViewport, setIsMobileViewport] = useState(() => {
-        if (typeof window === "undefined") return false;
-        return window.matchMedia("(max-width: 767px)").matches;
+
+    // Find current and next meeting
+    const current = todayBookings.find((booking) => {
+      const start = DateTime.fromISO(booking.start_time).setZone("Europe/Berlin");
+      const end = DateTime.fromISO(booking.end_time).setZone("Europe/Berlin");
+      return now >= start && now < end;
     });
 
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-        const mediaQuery = window.matchMedia("(max-width: 767px)");
-        const handleChange = (event) => setIsMobileViewport(event.matches);
-        handleChange(mediaQuery);
-        mediaQuery.addEventListener("change", handleChange);
-        return () => mediaQuery.removeEventListener("change", handleChange);
-    }, []);
+    const upcoming = todayBookings.filter((booking) => {
+      const start = DateTime.fromISO(booking.start_time).setZone("Europe/Berlin");
+      return start > now;
+    });
 
-    useEffect(() => {
-        // Hide helper permanently after menu is opened for the first time
-        if (isMenuOpen && showHelper) {
-            localStorage.setItem('hasSeenMenuHelper', 'true');
-            setShowHelper(false);
-        }
-    }, [isMenuOpen, showHelper]);
-
-    const handleColorModeChange = (mode, { closeMenu = false } = {}) => {
-        if (mode === colorMode) {
-            if (closeMenu) {
-                setTimeout(() => setIsMenuOpen(false), 150);
-            }
-            return;
-        }
-
-        setColorMode(mode);
-        if (closeMenu) {
-            showAlert(`Color mode switched to ${mode}`, { type: "success", duration: 2500 });
-        }
-        if (closeMenu) {
-            setTimeout(() => setIsMenuOpen(false), 150);
-        }
+    return {
+      morning,
+      afternoon,
+      current,
+      next: upcoming[0] || null,
     };
+  }, [bookings]);
 
-    const handleLanguageChange = (lang, { closeMenu = false } = {}) => {
-        if (lang === language) {
-            if (closeMenu) {
-                setTimeout(() => setIsMenuOpen(false), 150);
-            }
-            return;
-        }
+  // Get rooms available right now
+  const availableNow = useMemo(() => {
+    if (!rooms.length || !bookings.length) return rooms.length;
 
-        setLanguage(lang);
-        if (closeMenu) {
-            showAlert(`Language switched to ${lang}`, { type: "success", duration: 2500 });
-        }
-        if (closeMenu) {
-            setTimeout(() => setIsMenuOpen(false), 150);
-        }
+    const now = DateTime.now().setZone("Europe/Berlin");
+    const bookedRoomIds = bookings
+      .filter((booking) => {
+        const start = DateTime.fromISO(booking.start_time).setZone("Europe/Berlin");
+        const end = DateTime.fromISO(booking.end_time).setZone("Europe/Berlin");
+        return now >= start && now < end;
+      })
+      .map((b) => b.room);
+
+    return rooms.filter((room) => !bookedRoomIds.includes(room.id)).length;
+  }, [rooms, bookings]);
+
+  // Close modal on Escape key
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === "Escape") {
+        setShowQuickBook(false);
+        setSelectedRoomId(null);
+      }
     };
+    if (showQuickBook) {
+      document.addEventListener("keydown", handleEscape);
+      return () => document.removeEventListener("keydown", handleEscape);
+    }
+  }, [showQuickBook]);
 
-    // Get time-based greeting
-    const getTimeBasedGreeting = () => {
-        const hour = DateTime.now().hour;
-        if (hour < 12) return "Good morning";
-        if (hour < 17) return "Good afternoon";
-        return "Good evening";
-    };
-
-    useEffect(() => {
-        if (!isAuthenticated) {
-            setRooms([]);
-            setBookings([]);
-            return;
-        }
-
-        const fetchData = async () => {
-            try {
-                const roomsData = await authFetch("/api/rooms/");
-                setRooms(roomsData);
-                const bookingsData = await authFetch("/api/bookings/");
-                setBookings(bookingsData);
-            } catch (err) {
-                logError("Error fetching data:", err);
-            }
-        };
-
-        fetchData();
-    }, [authFetch, isAuthenticated]);
-
-    /**
-     * Refetch bookings after a new booking is created.
-     * Ensures room names and all fields are up to date.
-     */
-    const handleBookingCreated = async () => {
-        try {
-            const bookingsData = await authFetch("/api/bookings/");
-            setBookings(bookingsData);
-        } catch (err) {
-            logError("Error refreshing bookings:", err);
-        }
-    };
-
-  
-    const { upcomingCount, nextBooking } = useMemo(() => {
-        if (!bookings || bookings.length === 0) {
-            return { upcomingCount: 0, nextBooking: null };
-        }
-
-        const now = DateTime.now();
-        const upcoming = bookings
-            .filter((booking) => {
-                if (!booking?.start_time) return false;
-                const start = DateTime.fromISO(booking.start_time);
-                return start >= now;
-            })
-            .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
-
-        return {
-            upcomingCount: upcoming.length,
-            nextBooking: upcoming[0] || null,
-        };
-    }, [bookings]);
-
-    const stats = useMemo(() => {
-        const totalRooms = rooms?.length || 0;
-        const nextStart = nextBooking ? DateTime.fromISO(nextBooking.start_time).toFormat("dd MMM, HH:mm") : "No events";
-        const nextRoom = nextBooking?.room_name || nextBooking?.room || "You're all caught up";
-        return [
-            {
-                label: "Rooms",
-                value: totalRooms,
-                helper: totalRooms === 1 ? "available room" : "available rooms",
-            },
-            {
-                label: "Upcoming bookings",
-                value: upcomingCount,
-                helper: upcomingCount ? "scheduled" : "Nothing scheduled",
-            },
-            {
-                label: "Next event",
-                value: nextStart,
-                helper: nextBooking ? nextRoom : "Enjoy the quiet",
-            },
-        ];
-    }, [rooms, upcomingCount, nextBooking]);
-
-    const whatsNewItems = useMemo(
-        () => [
-            {
-                title: "Grid view for bookings",
-                description: "Preview overlaps faster with the new calendar-style overview.",
-                date: "Nov 20",
-            },
-            {
-                title: "Slack notifications",
-                description: "Get channel alerts 10 minutes before your meeting starts.",
-                date: "Nov 14",
-            },
-            {
-                title: "Dark mode refresh",
-                description: "We tuned the palette to improve contrast during late sessions.",
-                date: "Nov 02",
-            },
-        ],
-        []
-    );
-
-    useEffect(() => {
-        const contentEl = contentRef.current;
-        if (!contentEl) return;
-        if (isMenuOpen && isMobileViewport) {
-            contentEl.setAttribute("aria-hidden", "true");
-            contentEl.setAttribute("inert", "");
-        } else {
-            contentEl.removeAttribute("aria-hidden");
-            contentEl.removeAttribute("inert");
-        }
-    }, [isMenuOpen, isMobileViewport]);
-
-    // Close menu when clicking outside on desktop
-    useEffect(() => {
-        if (!isMenuOpen || isMobileViewport) return;
-
-        const handleClickOutside = (event) => {
-            const menuPanel = document.getElementById('workspace-menu-panel');
-            const logoButton = event.target.closest('[aria-label="Toggle workspace menu"]');
-
-            // Don't close if clicking on the menu panel or the logo button
-            if (menuPanel && !menuPanel.contains(event.target) && !logoButton) {
-                setIsMenuOpen(false);
-            }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [isMenuOpen, isMobileViewport]);
-
-    useEffect(() => {
-        if (!isMenuOpen || !isMobileViewport || typeof document === "undefined") return;
-        const panel = menuPanelRef.current;
-        if (!panel) return;
-
-        previouslyFocusedElementRef.current = document.activeElement instanceof HTMLElement
-            ? document.activeElement
-            : null;
-
-        const focusableSelectors = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-        const focusableElements = Array.from(panel.querySelectorAll(focusableSelectors));
-        const firstElement = focusableElements[0] || panel;
-        const lastElement = focusableElements[focusableElements.length - 1] || panel;
-
-        const handleKeyDown = (event) => {
-            if (event.key === "Escape") {
-                event.preventDefault();
-                setIsMenuOpen(false);
-                return;
-            }
-
-            if (event.key === "Tab" && focusableElements.length > 0) {
-                if (event.shiftKey) {
-                    if (document.activeElement === firstElement) {
-                        event.preventDefault();
-                        lastElement.focus();
-                    }
-                } else {
-                    if (document.activeElement === lastElement) {
-                        event.preventDefault();
-                        firstElement.focus();
-                    }
-                }
-            }
-        };
-
-        document.addEventListener("keydown", handleKeyDown);
-        requestAnimationFrame(() => firstElement.focus());
-
-        return () => {
-            document.removeEventListener("keydown", handleKeyDown);
-            const previouslyFocused = previouslyFocusedElementRef.current;
-            if (previouslyFocused) {
-                setTimeout(() => previouslyFocused.focus(), 0);
-            }
-        };
-    }, [isMenuOpen]);
-
-    return (
-        <div className="min-h-screen bg-surface-muted px-6 py-12 relative">
-            {loading && <div className="text-center mt-20"><Text variant="default">Loading...</Text></div>}
-
-            {!loading && (
-                <>
-                    <div ref={contentRef} className="relative">
-                        {/* Logo and helper - positioned to be above menu */}
-                        <div className="relative flex flex-col items-center gap-4 z-20 mb-8">
-                            {/* Helper text - only shown to new users */}
-                            {showHelper && (
-                                <div className={`transition-all duration-500 overflow-hidden ${
-                                    isMenuOpen ? 'max-h-0 opacity-0' : 'max-h-8 opacity-100'
-                                }`}>
-                                    <Text variant="small" className="text-center text-accent-secondary/50">
-                                        Manage theme, language, and account controls right from here.
-                                    </Text>
-                                </div>
-                            )}
-
-                            {/* Arrow - only shown to new users */}
-                            {showHelper && (
-                                <div className="flex justify-center">
-                                    <span
-                                        aria-hidden="true"
-                                        className={`text-xs leading-none transition-all duration-200 inline-block animate-bounce-gentle ${
-                                            isMenuOpen
-                                                ? 'opacity-0'
-                                                : 'text-accent-secondary/60 opacity-70'
-                                        }`}
-                                    >
-                                        ▼
-                                    </span>
-                                </div>
-                            )}
-
-                            {/* Logo and workspace text */}
-                            <div className="flex items-center gap-6">
-                                <span className="text-sm uppercase tracking-[0.2em] text-accent-secondary/70 select-none cursor-default">Konfequem</span>
-                                <div className="flex flex-col items-center gap-2">
-                                    <div
-                                        className={`relative rounded-full p-[3px] transition-all duration-300 ${
-                                            isMenuOpen ? 'scale-105 opacity-100' : 'scale-90 opacity-80'
-                                        }`}
-                                        style={{
-                                            background: 'linear-gradient(120deg, rgba(130,255,214,0.7), rgba(80,130,255,0.4))',
-                                            boxShadow: isMenuOpen ? '0 0 18px rgba(99, 255, 214, 0.35)' : '0 0 10px rgba(99, 255, 214, 0.15)'
-                                        }}
-                                    >
-                                        <button
-                                            type="button"
-                                            aria-label="Toggle workspace menu"
-                                            aria-controls="workspace-menu-panel"
-                                            aria-expanded={isMenuOpen}
-                                            aria-pressed={isMenuOpen}
-                                            className={`group relative flex h-20 w-20 items-center justify-center rounded-full border border-transparent bg-surface-base/80 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/30 ${
-                                                isMenuOpen ? 'shadow-soft border-border-subtle/80' : 'hover:border-border-subtle/70 hover:bg-surface-base'
-                                            }`}
-                                            onClick={() => setIsMenuOpen((prev) => !prev)}
-                                        >
-                                            <span className="sr-only">{isMenuOpen ? 'Hide workspace controls' : 'Show workspace controls'}</span>
-                                            <span
-                                                className="relative flex h-12 w-12 items-center justify-center transition-transform duration-300 ease-out"
-                                                style={{ transform: isMenuOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}
-                                            >
-                                                <img
-                                                    src="/konfequem_logo.svg"
-                                                    alt="Konfequem logo left half"
-                                                    className="absolute h-full w-auto origin-center transition-transform duration-300 ease-out"
-                                                    style={{
-                                                        clipPath: 'polygon(0 0, 48% 0, 48% 100%, 0 100%)',
-                                                        transform: `translateX(${isMenuOpen ? '-5px' : '-0.2px'})`
-                                                    }}
-                                                    aria-hidden="true"
-                                                />
-                                                <img
-                                                    src="/konfequem_logo.svg"
-                                                    alt="Konfequem logo right half"
-                                                    className="absolute h-full w-auto origin-center transition-transform duration-300 ease-out"
-                                                    style={{
-                                                        clipPath: 'polygon(52% 0, 100% 0, 100% 100%, 52% 100%)',
-                                                        transform: `translateX(${isMenuOpen ? '5px' : '0.2px'})`
-                                                    }}
-                                                    aria-hidden="true"
-                                                />
-                                            </span>
-                                        </button>
-                                    </div>
-                                </div>
-                                <span className="text-sm uppercase tracking-[0.2em] text-accent-secondary/70 select-none cursor-default">Workspace</span>
-                            </div>
-                        </div>
-
-                        {/* Menu - positioned to appear from under the logo */}
-                        <div className="hidden md:block">
-                            <div
-                                id="workspace-menu-panel"
-                                role="region"
-                                aria-label="Workspace controls"
-                                className={`mx-auto w-full max-w-3xl overflow-hidden rounded-3xl border border-border-subtle bg-surface-base shadow-soft transition-all duration-500 ease-out z-10 ${
-                                    isMenuOpen
-                                        ? 'opacity-100 max-h-[320px] mt-4'
-                                        : 'opacity-0 max-h-0 -translate-y-2 pointer-events-none'
-                                }`}
-                            >
-                                <div className="grid gap-6 p-6 md:grid-cols-3">
-                                    <div>
-                                        <Text variant="small" className="uppercase tracking-[0.2em] text-accent-secondary/60 mb-3">
-                                            Color mode
-                                        </Text>
-                                        <div className="flex items-center gap-3">
-                                            {['Light', 'Dark'].map((mode) => (
-                                                <button
-                                                    key={mode}
-                                                    type="button"
-                                                    onClick={() => handleColorModeChange(mode)}
-                                                    className={`flex-1 rounded-2xl border px-4 py-2 text-sm font-semibold transition ${
-                                                        colorMode === mode
-                                                            ? 'border-border-soft bg-surface-muted text-accent-secondary'
-                                                            : 'border-border-subtle text-accent-secondary/70 hover:border-accent-primary/50 hover:bg-accent-primary/5'
-                                                    }`}
-                                                >
-                                                    <span className="flex items-center justify-center gap-2">
-                                                        {colorMode === mode && (
-                                                            <span className="inline-flex h-1.5 w-1.5 rounded-full bg-accent-secondary" aria-hidden="true" />
-                                                        )}
-                                                        {mode}
-                                                    </span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <Text variant="small" className="uppercase tracking-[0.2em] text-accent-secondary/60 mb-3">
-                                            Language
-                                        </Text>
-                                        <div className="flex items-center gap-3">
-                                            {['ENG', 'DE'].map((lang) => (
-                                                <button
-                                                    key={lang}
-                                                    type="button"
-                                                    onClick={() => handleLanguageChange(lang)}
-                                                    className={`flex-1 rounded-2xl border px-4 py-2 text-sm font-semibold transition ${
-                                                        language === lang
-                                                            ? 'border-border-soft bg-surface-muted text-accent-secondary'
-                                                            : 'border-border-subtle text-accent-secondary/70 hover:border-accent-primary/50 hover:bg-accent-primary/5'
-                                                    }`}
-                                                >
-                                                    <span className="flex items-center justify-center gap-2">
-                                                        {language === lang && (
-                                                            <span className="inline-flex h-1.5 w-1.5 rounded-full bg-accent-secondary" aria-hidden="true" />
-                                                        )}
-                                                        {lang}
-                                                    </span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <Text variant="small" className="uppercase tracking-[0.2em] text-accent-secondary/60 mb-3">
-                                            Account
-                                        </Text>
-                                        <div className="rounded-2xl border border-border-subtle/70 bg-surface-muted/60 px-4 py-3 text-center">
-                                            <p className="text-sm font-semibold text-accent-secondary mb-2">
-                                                {user?.first_name || user?.username || 'User'}
-                                            </p>
-                                            {isAuthenticated ? (
-                                                <Button variant="danger" className="w-full" onClick={logout}>
-                                                    Logout
-                                                </Button>
-                                            ) : (
-                                                <Text variant="small">Not signed in</Text>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                                {isMenuOpen && (
-                                    <div className="px-6 pb-6">
-                                        <Text variant="small" className="text-center text-accent-secondary/50">
-
-                                        </Text>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Spacing between menu and content when menu is open */}
-                        {isMenuOpen && <div className="mb-8"></div>}
-
-                        {isAuthenticated ? (
-                            <>
-                                <section className="mb-10">
-                                    <div className="grid gap-6 lg:grid-cols-3">
-                                        <div className="lg:col-span-2 bg-gradient-to-br from-surface-base to-surface-base/95 border border-border-subtle rounded-3xl p-6 shadow-soft relative overflow-hidden">
-                                            {/* Subtle background decoration */}
-                                            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-accent-primary/5 to-transparent rounded-full -translate-y-1/2 translate-x-1/2" />
-
-                                            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between relative">
-                                                <div>
-                                                    <p className="text-xs uppercase tracking-[0.3em] text-accent-primary/60 font-semibold mb-2 flex items-center gap-2">
-                                                        <SparklesIcon className="w-4 h-4" />
-                                                        {getTimeBasedGreeting()}
-                                                    </p>
-                                                    <Heading level={2} className="mb-3 text-4xl font-bold text-accent-secondary">
-                                                        Hi, {user?.first_name || user?.username || "there"}!
-                                                    </Heading>
-                                                    <Text variant="default" className="text-accent-secondary/80">
-                                                        Here's your workspace overview for today.
-                                                    </Text>
-                                                </div>
-                                                <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-3">
-                                                    {stats.map((item, index) => (
-                                                        <div
-                                                            key={item.label}
-                                                            className="group rounded-2xl border border-border-subtle/50 bg-gradient-to-br from-surface-muted/80 to-surface-muted/40 px-5 py-4 hover:border-accent-primary/40 hover:shadow-md transition-all duration-300 relative overflow-hidden"
-                                                        >
-                                                            {/* Subtle gradient overlay on hover */}
-                                                            <div className="absolute inset-0 bg-gradient-to-br from-accent-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-                                                            {/* Icon for each stat */}
-                                                            <div className="flex items-center justify-between mb-2">
-                                                                <p className="text-xs uppercase tracking-wider font-semibold text-accent-secondary/70">{item.label}</p>
-                                                                {index === 0 && <BuildingOfficeIcon className="w-4 h-4 text-accent-secondary/50" />}
-                                                                {index === 1 && <CalendarIcon className="w-4 h-4 text-accent-secondary/50" />}
-                                                                {index === 2 && <ClockIcon className="w-4 h-4 text-accent-secondary/50" />}
-                                                            </div>
-                                                            <p className="text-3xl font-bold bg-gradient-to-br from-accent-primary to-accent-primary/80 bg-clip-text text-transparent mt-2">{item.value}</p>
-                                                            <p className="text-sm text-accent-secondary/70 mt-1">{item.helper}</p>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                            {nextBooking && (
-                                                <div className="mt-6 rounded-2xl border border-accent-primary/30 bg-gradient-to-r from-accent-primary/10 via-accent-primary/5 to-transparent px-6 py-4 flex items-center justify-between shadow-lg shadow-accent-primary/5 hover:shadow-accent-primary/10 transition-all duration-300 group">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-accent-primary/20 to-accent-primary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                                                            <CheckCircleIcon className="w-6 h-6 text-accent-primary" />
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-xs uppercase tracking-[0.3em] text-accent-primary/70 font-semibold">Next meeting</p>
-                                                            <p className="text-lg font-bold text-accent-primary mt-1">
-                                                                {nextBooking.room_name || nextBooking.room || "Room"}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className="text-base font-semibold text-accent-primary">
-                                                            {DateTime.fromISO(nextBooking.start_time).toFormat("ccc, dd MMM")}
-                                                        </p>
-                                                        <p className="text-sm font-medium text-accent-primary/80 flex items-center gap-1 justify-end">
-                                                            <ClockIcon className="w-4 h-4" />
-                                                            {DateTime.fromISO(nextBooking.start_time).toFormat("HH:mm")} – {DateTime.fromISO(nextBooking.end_time).toFormat("HH:mm")}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className="bg-surface-base border border-border-subtle rounded-3xl p-6 shadow-soft">
-                                            <div className="flex items-center justify-between mb-4">
-                                                <p className="text-sm font-semibold text-accent-secondary">What’s new</p>
-                                                <span className="text-xs text-accent-secondary/50">This month</span>
-                                            </div>
-                                            <div className="space-y-4">
-                                                {whatsNewItems.map((item) => (
-                                                    <div key={item.title} className="rounded-2xl border border-border-subtle/70 bg-surface-muted/60 px-4 py-3">
-                                                        <p className="text-xs uppercase tracking-[0.2em] text-accent-secondary/50">{item.date}</p>
-                                                        <p className="text-sm font-semibold text-accent-secondary mt-1">{item.title}</p>
-                                                        <p className="text-xs text-accent-secondary/70 mt-1">{item.description}</p>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </section>
-
-                                <section className="mb-12">
-                                    <Heading level={2} className="mb-6">
-                                        Available Rooms
-                                    </Heading>
-                                    <RoomList rooms={rooms} onBook={handleBookingCreated} bookings={bookings} />
-                                </section>
-
-                                <section className="mb-12">
-                                    <AvailabilityCalendar bookings={bookings} />
-                                </section>
-
-                                <section>
-                                    <Heading level={2} className="mb-6">
-                                        Your Bookings
-                                    </Heading>
-                                    {bookings.length > 0 ? (
-                                        <BookingList bookings={bookings} authFetch={authFetch} onRefresh={handleBookingCreated} />
-                                    ) : (
-                                        <div className="bg-surface-base border border-border-subtle rounded-2xl shadow-soft p-8 text-center">
-                                            <Text variant="muted">No bookings found.</Text>
-                                        </div>
-                                    )}
-                                </section>
-                            </>
-                        ) : (
-                            <div className="text-center py-12">
-                                <Text variant="large">Please log in to see rooms and bookings.</Text>
-                            </div>
-                        )}
-                    </div>
-
-                    <div
-                        className={`fixed inset-0 z-40 md:hidden ${isMenuOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
-                        aria-hidden={!isMenuOpen}
-                    >
-                        <div
-                            className={`absolute inset-0 bg-surface-base transition-opacity duration-300 ${isMenuOpen ? 'opacity-90' : 'opacity-0'}`}
-                            onClick={() => setIsMenuOpen(false)}
-                            aria-hidden="true"
-                        />
-                        <div
-                            role="dialog"
-                            aria-modal="true"
-                            ref={menuPanelRef}
-                            tabIndex={-1}
-                            className={`relative ml-auto flex h-full w-full max-w-md flex-col overflow-hidden bg-surface-base px-6 py-8 shadow-soft transition-transform duration-300 ease-out ${
-                                isMenuOpen ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'
-                            }`}
-                        >
-                            <div className="flex items-center justify-between">
-                                <span className="text-xs uppercase tracking-[0.3em] text-accent-secondary/50">Menu</span>
-                                <button
-                                    type="button"
-                                    aria-label="Close menu"
-                                    className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-border-subtle text-accent-secondary/70 transition hover:bg-surface-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-600/30"
-                                    onClick={() => setIsMenuOpen(false)}
-                                >
-                                    <span className="absolute inset-0 flex items-center justify-center text-xl leading-[1] -translate-y-[2px]">×</span>
-                                </button>
-                            </div>
-
-                            <div className="mt-10 flex-1 flex flex-col overflow-y-auto pr-1">
-                                <div className="rounded-2xl border border-border-subtle/80 bg-surface-base/95 px-5 py-6 shadow-soft backdrop-blur-sm space-y-6">
-                                    <div>
-                                        <Text variant="muted" className="mb-3 text-xs uppercase tracking-[0.2em]">Color mode</Text>
-                                        <div className="flex items-center gap-3">
-                                            {['Light', 'Dark'].map((mode) => (
-                                                <button
-                                                    key={mode}
-                                                    type="button"
-                                                    onClick={() => handleColorModeChange(mode, { closeMenu: true })}
-                                                    className={`flex-1 rounded-2xl border px-4 py-3 text-base font-semibold transition ${
-                                                        colorMode === mode
-                                                            ? 'border-border-soft bg-surface-muted text-accent-secondary'
-                                                            : 'border-border-subtle text-accent-secondary/80 hover:border-accent-primary/50 hover:bg-accent-primary/5'
-                                                    }`}
-                                                >
-                                                    <span className="flex items-center justify-center gap-2">
-                                                        {colorMode === mode && (
-                                                            <span className="inline-flex h-1.5 w-1.5 rounded-full bg-accent-secondary" aria-hidden="true" />
-                                                        )}
-                                                        {mode}
-                                                    </span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className="h-px bg-border-subtle" aria-hidden="true" />
-
-                                    <div>
-                                        <Text variant="muted" className="mb-3 text-xs uppercase tracking-[0.2em]">Color mode</Text>
-                                        <div className="flex items-center gap-3">
-                                            {['ENG', 'DE'].map((lang) => (
-                                                <button
-                                                    key={lang}
-                                                    type="button"
-                                                    onClick={() => handleLanguageChange(lang, { closeMenu: true })}
-                                                    className={`flex-1 rounded-2xl border px-4 py-3 text-base font-semibold transition ${
-                                                        language === lang
-                                                            ? 'border-border-soft bg-surface-muted text-accent-secondary'
-                                                            : 'border-border-subtle text-accent-secondary/80 hover:border-accent-primary/50 hover:bg-accent-primary/5'
-                                                    }`}
-                                                >
-                                                    <span className="flex items-center justify-center gap-2">
-                                                        {language === lang && (
-                                                            <span className="inline-flex h-1.5 w-1.5 rounded-full bg-accent-secondary" aria-hidden="true" />
-                                                        )}
-                                                        {lang}
-                                                    </span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {isMenuOpen && (
-                                    <div className="mt-6 pt-6 border-t border-border-subtle/70">
-                                        <Text variant="small" className="text-center text-accent-secondary/50">
-                                           
-                                        </Text>
-                                    </div>
-                                )}
-
-                                {isAuthenticated && (
-                                    <div className="mt-auto pt-8">
-                                        <div className="h-px bg-border-subtle/70 mb-6" aria-hidden="true" />
-                                        <div className="space-y-4">
-                                            <Text variant="muted" className="text-xs uppercase tracking-[0.2em]">Account</Text>
-                                            <Button variant="danger" className="w-full" onClick={logout}>
-                                                Logout
-                                            </Button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </>
-            )}
+  return (
+    <div className="min-h-screen bg-surface-muted pb-20">
+      {loading && (
+        <div className="flex items-center justify-center min-h-screen">
+          <Text variant="default">Loading...</Text>
         </div>
-    );
+      )}
+
+      {!loading && isAuthenticated ? (
+        <div className="px-4 py-6 max-w-4xl mx-auto">
+          {/* Header with date */}
+          <section className="mb-6">
+            <p className="text-sm text-accent-secondary/60 mb-1">
+              {getTimeBasedGreeting()}, {user?.first_name || user?.username || "there"}
+            </p>
+            <Heading level={1} className="text-2xl font-semibold text-accent-secondary">
+              Your workspace
+            </Heading>
+            <Text variant="muted" className="text-sm mt-1">
+              {getTodayDate()}
+            </Text>
+          </section>
+
+          {/* Current status card */}
+          <section className="mb-6">
+            <div className="bg-surface-base border border-border-subtle rounded-xl p-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-accent-secondary/60 mb-1">Available now</p>
+                  <p className="text-2xl font-semibold text-accent-secondary">
+                    {availableNow} <span className="text-sm font-normal text-accent-secondary/60">of {rooms?.length || 0} rooms</span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-accent-secondary/60 mb-1">Today's meetings</p>
+                  <p className="text-2xl font-semibold text-accent-secondary">
+                    {todaySchedule.morning.length + todaySchedule.afternoon.length}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Current/Next meeting highlight */}
+          {todaySchedule.current && (
+            <section className="mb-6">
+              <div className="bg-status-success/10 border border-status-success/20 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircleIcon className="w-5 h-5 text-status-success" />
+                  <p className="text-sm font-medium text-status-success">Happening now</p>
+                </div>
+                <p className="font-semibold text-accent-secondary">
+                  {todaySchedule.current.room_name || todaySchedule.current.room}
+                </p>
+                <p className="text-sm text-accent-secondary/70 mt-1">
+                  Until {DateTime.fromISO(todaySchedule.current.end_time).setZone("Europe/Berlin").toFormat("HH:mm")}
+                </p>
+              </div>
+            </section>
+          )}
+
+          {!todaySchedule.current && todaySchedule.next && (
+            <section className="mb-6">
+              <div className="bg-accent-primary/10 border border-accent-primary/20 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <ClockIcon className="w-5 h-5 text-accent-primary" />
+                  <p className="text-sm font-medium text-accent-primary">Upcoming next</p>
+                </div>
+                <p className="font-semibold text-accent-secondary">
+                  {todaySchedule.next.room_name || todaySchedule.next.room}
+                </p>
+                <p className="text-sm text-accent-secondary/70 mt-1">
+                  {DateTime.fromISO(todaySchedule.next.start_time).setZone("Europe/Berlin").toFormat("HH:mm")} –{" "}
+                  {DateTime.fromISO(todaySchedule.next.end_time).setZone("Europe/Berlin").toFormat("HH:mm")}
+                </p>
+              </div>
+            </section>
+          )}
+
+          {/* Today's Schedule */}
+          <section className="mb-6">
+            <Heading level={2} className="text-lg font-semibold text-accent-secondary mb-4">
+              Today's Schedule
+            </Heading>
+
+            {todaySchedule.morning.length === 0 && todaySchedule.afternoon.length === 0 ? (
+              <div className="bg-surface-base border border-border-subtle rounded-xl p-6 text-center">
+                <Text variant="muted">No meetings scheduled for today</Text>
+                <button
+                  onClick={() => navigate("/rooms")}
+                  className="mt-4 text-accent-primary hover:underline text-sm font-medium"
+                >
+                  Browse rooms →
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Morning */}
+                {todaySchedule.morning.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-accent-secondary/60 uppercase tracking-wide mb-2">
+                      Morning
+                    </p>
+                    <div className="space-y-2">
+                      {todaySchedule.morning.map((booking) => (
+                        <div
+                          key={booking.id}
+                          className={`bg-surface-base border rounded-xl p-3 flex items-center justify-between gap-3 ${
+                            todaySchedule.current?.id === booking.id
+                              ? "border-status-success/30 bg-status-success/5"
+                              : "border-border-subtle"
+                          }`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-accent-secondary truncate">
+                              {booking.room_name || booking.room}
+                            </p>
+                            <p className="text-xs text-accent-secondary/60">
+                              {DateTime.fromISO(booking.start_time).setZone("Europe/Berlin").toFormat("HH:mm")} –{" "}
+                              {DateTime.fromISO(booking.end_time).setZone("Europe/Berlin").toFormat("HH:mm")}
+                            </p>
+                          </div>
+                          {todaySchedule.current?.id === booking.id && (
+                            <span className="text-xs font-medium text-status-success px-2 py-1 bg-status-success/10 rounded-full flex-shrink-0">
+                              Now
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Afternoon */}
+                {todaySchedule.afternoon.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-accent-secondary/60 uppercase tracking-wide mb-2">
+                      Afternoon
+                    </p>
+                    <div className="space-y-2">
+                      {todaySchedule.afternoon.map((booking) => (
+                        <div
+                          key={booking.id}
+                          className={`bg-surface-base border rounded-xl p-3 flex items-center justify-between gap-3 ${
+                            todaySchedule.current?.id === booking.id
+                              ? "border-status-success/30 bg-status-success/5"
+                              : "border-border-subtle"
+                          }`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-accent-secondary truncate">
+                              {booking.room_name || booking.room}
+                            </p>
+                            <p className="text-xs text-accent-secondary/60">
+                              {DateTime.fromISO(booking.start_time).setZone("Europe/Berlin").toFormat("HH:mm")} –{" "}
+                              {DateTime.fromISO(booking.end_time).setZone("Europe/Berlin").toFormat("HH:mm")}
+                            </p>
+                          </div>
+                          {todaySchedule.current?.id === booking.id && (
+                            <span className="text-xs font-medium text-status-success px-2 py-1 bg-status-success/10 rounded-full flex-shrink-0">
+                              Now
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
+          {/* Quick Book CTA */}
+          <section className="mb-6 relative">
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={() => setShowQuickBook(true)}
+              className="w-full flex items-center justify-center"
+            >
+              <PlusIcon className="w-5 h-5" />
+              <span className="ml-2">Quick Book a Room</span>
+            </Button>
+
+            {/* Quick Book Modal (inline dropdown) */}
+            {showQuickBook && (
+              <div className="absolute top-full left-0 right-0 mt-2 z-50" ref={quickBookRef}>
+                <div className="bg-surface-base border border-border-subtle rounded-xl shadow-lg overflow-hidden">
+                  {/* Modal Header */}
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
+                    <Heading level={3} className="text-base font-semibold">
+                      Quick Book
+                    </Heading>
+                    <button
+                      onClick={() => {
+                        setShowQuickBook(false);
+                        setSelectedRoomId(null);
+                      }}
+                      className="p-1 hover:bg-surface-muted rounded-lg transition-colors"
+                      aria-label="Close"
+                    >
+                      <XMarkIcon className="w-5 h-5 text-accent-secondary/60" />
+                    </button>
+                  </div>
+
+                  {/* Booking Form */}
+                  <div className="max-h-[60vh] overflow-y-auto">
+                    {!selectedRoomId ? (
+                      // Step 1: Select Room
+                      <div className="p-4">
+                        <Text variant="muted" className="mb-3 text-sm">
+                          Select a room to book
+                        </Text>
+                        <div className="space-y-2">
+                          {rooms.map((room) => {
+                            // Check if room is available now
+                            const now = DateTime.now().setZone("Europe/Berlin");
+                            const isBooked = bookings.some((b) => {
+                              const start = DateTime.fromISO(b.start_time).setZone("Europe/Berlin");
+                              const end = DateTime.fromISO(b.end_time).setZone("Europe/Berlin");
+                              return b.room === room.id && now >= start && now < end;
+                            });
+
+                            return (
+                              <button
+                                key={room.id}
+                                onClick={() => setSelectedRoomId(room.id)}
+                                className="w-full text-left p-3 border border-border-subtle rounded-xl hover:border-accent-primary/50 hover:bg-surface-muted transition-colors"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <p className="font-medium text-accent-secondary">{room.name}</p>
+                                    <p className="text-xs text-accent-secondary/60 mt-0.5">
+                                      {room.location} • {room.capacity} people
+                                    </p>
+                                  </div>
+                                  {!isBooked && (
+                                    <span className="text-xs px-2 py-1 bg-status-success/10 text-status-success rounded-full">
+                                      Free
+                                    </span>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      // Step 2: Booking Form
+                      <>
+                        <button
+                          onClick={() => setSelectedRoomId(null)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-accent-secondary/70 hover:text-accent-secondary border-b border-border-subtle w-full"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                          </svg>
+                          Back to rooms
+                        </button>
+                        <div className="p-4">
+                          <BookingForm
+                            roomId={selectedRoomId}
+                            rooms={rooms}
+                            onBookingCreated={() => {
+                              // Refresh bookings
+                              authFetch("/api/bookings/").then(setBookings).catch(logError);
+                              setShowQuickBook(false);
+                              setSelectedRoomId(null);
+                            }}
+                            onCancel={() => {
+                              setShowQuickBook(false);
+                              setSelectedRoomId(null);
+                            }}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* Helpful office info */}
+          <section className="mb-4">
+            <div className="bg-surface-base border border-border-subtle rounded-xl p-4">
+              <p className="text-xs font-medium text-accent-secondary/60 uppercase tracking-wide mb-3">
+                Office Info
+              </p>
+              <div className="space-y-2 text-sm text-accent-secondary/80">
+                <div className="flex items-center gap-2">
+                  <ClockIcon className="w-4 h-4 flex-shrink-0" />
+                  <span>Office hours: 08:00 – 22:00</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Min. booking: 15 min • Max: 8 hours</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Book up to 90 days in advance</span>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : (
+        !loading && (
+          <div className="flex items-center justify-center min-h-screen px-4">
+            <Text variant="muted" className="text-center">
+              Please log in to see your schedule.
+            </Text>
+          </div>
+        )
+      )}
+
+      {/* Bottom Navigation */}
+      {isAuthenticated && <BottomNav />}
+    </div>
+  );
 }
-
-
-

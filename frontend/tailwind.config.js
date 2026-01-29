@@ -7,75 +7,87 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Neutral zinc-based palette - professional & clean
         surface: {
           base: "#ffffff",
-          muted: "#f8fafc",
-          elevated: "#fdfefc",
+          muted: "#f4f4f5",
+          elevated: "#fafafa",
         },
         border: {
-          subtle: "#e5e7eb",
-          soft: "#d6dae2",
+          subtle: "#e4e4e7",
+          soft: "#d4d4d8",
         },
         accent: {
-          primary: "#2563eb",
-          secondary: "#0f172a",
+          primary: "#3f3f46",
+          secondary: "#18181b",
           danger: "#dc2626",
         },
+        // Flat status colors - no gradients
         status: {
           success: {
             DEFAULT: "#16a34a",
-            soft: "#ecfdf5",
+            soft: "#f0fdf4",
             border: "#bbf7d0",
             text: "#166534",
           },
           warning: {
-            DEFAULT: "#f97316",
-            soft: "#fff7ed",
-            border: "#fed7aa",
-            text: "#9a3412",
+            DEFAULT: "#f59e0b",
+            soft: "#fffbeb",
+            border: "#fde68a",
+            text: "#92400e",
           },
           info: {
-            DEFAULT: "#0ea5e9",
-            soft: "#e0f2fe",
-            border: "#bae6fd",
-            text: "#0c4a6e",
+            DEFAULT: "#3b82f6",
+            soft: "#eff6ff",
+            border: "#bfdbfe",
+            text: "#1e40af",
           },
           danger: {
-            DEFAULT: "#dc2626",
+            DEFAULT: "#ef4444",
             soft: "#fef2f2",
             border: "#fecaca",
-            text: "#7f1d1d",
+            text: "#991b1b",
           },
           neutral: {
-            DEFAULT: "#475569",
-            soft: "#f1f5f9",
-            border: "#cbd5f5",
-            text: "#1e293b",
+            DEFAULT: "#71717a",
+            soft: "#f4f4f5",
+            border: "#e4e4e7",
+            text: "#3f3f46",
           }
         }
       },
-      boxShadow: {
-        soft: "0 8px 30px rgba(15, 23, 42, 0.08)",
-        lift: "0 12px 40px rgba(15, 23, 42, 0.12)",
+      // System font stack - fast and native
+      fontFamily: {
+        sans: [
+          "system-ui",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "Roboto",
+          "sans-serif",
+        ],
       },
+      // Professional rounded corners
       borderRadius: {
-        xl: "1.25rem",
-        "2xl": "1.5rem",
+        "xl": "0.75rem",
+        "2xl": "1rem",
+        "3xl": "1.25rem",
         pill: "9999px",
       },
+      // Subtle shadows only - no colored shadows
+      boxShadow: {
+        soft: "0 1px 3px rgba(0,0,0,0.08)",
+        lift: "0 4px 12px rgba(0,0,0,0.10)",
+      },
+      // Minimal animations
       keyframes: {
         fadeIn: {
-          "0%": { opacity: 0, transform: "translateY(12px)" },
+          "0%": { opacity: 0, transform: "translateY(8px)" },
           "100%": { opacity: 1, transform: "translateY(0)" },
-        },
-        rotate180: {
-          "0%": { transform: "rotate(0deg)" },
-          "100%": { transform: "rotate(180deg)" },
         },
       },
       animation: {
-        fadeIn: "fadeIn 0.3s ease-in-out forwards",
-        rotate180: "rotate180 0.3s ease-in-out forwards",
+        fadeIn: "fadeIn 0.2s ease-out forwards",
       },
     },
   },
