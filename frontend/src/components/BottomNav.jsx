@@ -22,7 +22,7 @@ export default function BottomNav() {
             <button
               key={item.path}
               onClick={() => navigate(item.path)}
-              className={`flex flex-col items-center justify-center w-full h-full transition-colors ${
+              className={`flex flex-col items-center justify-center w-full h-full transition-colors relative ${
                 isActive
                   ? "text-accent-primary"
                   : "text-accent-secondary/60"
@@ -32,6 +32,9 @@ export default function BottomNav() {
             >
               <Icon className="w-6 h-6 mb-1" aria-hidden="true" />
               <span className="text-xs font-medium">{item.label}</span>
+              {isActive && (
+                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-0.5 bg-accent-primary rounded-full" />
+              )}
             </button>
           );
         })}

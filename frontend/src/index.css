@@ -5,6 +5,7 @@
 /* Smooth scrolling for the entire page */
 html {
   scroll-behavior: smooth;
+  scrollbar-gutter: stable;
 }
 
 /* Focus visible styles for accessibility */
