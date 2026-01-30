@@ -1,10 +1,9 @@
-import React from "react";
 import { Label } from "./ui/Typography";
-import { RoomFeatureBadge } from "./RoomFeatureBadges";
+import { FEATURE_ICONS } from "./RoomFeatureBadges";
 
 /**
  * RoomFilters component for filtering rooms by capacity and features
- * Optimized for mobile with horizontal scrolling
+ * Features display with icons and text labels
  *
  * @param {Object} props
  * @param {Array} props.features - Available features to filter by
@@ -65,21 +64,30 @@ export default function RoomFilters({
         </select>
       </div>
 
-      {/* Features filter - horizontal scroll on mobile */}
+      {/* Features filter - wrapped badges with icons and text */}
       {features.length > 0 && (
         <div>
-          <Label className="mb-2 block">Features</Label>
-          <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+          <Label className="mb-3 block">Features</Label>
+          <div className="flex flex-wrap gap-2">
             {features.map((feature) => {
-              const isActive =
-                activeFilters.features?.includes(feature.id);
+              const isActive = activeFilters.features?.includes(feature.id);
+              const Icon = FEATURE_ICONS[feature.icon] || FEATURE_ICONS.projector;
               return (
-                <RoomFeatureBadge
+                <button
                   key={feature.id}
-                  feature={feature}
-                  selected={isActive}
+                  type="button"
                   onClick={() => handleFeatureToggle(feature.id)}
-                />
+                  className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border transition ${
+                    isActive
+                      ? "bg-accent-primary/10 border-accent-primary text-accent-primary"
+                      : "bg-surface-base border-border-subtle text-accent-secondary hover:bg-surface-muted hover:border-border-soft"
+                  }`}
+                >
+                  <span className={isActive ? "text-accent-primary" : "text-accent-secondary/60"}>
+                    {Icon}
+                  </span>
+                  <span className="text-sm font-medium">{feature.name}</span>
+                </button>
               );
             })}
           </div>

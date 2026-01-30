@@ -51,9 +51,11 @@ export default function RoomCard({
           </div>
         </div>
 
-        {/* Room Features */}
+        {/* Room Features - icon only for cleaner look */}
         {room.features && room.features.length > 0 && (
-          <RoomFeatureBadges features={room.features} className="mb-4" />
+          <div className="mb-4">
+            <RoomFeatureBadges features={room.features} showLabels={false} />
+          </div>
         )}
 
         {/* Mini Availability */}

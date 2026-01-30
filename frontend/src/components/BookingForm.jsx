@@ -29,7 +29,7 @@ import Button from "./ui/Button";
 import { Text, Label } from "./ui/Typography";
 import Card from "./ui/Card";
 
-export default function BookingForm({ roomId, onBookingCreated, onClose }) {
+export default function BookingForm({ roomId, onBookingCreated, onClose, onValidityChange, formRef }) {
   const { authFetch } = useAuth();
   const { showAlert } = useAlert();
   const [isBookingSuccessful, setIsBookingSuccessful] = useState(false);
@@ -43,6 +43,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
   const [error, setError] = useState(null);
   const [nextAvailableDay, setNextAvailableDay] = useState(null);
   const [filteredDates, setFilteredDates] = useState(new Map());
+  const [expandedPeriod, setExpandedPeriod] = useState(null);
 
   // Calculate date limits (persist for session)
   const [minDate] = useState(() =>
@@ -131,6 +132,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
     setError(null);
     setSelectedSlot(null);
     setSelectedDuration(null);
+    setExpandedPeriod(null);
 
     const now = DateTime.now().setZone(OFFICE_TIMEZONE);
     const selectedDateTime = DateTime.fromJSDate(selectedDate).setZone(
@@ -313,8 +315,14 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
     return `Book for ${timeStr}`;
   };
 
+  // Notify parent when form validity changes
+  useEffect(() => {
+    const isFormValid = !!(selectedDate && selectedSlot && selectedDuration);
+    onValidityChange?.(isFormValid);
+  }, [selectedDate, selectedSlot, selectedDuration, onValidityChange]);
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
       {error && (
         <Card className="p-4 border-status-danger/20 bg-status-danger/10">
           <Text className="font-medium text-status-danger-text">{error}</Text>
@@ -383,92 +391,113 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
         )}
       </div>
 
-      {/* Step 2: Available Times (grouped by period, all shown at once) */}
+      {/* Step 2: Available Times (three buttons in a row) */}
       {selectedDate && !loading && Object.keys(groupedSlots).length > 0 && (
-        <div className="space-y-6">
-          {Object.entries(TIME_PERIODS).map(([periodKey, period]) => {
-            const slots = groupedSlots[periodKey] || [];
-            if (slots.length === 0) return null;
+        <div>
+          {/* Period buttons row */}
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            {Object.entries(TIME_PERIODS).map(([periodKey, period]) => {
+              const slots = groupedSlots[periodKey] || [];
+              if (slots.length === 0) return null;
 
-            return (
-              <div key={periodKey}>
-                <Label className="mb-3 block">{period.label}</Label>
-                <div className="grid grid-cols-4 gap-2">
-                  {slots.map((slot) => {
-                    const formattedTime = slot.format();
-                    const slotKey = `${formattedTime.start}-${formattedTime.end}`;
-                    const isSelected =
-                      selectedSlot?.start &&
-                      selectedSlot.start.equals(slot.start);
+              const isSelected = expandedPeriod === periodKey;
+              const hasSelectedSlot = selectedSlot && slots.some(s =>
+                s.start.equals(selectedSlot.start)
+              );
 
-                    // Check if this slot is available
-                    const selectedDateTime = DateTime.fromJSDate(
-                      selectedDate
-                    ).setZone(OFFICE_TIMEZONE);
-                    const relevantBookings = bookings.filter((booking) => {
-                      const bookingStart = DateTime.fromISO(
-                        booking.start_time
-                      ).setZone(OFFICE_TIMEZONE);
-                      const bookingRoomId = booking.room?.id || booking.room;
-                      return (
-                        bookingRoomId === roomId &&
-                        bookingStart.hasSame(selectedDateTime, "day")
-                      );
-                    });
+              return (
+                <button
+                  key={periodKey}
+                  type="button"
+                  onClick={() => setExpandedPeriod(isSelected ? null : periodKey)}
+                  className={`px-4 py-3 rounded-xl border font-medium transition ${
+                    isSelected || hasSelectedSlot
+                      ? "bg-accent-primary/10 border-accent-primary text-accent-primary"
+                      : "bg-surface-base border-border-subtle text-accent-secondary hover:bg-surface-muted hover:border-border-soft"
+                  }`}
+                >
+                  {period.label}
+                </button>
+              );
+            })}
+          </div>
 
-                    // Check for overlaps
-                    let isAvailable = true;
-                    for (const booking of relevantBookings) {
-                      const bookingStart = DateTime.fromISO(
-                        booking.start_time
-                      ).setZone(OFFICE_TIMEZONE);
-                      const bookingEnd = DateTime.fromISO(
-                        booking.end_time
-                      ).setZone(OFFICE_TIMEZONE);
+          {/* Time slots for selected period */}
+          {expandedPeriod && groupedSlots[expandedPeriod] && (
+            <div className="grid grid-cols-4 gap-2">
+              {groupedSlots[expandedPeriod].map((slot) => {
+                const formattedTime = slot.format();
+                const slotKey = `${formattedTime.start}-${formattedTime.end}`;
+                const isSelected =
+                  selectedSlot?.start &&
+                  selectedSlot.start.equals(slot.start);
 
-                      // Check 15-minute slot availability
-                      const slotEnd = slot.start.plus({ minutes: 15 });
-                      if (
-                        slot.start < bookingEnd &&
-                        slotEnd > bookingStart
-                      ) {
-                        isAvailable = false;
-                        break;
-                      }
+                // Check if this slot is available
+                const selectedDateTime = DateTime.fromJSDate(
+                  selectedDate
+                ).setZone(OFFICE_TIMEZONE);
+                const relevantBookings = bookings.filter((booking) => {
+                  const bookingStart = DateTime.fromISO(
+                    booking.start_time
+                  ).setZone(OFFICE_TIMEZONE);
+                  const bookingRoomId = booking.room?.id || booking.room;
+                  return (
+                    bookingRoomId === roomId &&
+                    bookingStart.hasSame(selectedDateTime, "day")
+                  );
+                });
+
+                // Check for overlaps
+                let isAvailable = true;
+                for (const booking of relevantBookings) {
+                  const bookingStart = DateTime.fromISO(
+                    booking.start_time
+                  ).setZone(OFFICE_TIMEZONE);
+                  const bookingEnd = DateTime.fromISO(
+                    booking.end_time
+                  ).setZone(OFFICE_TIMEZONE);
+
+                  // Check 15-minute slot availability
+                  const slotEnd = slot.start.plus({ minutes: 15 });
+                  if (
+                    slot.start < bookingEnd &&
+                    slotEnd > bookingStart
+                  ) {
+                    isAvailable = false;
+                    break;
+                  }
+                }
+
+                return (
+                  <Button
+                    key={slotKey}
+                    type="button"
+                    variant={isSelected ? "primary" : "secondary"}
+                    size="sm"
+                    disabled={!isAvailable}
+                    className={
+                      !isAvailable
+                        ? "bg-surface-muted text-accent-secondary/40 cursor-not-allowed"
+                        : ""
                     }
-
-                    return (
-                      <Button
-                        key={slotKey}
-                        type="button"
-                        variant={isSelected ? "primary" : "secondary"}
-                        size="sm"
-                        disabled={!isAvailable}
-                        className={
-                          !isAvailable
-                            ? "bg-surface-muted text-accent-secondary/40 cursor-not-allowed"
-                            : ""
-                        }
-                        onClick={() => {
-                          if (isAvailable) {
-                            // Create a 15-minute slot by default
-                            const defaultSlot = new TimeSlot(
-                              slot.start,
-                              slot.start.plus({ minutes: 15 })
-                            );
-                            setSelectedSlot(defaultSlot);
-                            setSelectedDuration({ minutes: 15, label: "15 min" });
-                          }
-                        }}
-                      >
-                        {formattedTime.start}
-                      </Button>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
+                    onClick={() => {
+                      if (isAvailable) {
+                        // Create a 15-minute slot by default
+                        const defaultSlot = new TimeSlot(
+                          slot.start,
+                          slot.start.plus({ minutes: 15 })
+                        );
+                        setSelectedSlot(defaultSlot);
+                        setSelectedDuration({ minutes: 15, label: "15 min" });
+                      }
+                    }}
+                  >
+                    {formattedTime.start}
+                  </Button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -516,16 +545,6 @@ export default function BookingForm({ roomId, onBookingCreated, onClose }) {
         </div>
       )}
 
-      {/* Submit button with contextual label */}
-      <Button
-        variant="primary"
-        size="lg"
-        type="submit"
-        disabled={!isValid() || loading || isBookingSuccessful}
-        className="w-full"
-      >
-        {getButtonLabel()}
-      </Button>
     </form>
   );
 }
