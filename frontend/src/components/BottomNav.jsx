@@ -33,7 +33,7 @@ export default function BottomNav() {
               <Icon className="w-6 h-6 mb-1" aria-hidden="true" />
               <span className="text-xs font-medium">{item.label}</span>
               {isActive && (
-                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-0.5 bg-accent-primary rounded-full" />
+                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-1 bg-accent-primary " />
               )}
             </button>
           );

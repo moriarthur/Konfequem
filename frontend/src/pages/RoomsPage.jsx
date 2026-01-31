@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
+import Button from "../components/ui/Button";
 import { error as logError } from "../utils/logger";
 import BottomNav from "../components/BottomNav";
 import RoomList from "../components/RoomList";
@@ -15,6 +16,8 @@ export default function RoomsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedRoomId, setSelectedRoomId] = useState(null);
   const [showBookingForm, setShowBookingForm] = useState(false);
+  const [isFormValid, setIsFormValid] = useState(false);
+  const bookingFormRef = useRef(null);
   const [activeFilters, setActiveFilters] = useState({
     capacity: null,
     features: [],
@@ -50,6 +53,19 @@ export default function RoomsPage() {
     fetchData();
   }, [authFetch, isAuthenticated]);
 
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (showBookingForm) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+      setIsFormValid(false);
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showBookingForm]);
+
   /**
    * Handle booking creation - refresh bookings and close form
    */
@@ -59,6 +75,7 @@ export default function RoomsPage() {
       setBookings(bookingsData);
       setShowBookingForm(false);
       setSelectedRoomId(null);
+      setIsFormValid(false);
     } catch (err) {
       logError("Error refreshing bookings:", err);
     }
@@ -85,6 +102,7 @@ export default function RoomsPage() {
     if (selectedRoomId === roomId) {
       setShowBookingForm(false);
       setSelectedRoomId(null);
+      setIsFormValid(false);
     } else {
       setSelectedRoomId(roomId);
       setShowBookingForm(true);
@@ -180,9 +198,9 @@ export default function RoomsPage() {
 
       {/* Booking form modal */}
       {showBookingForm && selectedRoomId && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
-          <div className="bg-surface-base w-full sm:max-w-lg sm:rounded-xl rounded-t-xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-surface-base border-b border-border-subtle px-6 py-4 flex items-center justify-between">
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center">
+          <div className="bg-surface-base w-full sm:max-w-lg sm:rounded-xl rounded-t-xl max-h-[calc(100vh-4rem)] sm:max-h-[85vh] overflow-y-auto">
+            <div className="sticky top-0 z-10 bg-surface-base border-b border-border-subtle px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between shrink-0">
               <Heading level={2} className="text-lg font-semibold">
                 Book Room
               </Heading>
@@ -199,16 +217,34 @@ export default function RoomsPage() {
                 </svg>
               </button>
             </div>
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <BookingForm
                 roomId={selectedRoomId}
                 rooms={rooms}
+                formRef={bookingFormRef}
+                showSubmitButton={false}
+                onValidityChange={setIsFormValid}
                 onBookingCreated={handleBookingCreated}
                 onCancel={() => {
                   setShowBookingForm(false);
                   setSelectedRoomId(null);
                 }}
               />
+              
+              {/* Submit Button */}
+              <Button
+                variant="primary"
+                size="lg"
+                disabled={!isFormValid}
+                onClick={() => bookingFormRef.current?.requestSubmit()}
+                className={`w-full mt-6 ${
+                  isFormValid
+                    ? '!bg-status-success hover:!bg-status-success/90 !border-status-success'
+                    : ''
+                }`}
+              >
+                Book a Room
+              </Button>
             </div>
           </div>
         </div>

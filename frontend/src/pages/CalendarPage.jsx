@@ -2,29 +2,37 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 import { error as logError } from "../utils/logger";
 import BottomNav from "../components/BottomNav";
-import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
+import { ChevronLeftIcon, ChevronRightIcon, ClockIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { Heading, Text } from "../components/ui/Typography";
 import { DateTime } from "luxon";
 
 export default function CalendarPage() {
   const { authFetch, isAuthenticated } = useAuth();
   const [bookings, setBookings] = useState([]);
+  const [allBookings, setAllBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(DateTime.now());
 
   useEffect(() => {
     if (!isAuthenticated) {
       setBookings([]);
+      setAllBookings([]);
       setLoading(false);
       return;
     }
 
-    const fetchBookings = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         const monthStr = currentMonth.toFormat("yyyy-MM");
+        
+        // Fetch month bookings for calendar display
         const bookingsData = await authFetch(`/api/bookings/?month=${monthStr}`);
         setBookings(bookingsData);
+
+        // Fetch all bookings for current/next calculation
+        const allBookingsData = await authFetch("/api/bookings/");
+        setAllBookings(allBookingsData);
       } catch (err) {
         logError("Error fetching bookings:", err);
       } finally {
@@ -32,7 +40,7 @@ export default function CalendarPage() {
       }
     };
 
-    fetchBookings();
+    fetchData();
   }, [authFetch, isAuthenticated, currentMonth]);
 
   /**
@@ -57,6 +65,36 @@ export default function CalendarPage() {
   };
 
   /**
+   * Find current and next upcoming bookings (from ALL bookings, not just current month)
+   */
+  const { currentBooking, nextBooking } = useMemo(() => {
+    if (!allBookings || allBookings.length === 0) return { currentBooking: null, nextBooking: null };
+
+    const now = DateTime.now().setZone("Europe/Berlin");
+
+    // Find current booking (happening now)
+    const current = allBookings.find((booking) => {
+      if (!booking?.start_time) return false;
+      const start = DateTime.fromISO(booking.start_time).setZone("Europe/Berlin");
+      const end = DateTime.fromISO(booking.end_time).setZone("Europe/Berlin");
+      return now >= start && now < end;
+    });
+
+    // Filter and sort future bookings
+    const futureBookings = allBookings
+      .filter((booking) => {
+        if (!booking?.start_time) return false;
+        const start = DateTime.fromISO(booking.start_time).setZone("Europe/Berlin");
+        return start > now;
+      })
+      .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+
+    const next = futureBookings.length > 0 ? futureBookings[0] : null;
+
+    return { currentBooking: current, nextBooking: next };
+  }, [allBookings]);
+
+  /**
    * Get calendar grid for the current month
    */
   const calendarDays = useMemo(() => {
@@ -64,15 +102,18 @@ export default function CalendarPage() {
     const endOfMonth = currentMonth.endOf("month");
     const startOfGrid = startOfMonth.startOf("week");
     const endOfGrid = endOfMonth.endOf("week");
+    const today = DateTime.now().setZone("Europe/Berlin").startOf("day");
 
     const days = [];
     let current = startOfGrid;
 
     while (current <= endOfGrid) {
+      const dayDate = current.startOf("day");
       days.push({
         date: current,
         isCurrentMonth: current.month === currentMonth.month,
         isToday: current.hasSame(DateTime.now(), "day"),
+        isPast: dayDate < today,
         dayBookings: bookings.filter((booking) => {
           if (!booking?.start_time) return false;
           const bookingDate = DateTime.fromISO(booking.start_time);
@@ -175,18 +216,20 @@ export default function CalendarPage() {
           ) : (
             <div className="grid grid-cols-7">
               {calendarDays.map((dayInfo, index) => {
-                const { date, isCurrentMonth, isToday, dayBookings } = dayInfo;
+                const { date, isCurrentMonth, isToday, isPast, dayBookings } = dayInfo;
                 return (
                   <div
                     key={index}
                     className={`min-h-[80px] sm:min-h-[100px] border-r border-b border-border-subtle p-1 sm:p-2 ${
-                      !isCurrentMonth ? "bg-surface-muted/50" : ""
-                    } ${isToday ? "bg-accent-primary/5" : ""}`}
+                      isPast ? "bg-surface-muted" : !isCurrentMonth ? "bg-surface-muted/50" : ""
+                    } ${isToday && !isPast ? "bg-white" : ""}`}
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span
                         className={`text-sm font-medium ${
-                          isCurrentMonth
+                          isPast
+                            ? "text-accent-secondary/40"
+                            : isCurrentMonth
                             ? isToday
                               ? "text-accent-primary"
                               : "text-accent-secondary"
@@ -199,20 +242,40 @@ export default function CalendarPage() {
 
                     {/* Day bookings */}
                     <div className="space-y-1">
-                      {dayBookings.slice(0, 2).map((booking) => (
-                        <div
-                          key={booking.id}
-                          className="text-[10px] sm:text-xs px-1.5 py-0.5 bg-status-success/10 border border-status-success/20 rounded text-accent-secondary truncate"
-                          title={`${booking.room_name || booking.room}: ${DateTime.fromISO(
-                            booking.start_time
-                          ).toFormat("HH:mm")} - ${DateTime.fromISO(
-                            booking.end_time
-                          ).toFormat("HH:mm")}`}
-                        >
-                          {DateTime.fromISO(booking.start_time).toFormat("HH:mm")}{" "}
-                          {booking.room_name || booking.room}
-                        </div>
-                      ))}
+                      {dayBookings.slice(0, 2).map((booking) => {
+                        const now = DateTime.now().setZone("Europe/Berlin");
+                        const bookingEnd = DateTime.fromISO(booking.end_time).setZone("Europe/Berlin");
+                        const isPast = bookingEnd < now;
+                        const isCurrent = currentBooking?.id === booking.id;
+                        const isNext = nextBooking?.id === booking.id;
+                        
+                        return (
+                          <div
+                            key={booking.id}
+                            className={`text-[10px] sm:text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${
+                              isPast
+                                ? 'bg-surface-muted border border-border-subtle text-accent-secondary/40'
+                                : isCurrent
+                                ? 'bg-status-success/10 border border-status-success/20 text-status-success font-medium'
+                                : isNext
+                                ? 'bg-status-warning/10 border border-status-warning/20 text-status-warning font-medium'
+                                : 'bg-accent-primary/5 border border-accent-primary/10 text-accent-secondary'
+                            }`}
+                            title={`${booking.room_name || booking.room}: ${DateTime.fromISO(
+                              booking.start_time
+                            ).toFormat("HH:mm")} - ${DateTime.fromISO(
+                              booking.end_time
+                            ).toFormat("HH:mm")}`}
+                          >
+                            {isCurrent && <CheckCircleIcon className="w-3 h-3 flex-shrink-0" />}
+                            {isNext && <ClockIcon className="w-3 h-3 flex-shrink-0" />}
+                            <span className={`truncate ${isPast ? 'line-through' : ''}`}>
+                              {DateTime.fromISO(booking.start_time).toFormat("HH:mm")}{" "}
+                              {booking.room_name || booking.room}
+                            </span>
+                          </div>
+                        );
+                      })}
                       {dayBookings.length > 2 && (
                         <div className="text-[10px] text-accent-secondary/60 px-1.5">
                           +{dayBookings.length - 2} more
@@ -227,14 +290,30 @@ export default function CalendarPage() {
         </div>
 
         {/* Legend */}
-        <div className="mt-4 flex items-center gap-4 text-xs text-accent-secondary/60">
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-accent-secondary/60">
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 bg-accent-primary/10 border border-accent-primary/20 rounded"></div>
             <span>Today</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 bg-status-success/10 border border-status-success/20 rounded"></div>
-            <span>Booked</span>
+            <span>Current</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 bg-status-warning/10 border border-status-warning/20 rounded"></div>
+            <span>Upcoming</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 bg-accent-primary/5 border border-accent-primary/10 rounded"></div>
+            <span>Future</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 bg-surface-muted border border-border-subtle rounded relative flex items-center justify-center">
+              <svg className="w-2 h-2 text-accent-secondary/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+            <span>Past</span>
           </div>
         </div>
       </div>

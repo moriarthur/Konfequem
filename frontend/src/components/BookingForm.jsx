@@ -29,7 +29,7 @@ import Button from "./ui/Button";
 import { Text, Label } from "./ui/Typography";
 import Card from "./ui/Card";
 
-export default function BookingForm({ roomId, onBookingCreated, onClose, onValidityChange, formRef }) {
+export default function BookingForm({ roomId, onBookingCreated, onClose, onValidityChange, formRef, showSubmitButton = true }) {
   const { authFetch } = useAuth();
   const { showAlert } = useAlert();
   const [isBookingSuccessful, setIsBookingSuccessful] = useState(false);
@@ -349,7 +349,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
       {/* Step 1: Select Date */}
       <div>
         <Label>Select Date</Label>
-        <div className="flex justify-center">
+        <div className="flex justify-center mt-2">
           <DayPicker
             mode="single"
             selected={selectedDate}
@@ -543,6 +543,18 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
             })()}
           </div>
         </div>
+      )}
+
+      {/* Submit Button */}
+      {showSubmitButton && selectedDate && selectedSlot && selectedDuration && (
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={loading}
+          className="w-full mt-4"
+        >
+          {getButtonLabel()}
+        </Button>
       )}
 
     </form>

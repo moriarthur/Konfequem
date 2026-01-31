@@ -218,70 +218,82 @@ export default function Home() {
 
           {/* Upcoming Bookings */}
           <section className="mb-6">
-            <Heading level={2} className="text-lg font-semibold text-accent-secondary mb-4">
-              Upcoming Bookings
-            </Heading>
+            <div className="bg-surface-base border border-border-subtle rounded-xl p-4">
+              <Heading level={2} className="text-lg font-semibold text-accent-secondary mb-4">
+                Upcoming Bookings
+              </Heading>
 
-            {upcomingBookings.upcoming.length === 0 && !upcomingBookings.current ? (
-              <div className="bg-surface-base border border-border-subtle rounded-xl p-6 text-center">
-                <Text variant="muted">No upcoming bookings</Text>
-                <button
-                  onClick={() => navigate("/rooms")}
-                  className="mt-4 text-accent-primary hover:underline text-sm font-medium"
-                >
-                  Book a room →
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {upcomingBookings.current && (
-                  <div
-                    className={`bg-surface-base border rounded-xl p-3 flex items-center justify-between gap-3 border-status-success/30 bg-status-success/5`}
+              {upcomingBookings.upcoming.length === 0 && !upcomingBookings.current ? (
+                <div className="text-center py-4">
+                  <Text variant="muted">No upcoming bookings</Text>
+                  <button
+                    onClick={() => navigate("/rooms")}
+                    className="mt-4 text-accent-primary hover:underline text-sm font-medium"
                   >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-accent-secondary truncate">
-                        {upcomingBookings.current.room_name || upcomingBookings.current.room}
-                      </p>
-                      <p className="text-xs text-accent-secondary/60">
-                        {DateTime.fromISO(upcomingBookings.current.start_time).setZone("Europe/Berlin").toFormat("HH:mm")} –{" "}
-                        {DateTime.fromISO(upcomingBookings.current.end_time).setZone("Europe/Berlin").toFormat("HH:mm")}
-                        <span className="ml-2 text-status-success font-medium">Now</span>
-                      </p>
-                    </div>
-                    <span className="text-xs font-medium text-status-success px-2 py-1 bg-status-success/10 rounded-full flex-shrink-0">
-                      Current
-                    </span>
-                  </div>
-                )}
-                {upcomingBookings.upcoming.map((booking) => {
-                  const start = DateTime.fromISO(booking.start_time).setZone("Europe/Berlin");
-                  const now = DateTime.now().setZone("Europe/Berlin");
-                  const isToday = start.hasSame(now, "day");
-                  const isTomorrow = start.hasSame(now.plus({ days: 1 }), "day");
-
-                  let dateLabel = start.toFormat("EEE, MMM d");
-                  if (isToday) dateLabel = "Today";
-                  if (isTomorrow) dateLabel = "Tomorrow";
-
-                  return (
-                    <div
-                      key={booking.id}
-                      className="bg-surface-base border border-border-subtle rounded-xl p-3 flex items-center justify-between gap-3"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-accent-secondary truncate">
-                          {booking.room_name || booking.room}
-                        </p>
-                        <p className="text-xs text-accent-secondary/60">
-                          {dateLabel} • {start.toFormat("HH:mm")} –{" "}
-                          {DateTime.fromISO(booking.end_time).setZone("Europe/Berlin").toFormat("HH:mm")}
-                        </p>
+                    Book a room →
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    {upcomingBookings.current && (
+                      <div
+                        className={`bg-surface-base border rounded-xl p-3 flex items-center justify-between gap-3 border-status-success/30 bg-status-success/5`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-accent-secondary truncate">
+                            {upcomingBookings.current.room_name || upcomingBookings.current.room}
+                          </p>
+                          <p className="text-xs text-accent-secondary/60">
+                            {DateTime.fromISO(upcomingBookings.current.start_time).setZone("Europe/Berlin").toFormat("HH:mm")} –{" "}
+                            {DateTime.fromISO(upcomingBookings.current.end_time).setZone("Europe/Berlin").toFormat("HH:mm")}
+                            <span className="ml-2 text-status-success font-medium">Now</span>
+                          </p>
+                        </div>
+                        <span className="text-xs font-medium text-status-success px-2 py-1 bg-status-success/10 rounded-full flex-shrink-0">
+                          Current
+                        </span>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    )}
+                    {upcomingBookings.upcoming.map((booking) => {
+                      const start = DateTime.fromISO(booking.start_time).setZone("Europe/Berlin");
+                      const now = DateTime.now().setZone("Europe/Berlin");
+                      const isToday = start.hasSame(now, "day");
+                      const isTomorrow = start.hasSame(now.plus({ days: 1 }), "day");
+
+                      let dateLabel = start.toFormat("EEE, MMM d");
+                      if (isToday) dateLabel = "Today";
+                      if (isTomorrow) dateLabel = "Tomorrow";
+
+                      return (
+                        <div
+                          key={booking.id}
+                          className="bg-surface-muted border border-border-subtle rounded-xl p-3 flex items-center justify-between gap-3"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-accent-secondary truncate">
+                              {booking.room_name || booking.room}
+                            </p>
+                            <p className="text-xs text-accent-secondary/60">
+                              {dateLabel} • {start.toFormat("HH:mm")} –{" "}
+                              {DateTime.fromISO(booking.end_time).setZone("Europe/Berlin").toFormat("HH:mm")}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* View all bookings button */}
+                  <button
+                    onClick={() => navigate("/calendar")}
+                    className="w-full text-center text-sm text-accent-primary hover:underline mt-4"
+                  >
+                    View all bookings →
+                  </button>
+                </>
+              )}
+            </div>
           </section>
 
           {/* Quick Book CTA */}
@@ -370,6 +382,7 @@ export default function Home() {
                           roomId={selectedRoomId}
                           rooms={rooms}
                           formRef={bookingFormRef}
+                          showSubmitButton={false}
                           onValidityChange={setIsFormValid}
                           onBookingCreated={() => {
                             // Refresh bookings
