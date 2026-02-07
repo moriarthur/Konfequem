@@ -7,7 +7,6 @@ import Button from "../components/ui/Button";
 import BookingForm from "../components/BookingForm";
 import { Heading, Text } from "../components/ui/Typography";
 import { DateTime } from "luxon";
-import { PlusIcon, ClockIcon, CheckCircleIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 export default function Home() {
   const { authFetch, isAuthenticated, loading, user } = useAuth();
@@ -185,7 +184,10 @@ export default function Home() {
             <section className="mb-6">
               <div className="bg-status-success/10 border border-status-success/20 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <CheckCircleIcon className="w-5 h-5 text-status-success" />
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-status-success">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M8.5 12.5L10.5 14.5L15.5 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
                   <p className="text-sm font-medium text-status-success">Happening now</p>
                 </div>
                 <p className="font-semibold text-accent-secondary">
@@ -202,7 +204,10 @@ export default function Home() {
             <section className="mb-6">
               <div className="bg-status-warning/10 border border-status-warning/20 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <ClockIcon className="w-5 h-5 text-status-warning" />
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-status-warning">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M12 8V12L14.5 14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
                   <p className="text-sm font-medium text-status-warning">Upcoming next</p>
                 </div>
                 <p className="font-semibold text-accent-secondary">
@@ -237,10 +242,11 @@ export default function Home() {
                 <>
                   <div className="space-y-2">
                     {upcomingBookings.current && (
-                      <div
-                        className={`bg-surface-base border rounded-xl p-3 flex items-center justify-between gap-3 border-status-success/30 bg-status-success/5`}
+                      <button
+                        onClick={() => navigate(`/calendar?edit=${upcomingBookings.current.id}`)}
+                        className={`w-full bg-surface-base border rounded-xl p-3 flex items-center justify-between gap-3 border-status-success/30 bg-status-success/5 hover:ring-2 hover:ring-status-success/30 transition-all group`}
                       >
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 text-left">
                           <p className="font-medium text-accent-secondary truncate">
                             {upcomingBookings.current.room_name || upcomingBookings.current.room}
                           </p>
@@ -253,7 +259,10 @@ export default function Home() {
                         <span className="text-xs font-medium text-status-success px-2 py-1 bg-status-success/10 rounded-full flex-shrink-0">
                           Current
                         </span>
-                      </div>
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-status-success/40 group-hover:text-status-success group-hover:translate-x-0.5 transition-all">
+                          <path d="M9.5 7L14.5 12L9.5 17" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
                     )}
                     {upcomingBookings.upcoming.map((booking) => {
                       const start = DateTime.fromISO(booking.start_time).setZone("Europe/Berlin");
@@ -266,11 +275,12 @@ export default function Home() {
                       if (isTomorrow) dateLabel = "Tomorrow";
 
                       return (
-                        <div
+                        <button
                           key={booking.id}
-                          className="bg-surface-muted border border-border-subtle rounded-xl p-3 flex items-center justify-between gap-3"
+                          onClick={() => navigate(`/calendar?edit=${booking.id}`)}
+                          className="w-full bg-surface-muted border border-border-subtle rounded-xl p-3 flex items-center justify-between gap-3 hover:ring-2 hover:ring-accent-primary/30 hover:bg-surface-base transition-all group"
                         >
-                          <div className="flex-1 min-w-0">
+                          <div className="flex-1 min-w-0 text-left">
                             <p className="font-medium text-accent-secondary truncate">
                               {booking.room_name || booking.room}
                             </p>
@@ -279,7 +289,10 @@ export default function Home() {
                               {DateTime.fromISO(booking.end_time).setZone("Europe/Berlin").toFormat("HH:mm")}
                             </p>
                           </div>
-                        </div>
+                          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-accent-secondary/30 group-hover:text-accent-primary group-hover:translate-x-0.5 transition-all flex-shrink-0">
+                            <path d="M9.5 7L14.5 12L9.5 17" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
                       );
                     })}
                   </div>
@@ -319,7 +332,9 @@ export default function Home() {
                     className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-surface-muted transition-colors"
                     aria-label="Close"
                   >
-                    <XMarkIcon className="w-5 h-5 text-accent-secondary/60" />
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-accent-secondary/60">
+                      <path d="M4 4L20 20M20 4L4 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                   </button>
                 </div>
 
@@ -422,7 +437,12 @@ export default function Home() {
                 showQuickBook && !isFormValid ? '!opacity-50 !cursor-not-allowed' : ''
               }`}
             >
-              {!showQuickBook && <PlusIcon className="w-5 h-5" />}
+              {!showQuickBook && (
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5">
+                  <path d="M2 12C2 7.28595 2 4.92893 3.46447 3.46447C4.92893 2 7.28595 2 12 2C16.714 2 19.0711 2 20.5355 3.46447C22 4.92893 22 7.28595 22 12C22 16.714 22 19.0711 20.5355 20.5355C19.0711 22 16.714 22 12 22C7.28595 22 4.92893 22 3.46447 20.5355C2 19.0711 2 16.714 2 12Z" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M15 12L12 12M12 12L9 12M12 12L12 9M12 12L12 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              )}
               <span className={!showQuickBook ? 'ml-2' : ''}>
                 {showQuickBook ? 'Book a Room' : 'Quick Book a Room'}
               </span>
@@ -437,18 +457,25 @@ export default function Home() {
               </p>
               <div className="space-y-2 text-sm text-accent-secondary/80">
                 <div className="flex items-center gap-2">
-                  <ClockIcon className="w-4 h-4 flex-shrink-0" />
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M12 8V12L14.5 14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
                   <span>Office hours: 08:00 – 22:00</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0">
+                    <path d="M21 13C21 17.9706 16.9706 22 12 22C7.02944 22 3 17.9706 3 13C3 8.02944 7.02944 4 12 4C16.9706 4 21 8.02944 21 13Z" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M12 13V9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M10 2H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                   </svg>
                   <span>Min. booking: 15 min • Max: 8 hours</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M12 17V11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    <circle cx="1" cy="1" r="1" transform="matrix(1 0 0 -1 11 9)" fill="currentColor"/>
                   </svg>
                   <span>Book up to 90 days in advance</span>
                 </div>
