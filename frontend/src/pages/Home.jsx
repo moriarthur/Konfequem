@@ -7,6 +7,7 @@ import Button from "../components/ui/Button";
 import BookingForm from "../components/BookingForm";
 import Logo from "../components/Logo";
 import { Heading, Text } from "../components/ui/Typography";
+import { Skeleton, StatCardSkeleton, BookingListSkeleton } from "../components/ui/Skeleton";
 import { DateTime } from "luxon";
 
 export default function Home() {
@@ -154,8 +155,31 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-surface-muted pb-20">
       {loading && (
-        <div className="flex items-center justify-center min-h-screen">
-          <Text variant="default">Loading...</Text>
+        <div className="px-4 py-6 max-w-4xl mx-auto">
+          {/* Header skeleton */}
+          <div className="mb-6">
+            <div className="flex items-center justify-center gap-1 mb-4">
+              <Skeleton className="h-5 w-28" />
+              <Skeleton className="h-5 w-5" />
+              <Skeleton className="h-5 w-28" />
+            </div>
+            <Skeleton className="h-4 w-48 mx-auto" />
+          </div>
+
+          {/* Status card skeleton */}
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+          </div>
+
+          {/* Booking list skeleton */}
+          <div className="bg-surface-base border border-border-subtle rounded-xl p-4">
+            <Skeleton className="h-5 w-32 mb-4" />
+            <BookingListSkeleton />
+          </div>
+
+          {/* Quick Book button skeleton */}
+          <div className="bg-surface-base border border-border-subtle rounded-xl h-14" />
         </div>
       )}
 

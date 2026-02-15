@@ -210,9 +210,12 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
   return (
     <div className="space-y-4">
       {/* Tabs */}
-      <Card padding="p-1" className="border border-border-subtle shadow-soft rounded-xl">
+      <Card padding="p-1" className="border border-border-subtle shadow-soft rounded-xl" role="tablist">
         <div className="flex gap-0">
           <button
+            role="tab"
+            aria-selected={activeTab === 'upcoming'}
+            aria-controls="bookings-panel"
             className={`flex-1 px-4 py-3 text-sm font-medium rounded-lg transition-all ${
               activeTab === 'upcoming'
                 ? 'text-accent-primary border border-accent-primary bg-accent-primary/10'
@@ -222,8 +225,11 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
           >
             Upcoming ({bookings.filter(b => DateTime.fromISO(b.start_time).setZone(OFFICE_TIMEZONE) >= now).length})
           </button>
-          <div className="w-px bg-border-subtle/30 mx-1" />
+          <div className="w-px bg-border-subtle/30 mx-1" aria-hidden="true" />
           <button
+            role="tab"
+            aria-selected={activeTab === 'history'}
+            aria-controls="bookings-panel"
             className={`flex-1 px-4 py-3 text-sm font-medium rounded-lg transition-all ${
               activeTab === 'history'
                 ? 'text-accent-primary border border-accent-primary bg-accent-primary/10'
@@ -330,6 +336,7 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
                                       end_time: booking.end_time
                                     });
                                   }}
+                                  aria-label={`Cancel booking for ${booking.room_name || 'room'} on ${DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE).toFormat('dd.MM.yyyy')}`}
                                 >
                                   Cancel
                                 </Button>
@@ -371,13 +378,19 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
 
       {/* Confirmation Modal */}
       {confirmCancel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cancel-modal-title"
+        >
           <div
             className="absolute inset-0 bg-black/40"
             onClick={() => setConfirmCancel(null)}
+            aria-hidden="true"
           />
           <div className="relative bg-surface-base border border-border-subtle rounded-2xl shadow-soft p-6 max-w-md w-full">
-            <h3 className="text-lg font-medium mb-4">Cancel Booking</h3>
+            <h3 id="cancel-modal-title" className="text-lg font-medium mb-4">Cancel Booking</h3>
             <p className="text-accent-secondary/70 mb-6">
               Are you sure you want to cancel this booking?
             </p>

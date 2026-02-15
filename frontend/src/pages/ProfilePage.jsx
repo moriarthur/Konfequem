@@ -6,6 +6,7 @@ import BottomNav from "../components/BottomNav";
 import Button from "../components/ui/Button";
 import Logo from "../components/Logo";
 import { Heading, Text } from "../components/ui/Typography";
+import { Skeleton, StatCardSkeleton } from "../components/ui/Skeleton";
 
 export default function ProfilePage() {
   const { user, authFetch, logout, isAuthenticated } = useAuth();
@@ -127,7 +128,13 @@ export default function ProfilePage() {
         </div>
 
         {/* Stats */}
-        {!loading && (
+        {loading ? (
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+          </div>
+        ) : (
           <div className="grid grid-cols-3 gap-3 mb-6">
             <div className="bg-surface-base border border-border-subtle rounded-xl p-4 text-center">
               <p className="text-2xl font-semibold text-accent-secondary">

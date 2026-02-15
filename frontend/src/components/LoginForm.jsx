@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FiEye, FiEyeOff } from "react-icons/fi";
-import Logo from "./Logo";
 
 const USERNAME_REGEX = /^[a-zA-ZäöüÄÖÜß0-9._-]+$/;
 
@@ -205,7 +204,7 @@ export default function LoginForm() {
 
       <div className="w-full max-w-sm p-8 rounded-2xl bg-surface-base shadow-soft border border-border-subtle">
         <div className="flex justify-center mb-6">
-          <Logo size="lg" />
+          <img src="/konfequem.svg" alt="Konfequem" width="160" height="160" />
         </div>
 
         {generalError && (

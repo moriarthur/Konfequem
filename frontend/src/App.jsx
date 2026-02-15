@@ -7,6 +7,7 @@ import CalendarPage from "./pages/CalendarPage";
 import ProfilePage from "./pages/ProfilePage";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { AlertProvider } from "./context/AlertContext";
+import ErrorBoundary from "./components/ErrorBoundary";
 import "./index.css";
 
 /**
@@ -21,47 +22,49 @@ function PrivateRoute({ children }) {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AlertProvider>
-        <Router future={{ v7_startTransition: true }}>
-          <Routes>
-            <Route path="/login" element={<LoginForm />} />
-            <Route
-              path="/"
-              element={
-                <PrivateRoute>
-                  <Home />
+    <ErrorBoundary>
+      <AuthProvider>
+        <AlertProvider>
+          <Router future={{ v7_startTransition: true }}>
+            <Routes>
+              <Route path="/login" element={<LoginForm />} />
+              <Route
+                path="/"
+                element={
+                  <PrivateRoute>
+                    <Home />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/rooms"
+                element={
+                  <PrivateRoute>
+                    <RoomsPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/calendar"
+                element={
+                  <PrivateRoute>
+                    <CalendarPage />
                 </PrivateRoute>
-              }
-            />
-            <Route
-              path="/rooms"
-              element={
-                <PrivateRoute>
-                  <RoomsPage />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/calendar"
-              element={
-                <PrivateRoute>
-                  <CalendarPage />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/profile"
-              element={
-                <PrivateRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <PrivateRoute>
                   <ProfilePage />
                 </PrivateRoute>
-              }
-            />
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </Router>
-      </AlertProvider>
-    </AuthProvider>
+                }
+              />
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </Router>
+        </AlertProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

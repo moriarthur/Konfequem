@@ -7,6 +7,7 @@ import RoomList from "../components/RoomList";
 import RoomFilters from "../components/RoomFilters";
 import BookingForm from "../components/BookingForm";
 import { Heading, Text } from "../components/ui/Typography";
+import { Skeleton, RoomCardSkeleton } from "../components/ui/Skeleton";
 
 export default function RoomsPage() {
   const { authFetch, authFetchRef, isAuthenticated } = useAuth();
@@ -164,6 +165,15 @@ export default function RoomsPage() {
           Browse and book available rooms
         </Text>
 
+        {/* Loading state */}
+        {loading && (
+          <div className="space-y-3">
+            <RoomCardSkeleton />
+            <RoomCardSkeleton />
+            <RoomCardSkeleton />
+          </div>
+        )}
+
         {/* Filters */}
         {!loading && features.length > 0 && (
           <div className="mb-6">
@@ -172,13 +182,6 @@ export default function RoomsPage() {
               activeFilters={activeFilters}
               onFilterChange={handleFilterChange}
             />
-          </div>
-        )}
-
-        {/* Loading state */}
-        {loading && (
-          <div className="flex items-center justify-center py-12">
-            <Text variant="muted">Loading rooms...</Text>
           </div>
         )}
 
