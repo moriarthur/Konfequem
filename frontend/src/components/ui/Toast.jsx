@@ -68,29 +68,17 @@ export default function Toast({ message, type = "info", duration = TOAST_DURATIO
       onMouseLeave={handleMouseLeave}
     >
       <div className={`px-4 py-3 rounded-xl shadow-soft border ${toastStyles[type]}`}>
-        <div className="flex items-start gap-3">
-          <Icon className="w-5 h-5 flex-shrink-0 mt-0.5" aria-hidden="true" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium break-words">{message}</p>
-          </div>
+        <div className="flex items-center gap-3">
+          <Icon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
+          <p className="text-sm font-medium flex-1 break-words">{message}</p>
           <button
             onClick={onClose}
-            className="flex-shrink-0 p-1 rounded-lg hover:bg-black/5 transition-colors"
+            className="flex-shrink-0 p-1 rounded-lg hover:bg-black/5 transition-colors flex items-center justify-center"
             aria-label="Close notification"
           >
             <FiX className="w-4 h-4" />
           </button>
         </div>
-        {duration > 0 && (
-          <div className="mt-2 h-1 bg-black/10 rounded-full overflow-hidden">
-            <div
-              className={`h-full bg-current opacity-50 rounded-full ${isPaused ? '' : 'animate-toast-progress'}`}
-              style={{ animationDuration: `${duration}ms` }}
-              role="progressbar"
-              aria-label="Notification dismiss timer"
-            />
-          </div>
-        )}
       </div>
     </div>
   );
