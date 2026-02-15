@@ -379,10 +379,19 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
     if (loading) return "Loading...";
     if (isBookingSuccessful) return bookingToEdit ? "✓ Booking Updated" : "✓ Booking Confirmed";
     if (conflictInfo?.hasConflict) return "Time Slot Unavailable";
-    if (!selectedDate || !selectedSlot || !selectedDuration) return bookingToEdit ? "Update Booking" : "Book Room";
 
+    // Check edit mode - look at the prop directly
+    if (bookingToEdit) {
+      // We're editing, even if form isn't fully initialized yet
+      if (!selectedDate || !selectedSlot || !selectedDuration) return "Update Booking";
+      const timeStr = selectedSlot.format().start;
+      return `Update for ${timeStr}`;
+    }
+
+    // Creating new booking
+    if (!selectedDate || !selectedSlot || !selectedDuration) return "Book Room";
     const timeStr = selectedSlot.format().start;
-    return bookingToEdit ? `Update for ${timeStr}` : `Book for ${timeStr}`;
+    return `Book for ${timeStr}`;
   };
 
   // Notify parent when form validity changes

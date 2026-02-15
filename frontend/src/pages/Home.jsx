@@ -24,8 +24,9 @@ export default function Home() {
 
   // Handle edit booking
   const handleEditBooking = (booking) => {
+    const roomId = booking.room?.id || booking.room || booking.room_id;
     setBookingToEdit(booking);
-    setSelectedRoomId(booking.room?.id || booking.room);
+    setSelectedRoomId(roomId);
     setShowQuickBook(true);
   };
 
@@ -502,7 +503,10 @@ export default function Home() {
                 </svg>
               )}
               <span className={!showQuickBook ? 'ml-2' : ''}>
-                {showQuickBook ? 'Book a Room' : 'Quick Book a Room'}
+                {showQuickBook
+                  ? (bookingToEdit ? 'Update Booking' : 'Book a Room')
+                  : 'Quick Book a Room'
+                }
               </span>
             </Button>
           </section>
