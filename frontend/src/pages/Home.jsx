@@ -493,11 +493,11 @@ export default function Home() {
                 }
               }}
               className={`w-full flex items-center justify-center ${
-                showQuickBook && isFormValid
+                showQuickBook && isFormValid && !hasBookingConflict
                   ? '!bg-status-success hover:!bg-status-success/90 !border-status-success'
                   : ''
               } ${
-                showQuickBook && !isFormValid ? '!opacity-50 !cursor-not-allowed' : ''
+                showQuickBook && (!isFormValid || hasBookingConflict) ? '!opacity-50 !cursor-not-allowed' : ''
               }`}
             >
               {!showQuickBook && (
