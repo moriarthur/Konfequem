@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useAlert } from "../context/AlertContext";
 import { error as logError } from "../utils/logger";
@@ -25,6 +25,7 @@ import {
   isDayFullyBooked,
   findNextAvailableDay,
 } from "../utils/timeSlots";
+import { checkBookingConflict, getConflictMessage } from "../utils/bookingConflict";
 import Button from "./ui/Button";
 import { Text, Label } from "./ui/Typography";
 import Card from "./ui/Card";
@@ -44,6 +45,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
   const [nextAvailableDay, setNextAvailableDay] = useState(null);
   const [filteredDates, setFilteredDates] = useState(new Map());
   const [expandedPeriod, setExpandedPeriod] = useState(null);
+  const [conflictInfo, setConflictInfo] = useState(null); // { hasConflict: boolean, message: string, conflictData: object }
 
   // Calculate date limits (persist for session)
   const [minDate] = useState(() =>
@@ -182,6 +184,32 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
     return undefined;
   }, [selectedDate, roomId]);
 
+  // Real-time conflict detection when date, slot, or duration changes
+  useEffect(() => {
+    if (!selectedDate || !selectedSlot || !bookings.length) {
+      setConflictInfo(null);
+      return;
+    }
+
+    // Check for booking conflicts
+    const conflict = checkBookingConflict(
+      selectedSlot.start,
+      selectedSlot.end,
+      bookings,
+      roomId
+    );
+
+    if (conflict) {
+      setConflictInfo({
+        hasConflict: true,
+        message: getConflictMessage(conflict),
+        conflictData: conflict,
+      });
+    } else {
+      setConflictInfo(null);
+    }
+  }, [selectedDate, selectedSlot, bookings, roomId]);
+
   // Get available durations based on selected slot
   const getAvailableDurationsForSlot = useCallback(() => {
     if (!selectedSlot || !selectedDate) return [];
@@ -314,6 +342,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
   const getButtonLabel = () => {
     if (loading) return "Loading...";
     if (isBookingSuccessful) return "✓ Booking Confirmed";
+    if (conflictInfo?.hasConflict) return "Time Slot Unavailable";
     if (!selectedDate || !selectedSlot || !selectedDuration) return "Book Room";
 
     const timeStr = selectedSlot.format().start;
@@ -348,6 +377,21 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
               </Text>
             </div>
           )}
+        </Card>
+      )}
+
+      {conflictInfo && conflictInfo.hasConflict && (
+        <Card className="p-4 border-status-warning/20 bg-status-warning/10">
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 text-status-warning flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div className="flex-1">
+              <Text className="font-medium text-status-warning-text">Booking Conflict</Text>
+              <Text variant="small" className="text-status-warning-text/80 mt-1">{conflictInfo.message}</Text>
+              <Text variant="small" className="text-status-warning-text/60 mt-2">Please choose a different time or duration.</Text>
+            </div>
+          </div>
         </Card>
       )}
 
@@ -555,7 +599,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
         <Button
           type="submit"
           variant="primary"
-          disabled={loading}
+          disabled={loading || conflictInfo?.hasConflict}
           className="w-full mt-4"
         >
           {getButtonLabel()}
