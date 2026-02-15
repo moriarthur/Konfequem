@@ -5,6 +5,7 @@ import { error as logError } from "../utils/logger";
 import BottomNav from "../components/BottomNav";
 import Button from "../components/ui/Button";
 import BookingForm from "../components/BookingForm";
+import Logo from "../components/Logo";
 import { Heading, Text } from "../components/ui/Typography";
 import { DateTime } from "luxon";
 
@@ -160,15 +161,19 @@ export default function Home() {
 
       {!loading && isAuthenticated ? (
         <div className="px-4 py-6 max-w-4xl mx-auto">
-          {/* Header with date */}
+          {/* Header with logo and greeting */}
           <section className="mb-6">
-            <p className="text-sm text-accent-secondary/60 mb-1">
-              {getTimeBasedGreeting()}, {user?.first_name || user?.username || "there"}
-            </p>
-            <Heading level={1} className="text-2xl font-semibold text-accent-secondary">
-              Your workspace
-            </Heading>
-            <Text variant="muted" className="text-sm mt-1">
+            <div className="flex items-center justify-center gap-1 mb-4">
+              <span className="text-xl font-bold tracking-wide" style={{ color: "#61b390" }}>KONFEQUEM</span>
+              <Logo size="sm" className="mx-1" />
+              <span className="text-xl font-bold tracking-wide" style={{ color: "#01352c" }}>WORKSPACE</span>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-accent-secondary/60">
+                {getTimeBasedGreeting()}, {user?.first_name || user?.username || "there"}
+              </p>
+            </div>
+            <Text variant="muted" className="text-sm text-center mt-1">
               {getTodayDate()}
             </Text>
           </section>
