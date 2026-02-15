@@ -3,6 +3,11 @@ services:
     image: postgres:15
     container_name: booking_db
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d booking"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     environment:
       POSTGRES_DB: booking
       POSTGRES_USER: admin
@@ -16,8 +21,15 @@ services:
     build: ./backend
     container_name: booking_backend
     restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     volumes:
       - ./backend:/app
     ports:

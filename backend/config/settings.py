@@ -40,8 +40,14 @@ if not ALLOWED_HOSTS:
 db_url = config("DATABASE_URL", default=None)
 if not db_url:
     raise ValueError("DATABASE_URL is not set in .env!")
+
+# Configure database with connection management
 DATABASES = {
-    "default": dj_database_url.config(default=db_url)
+    "default": dj_database_url.config(
+        default=db_url,
+        conn_max_age=600,  # Close connections after 10 minutes
+        conn_health_checks=True,  # Check connection health before use
+    )
 }
 
 # ==== Timezone settings ====
