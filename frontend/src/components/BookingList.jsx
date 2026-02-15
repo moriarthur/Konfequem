@@ -45,7 +45,7 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
   // Infinite scroll state
   const [displayedCount, setDisplayedCount] = useState(10); // Number of bookings to show
   const loadMoreRef = useRef(null); // Ref for the intersection observer target
-  const { showAlert } = useAlert();
+  const { success, error: showError } = useAlert();
   const scrollPositions = useRef(new Map());
   const [confirmCancel, setConfirmCancel] = useState(null); // { id, room_name, start_time, end_time }
 
@@ -426,21 +426,21 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
                     // Handle successful deletion
                     if (response === null || response === undefined || response === '') {
                       if (onRefresh) onRefresh();
-                      showAlert('Booking cancelled successfully', { type: 'success' });
+                      success('Booking cancelled successfully');
                       setConfirmCancel(null);
                     } else {
                       if (onRefresh) onRefresh();
-                      showAlert('Booking cancelled successfully', { type: 'success' });
+                      success('Booking cancelled successfully');
                       setConfirmCancel(null);
                     }
                   } catch (err) {
                     // Check if it's a JSON parse error (likely 204 response)
                     if (err.message.includes('JSON.parse') || err.message.includes('unexpected end of data')) {
                       if (onRefresh) onRefresh();
-                      showAlert('Booking cancelled successfully', { type: 'success' });
+                      success('Booking cancelled successfully');
                       setConfirmCancel(null);
                     } else {
-                      showAlert('Failed to cancel booking. Please try again.', { type: 'error' });
+                      showError('Failed to cancel booking. Please try again.');
                     }
                   }
                 }}

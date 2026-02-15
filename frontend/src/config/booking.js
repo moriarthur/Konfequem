@@ -31,3 +31,6 @@ export const UI = {
   DEBOUNCE_DELAY_MS: 300,
   ANIMATION_DURATION_MS: 300,
 };
+
+// Export commonly used constants directly for convenience
+export const { TOAST_DURATION_MS, DEBOUNCE_DELAY_MS, ANIMATION_DURATION_MS } = UI;
