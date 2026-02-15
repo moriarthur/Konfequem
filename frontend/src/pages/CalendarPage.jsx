@@ -287,7 +287,7 @@ export default function CalendarPage() {
           });
         }
 
-        showAlert("Booking updated successfully", "success");
+        showAlert("Booking updated successfully", { type: "success" });
         setEditingBooking(null);
         setValidationErrors({});
       }
@@ -308,21 +308,21 @@ export default function CalendarPage() {
           showAlert("Invalid booking data. Please check your input.", { type: "error" });
         }
       } else if (err.status === 401) {
-        showAlert("Your session has expired. Please refresh the page.", "error");
+        showAlert("Your session has expired. Please refresh the page.", { type: "error" });
       } else if (err.status === 403) {
         // Show specific error message from backend
         if (err.message && err.message.includes("currently in progress")) {
-          showAlert("Cannot modify a booking that is currently in progress.", "error");
+          showAlert("Cannot modify a booking that is currently in progress.", { type: "error" });
         } else if (err.message && err.message.includes("already ended")) {
-          showAlert("Cannot modify a booking that has already ended.", "error");
+          showAlert("Cannot modify a booking that has already ended.", { type: "error" });
         } else {
-          showAlert(err.message || "You don't have permission to modify this booking.", "error");
+          showAlert(err.message || "You don't have permission to modify this booking.", { type: "error" });
         }
       } else if (err.status === 404) {
-        showAlert("This booking no longer exists.", "error");
+        showAlert("This booking no longer exists.", { type: "error" });
         setEditingBooking(null);
       } else {
-        showAlert("Failed to update booking. Please try again.", "error");
+        showAlert("Failed to update booking. Please try again.", { type: "error" });
       }
     } finally {
       setSaving(false);
@@ -333,6 +333,22 @@ export default function CalendarPage() {
    * Show delete confirmation
    */
   const handleDeleteClick = (booking) => {
+    const now = DateTime.now().setZone(OFFICE_TIMEZONE);
+    const bookingStart = DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE);
+    const bookingEnd = DateTime.fromISO(booking.end_time).setZone(OFFICE_TIMEZONE);
+    const isPast = bookingEnd < now;
+    const isCurrent = now >= bookingStart && now < bookingEnd;
+
+    // Prevent deleting bookings that are in progress or already ended
+    if (isPast) {
+      showAlert("Cannot delete a booking that has already ended.", { type: "error" });
+      return;
+    }
+    if (isCurrent) {
+      showAlert("Cannot delete a booking that is currently in progress.", { type: "error" });
+      return;
+    }
+
     setDeleteConfirmBooking(booking);
   };
 
@@ -356,7 +372,7 @@ export default function CalendarPage() {
       setBookings(bookingsData);
       setAllBookings(allBookingsData);
 
-      showAlert("Booking deleted successfully", "success");
+      showAlert("Booking deleted successfully", { type: "success" });
 
       // Close expanded view if no bookings left, or remove deleted booking
       if (expandedDay) {
@@ -373,18 +389,18 @@ export default function CalendarPage() {
 
       // Handle specific error cases
       if (err.status === 401) {
-        showAlert("Your session has expired. Please refresh the page.", "error");
+        showAlert("Your session has expired. Please refresh the page.", { type: "error" });
       } else if (err.status === 403) {
         // Show specific error message from backend
         if (err.message && err.message.includes("currently in progress")) {
-          showAlert("Cannot delete a booking that is currently in progress.", "error");
+          showAlert("Cannot delete a booking that is currently in progress.", { type: "error" });
         } else if (err.message && err.message.includes("already ended")) {
-          showAlert("Cannot delete a booking that has already ended.", "error");
+          showAlert("Cannot delete a booking that has already ended.", { type: "error" });
         } else {
-          showAlert(err.message || "You don't have permission to delete this booking.", "error");
+          showAlert(err.message || "You don't have permission to delete this booking.", { type: "error" });
         }
       } else if (err.status === 404) {
-        showAlert("This booking no longer exists.", "error");
+        showAlert("This booking no longer exists.", { type: "error" });
         setDeleteConfirmBooking(null);
         // Refresh to clear stale data
         const monthStr = currentMonth.toFormat("yyyy-MM");
@@ -395,7 +411,7 @@ export default function CalendarPage() {
         setBookings(bookingsData);
         setAllBookings(allBookingsData);
       } else {
-        showAlert("Failed to delete booking. Please try again.", "error");
+        showAlert("Failed to delete booking. Please try again.", { type: "error" });
       }
     }
   };
@@ -418,7 +434,7 @@ export default function CalendarPage() {
         const isCurrent = now >= bookingDate && now < bookingEnd;
 
         if (isPast) {
-          showAlert("Cannot edit a booking that has already ended.", "error");
+          showAlert("Cannot edit a booking that has already ended.", { type: "error" });
           // Clear URL param without opening edit
           Promise.resolve().then(() => {
             navigate("/calendar", { replace: true });
@@ -427,7 +443,7 @@ export default function CalendarPage() {
         }
 
         if (isCurrent) {
-          showAlert("Cannot edit a booking that is currently in progress.", "error");
+          showAlert("Cannot edit a booking that is currently in progress.", { type: "error" });
           // Clear URL param without opening edit
           Promise.resolve().then(() => {
             navigate("/calendar", { replace: true });

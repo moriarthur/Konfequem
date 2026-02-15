@@ -248,10 +248,7 @@ export default function Home() {
                 <>
                   <div className="space-y-2">
                     {upcomingBookings.current && (
-                      <button
-                        onClick={() => navigate(`/calendar?edit=${upcomingBookings.current.id}`)}
-                        className={`w-full bg-surface-base border rounded-xl p-3 flex items-center justify-between gap-3 border-status-success/30 bg-status-success/5 hover:ring-2 hover:ring-status-success/30 transition-all group`}
-                      >
+                      <div className={`w-full bg-surface-base border rounded-xl p-3 flex items-center justify-between gap-3 border-status-success/30 bg-status-success/5`}>
                         <div className="flex-1 min-w-0 text-left">
                           <p className="font-medium text-accent-secondary truncate">
                             {upcomingBookings.current.room_name || upcomingBookings.current.room}
@@ -263,12 +260,9 @@ export default function Home() {
                           </p>
                         </div>
                         <span className="text-xs font-medium text-status-success px-2 py-1 bg-status-success/10 rounded-full flex-shrink-0">
-                          Current
+                          In Progress
                         </span>
-                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-status-success/40 group-hover:text-status-success group-hover:translate-x-0.5 transition-all">
-                          <path d="M9.5 7L14.5 12L9.5 17" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
+                      </div>
                     )}
                     {upcomingBookings.upcoming.map((booking) => {
                       const start = DateTime.fromISO(booking.start_time).setZone("Europe/Berlin");
