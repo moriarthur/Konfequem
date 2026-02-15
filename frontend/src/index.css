@@ -131,3 +131,17 @@ a.btn-sm {
 .animate-expand-in {
   animation: expandIn 0.2s ease-out forwards;
 }
+
+/* Toast progress bar animation */
+@keyframes toastProgress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.animate-toast-progress {
+  animation: toastProgress linear forwards;
+}

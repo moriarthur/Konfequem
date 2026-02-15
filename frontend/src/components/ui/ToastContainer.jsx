@@ -2,48 +2,43 @@ import { AnimatePresence, motion } from "framer-motion";
 import Toast from "./Toast";
 
 const toastVariants = {
-  enter: (direction) => ({
-    x: direction === "top" ? "-50%" : "-50%",
-    y: direction === "top" ? -100 : 100,
+  enter: {
     opacity: 0,
-    scale: 0.9,
-  }),
+    y: -20,
+    scale: 0.95,
+  },
   center: {
-    x: "-50%",
-    y: 0,
     opacity: 1,
+    y: 0,
     scale: 1,
   },
-  exit: (direction) => ({
-    x: direction === "top" ? "-50%" : "-50%",
-    y: direction === "top" ? -100 : 100,
+  exit: {
     opacity: 0,
-    scale: 0.9,
-  }),
+    y: -20,
+    scale: 0.95,
+  },
 };
 
 export default function ToastContainer({ toasts, position = "top", onRemove }) {
   return (
-    <div className={`fixed left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center ${position === "top" ? "top-4" : "bottom-24"} w-full px-4 pointer-events-none`}>
-      <AnimatePresence mode="popLayout" custom={position}>
+    <div className={`fixed left-0 right-0 z-50 flex flex-col gap-2 items-center ${position === "top" ? "top-4" : "bottom-24"} px-4 pointer-events-none`}>
+      <AnimatePresence mode="popLayout">
         {toasts.map((toast) => (
           <motion.div
             key={toast.id}
-            custom={position}
             variants={toastVariants}
             initial="enter"
             animate="center"
             exit="exit"
             transition={{
               type: "spring",
-              stiffness: 300,
-              damping: 30,
-              opacity: { duration: 0.2 },
+              stiffness: 400,
+              damping: 25,
+              opacity: { duration: 0.15 },
             }}
             layout
           >
             <Toast
-              id={toast.id}
               message={toast.message}
               type={toast.type}
               duration={toast.duration}
