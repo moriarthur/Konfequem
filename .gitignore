@@ -21,3 +21,8 @@ backend/venv/
 # Claude/Serena
 .claude/
 .serena/
+.backup/
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
