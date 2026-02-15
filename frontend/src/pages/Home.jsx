@@ -19,6 +19,7 @@ export default function Home() {
   const [selectedRoomId, setSelectedRoomId] = useState(null);
   const [isFormValid, setIsFormValid] = useState(false);
   const [bookingToEdit, setBookingToEdit] = useState(null);
+  const [hasBookingConflict, setHasBookingConflict] = useState(false);
   const bookingFormRef = useRef(null);
   const quickBookSectionRef = useRef(null);
 
@@ -35,6 +36,7 @@ export default function Home() {
     setShowQuickBook(false);
     setSelectedRoomId(null);
     setBookingToEdit(null);
+    setHasBookingConflict(false);
   };
 
   // Refresh bookings
@@ -454,6 +456,7 @@ export default function Home() {
                           formRef={bookingFormRef}
                           showSubmitButton={false}
                           onValidityChange={setIsFormValid}
+                          onConflictChange={setHasBookingConflict}
                           bookingToEdit={bookingToEdit}
                           onBookingCreated={() => {
                             refreshBookings();
@@ -477,14 +480,15 @@ export default function Home() {
             <Button
               variant="primary"
               size="lg"
-              disabled={showQuickBook && !isFormValid}
+              disabled={showQuickBook && (!isFormValid || hasBookingConflict)}
               onClick={() => {
-                if (showQuickBook && isFormValid) {
+                if (showQuickBook && isFormValid && !hasBookingConflict) {
                   // Trigger form submission
                   bookingFormRef.current?.requestSubmit();
                 } else {
                   // Opening for new booking - reset edit state
                   setBookingToEdit(null);
+                  setHasBookingConflict(false);
                   setShowQuickBook(true);
                 }
               }}

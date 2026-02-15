@@ -30,7 +30,7 @@ import Button from "./ui/Button";
 import { Text, Label } from "./ui/Typography";
 import Card from "./ui/Card";
 
-export default function BookingForm({ roomId, onBookingCreated, onClose, onValidityChange, formRef, showSubmitButton = true, bookingToEdit, onBookingUpdated }) {
+export default function BookingForm({ roomId, onBookingCreated, onClose, onValidityChange, onConflictChange, formRef, showSubmitButton = true, bookingToEdit, onBookingUpdated }) {
   const { authFetch } = useAuth();
   const { showAlert } = useAlert();
   const [isBookingSuccessful, setIsBookingSuccessful] = useState(false);
@@ -425,6 +425,11 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
     const isFormValid = !!(selectedDate && selectedSlot && selectedDuration);
     onValidityChange?.(isFormValid);
   }, [selectedDate, selectedSlot, selectedDuration, onValidityChange]);
+
+  // Notify parent when conflict status changes
+  useEffect(() => {
+    onConflictChange?.(conflictInfo?.hasConflict || false);
+  }, [conflictInfo, onConflictChange]);
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
