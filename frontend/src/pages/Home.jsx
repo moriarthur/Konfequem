@@ -9,7 +9,7 @@ import { Heading, Text } from "../components/ui/Typography";
 import { DateTime } from "luxon";
 
 export default function Home() {
-  const { authFetch, isAuthenticated, loading, user } = useAuth();
+  const { authFetch, authFetchRef, isAuthenticated, loading, user } = useAuth();
   const navigate = useNavigate();
   const [rooms, setRooms] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -41,13 +41,21 @@ export default function Home() {
       return;
     }
 
+    // Only fetch if the authFetchRef is available (i.e., authContext is fully initialized)
+    if (!authFetchRef?.current) {
+      // Auth context not fully initialized yet, skip this render
+      return;
+    }
+
     const fetchData = async () => {
       try {
-        const roomsResponse = await authFetch("/api/rooms/");
+        // Use the ref to get the latest authFetch function
+        const fetch = authFetchRef.current;
+        const roomsResponse = await fetch("/api/rooms/");
         // Handle pagination - extract results array from paginated response
         setRooms(roomsResponse.results || roomsResponse);
 
-        const bookingsResponse = await authFetch("/api/bookings/");
+        const bookingsResponse = await fetch("/api/bookings/");
         // Handle pagination - extract results array from paginated response
         setBookings(bookingsResponse.results || bookingsResponse);
       } catch (err) {
@@ -56,7 +64,7 @@ export default function Home() {
     };
 
     fetchData();
-  }, [authFetch, isAuthenticated]);
+  }, [isAuthenticated]);
 
   // Get upcoming bookings (nearest future bookings)
   const upcomingBookings = useMemo(() => {

@@ -18,7 +18,7 @@
 | Icon | SVG Source |
 |------|-----------|
 | Home | https://svgrepo.com/svg/522898/home |
-| Rooms | https://svgrepo.com/svg/523003/grid-2 |
+| Rooms | https://www.svgrepo.com/svg/448755/door|
 | Calendar | https://svgrepo.com/svg/522391/calendar |
 | Profile | https://svgrepo.com/svg/523092/user-circle |
 

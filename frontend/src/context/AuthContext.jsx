@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import { createContext, useContext, useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 /*
   The react-refresh ESLint rule (only-export-components) can warn when a file
   exports hooks/constants alongside components which breaks Fast Refresh.
@@ -76,6 +76,8 @@ export function AuthProvider({ children }) {
   const refreshPromise = useRef(null);
   // Track if we've already fetched user for current access token to prevent duplicate fetches
   const userFetchedRef = useRef(false);
+  // Use a ref to store the latest authFetch function to avoid dependency cycles
+  const authFetchRef = useRef(null);
 
   const logout = useCallback(() => {
     setAccess(null);
@@ -152,7 +154,7 @@ export function AuthProvider({ children }) {
         if (contentType.includes("application/json")) {
           errorPayload = await res.json().catch(() => ({}));
           if (errorPayload.detail) errorPayload.message = errorPayload.detail;
-          else if (errorPayload.errors) errorPayload.message = Object.values(errorPayload.errors).flat().join("\n");
+          else if (errorPayload.errors) errorPayload.message = Object.values(errorPayload.errors).flat().join("\\n");
         } else {
           const text = await res.text().catch(() => "");
           if (text) errorPayload = { message: text };
@@ -174,6 +176,12 @@ export function AuthProvider({ children }) {
     },
     [access, refreshAccessToken]
   );
+
+  // Keep the ref in sync with the latest authFetch function
+  // Use useLayoutEffect to ensure the ref is updated before other effects run
+  useLayoutEffect(() => {
+    authFetchRef.current = authFetch;
+  }, [authFetch]);
 
   const fetchUser = useCallback(
     async (tokenParam) => {
@@ -332,8 +340,8 @@ export function AuthProvider({ children }) {
     }
   }, [access, isAuthenticated, user]); // fetchUser is stable - defined with useCallback and only depends on access/refreshAccessToken
 
-  return (
-    <AuthContext.Provider value={{ access, refresh, isAuthenticated, loading, login, logout, authFetch, user }}>
+    return (
+    <AuthContext.Provider value={{ access, refresh, isAuthenticated, loading, login, logout, authFetch, authFetchRef, user }}>
       {children}
     </AuthContext.Provider>
   );

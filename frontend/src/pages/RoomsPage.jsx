@@ -9,7 +9,7 @@ import BookingForm from "../components/BookingForm";
 import { Heading, Text } from "../components/ui/Typography";
 
 export default function RoomsPage() {
-  const { authFetch, isAuthenticated } = useAuth();
+  const { authFetch, authFetchRef, isAuthenticated } = useAuth();
   const [rooms, setRooms] = useState([]);
   const [features, setFeatures] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -32,13 +32,22 @@ export default function RoomsPage() {
       return;
     }
 
+    // Only fetch if the authFetchRef is available (i.e., authContext is fully initialized)
+    if (!authFetchRef?.current) {
+      // Auth context not fully initialized yet, skip this render
+      setLoading(false);
+      return;
+    }
+
     const fetchData = async () => {
       try {
         setLoading(true);
+        // Use the ref to get the latest authFetch function
+        const fetch = authFetchRef.current;
         const [roomsData, featuresData, bookingsData] = await Promise.all([
-          authFetch("/api/rooms/"),
-          authFetch("/api/room-features/"),
-          authFetch("/api/bookings/"),
+          fetch("/api/rooms/"),
+          fetch("/api/room-features/"),
+          fetch("/api/bookings/"),
         ]);
         // Handle pagination - extract results array from paginated response
         setRooms(roomsData.results || roomsData);
@@ -52,7 +61,7 @@ export default function RoomsPage() {
     };
 
     fetchData();
-  }, [authFetch, isAuthenticated]);
+  }, [isAuthenticated]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
