@@ -373,6 +373,19 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
         setError(
           "Your session has expired. Please refresh the page and try again."
         );
+      } else if (error.status === 400) {
+        // Validation errors - check if it's a booking conflict
+        const errorMsg = error.message || error.general?.join(". ") || "";
+        if (errorMsg.toLowerCase().includes("booked") || errorMsg.toLowerCase().includes("overlap") || errorMsg.toLowerCase().includes("conflict")) {
+          // Show as warning for conflicts
+          setConflictInfo({
+            hasConflict: true,
+            message: errorMsg,
+            conflictData: null,
+          });
+        } else {
+          setError(errorMsg);
+        }
       } else if (error.general && Array.isArray(error.general)) {
         setError(error.general.join(". "));
       } else {
