@@ -47,6 +47,10 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
   const [expandedPeriod, setExpandedPeriod] = useState(null);
   const [conflictInfo, setConflictInfo] = useState(null); // { hasConflict: boolean, message: string, conflictData: object }
 
+  // Recurrence state
+  const [repeatFrequency, setRepeatFrequency] = useState("none"); // "none", "daily", "weekly"
+  const [repeatEndDate, setRepeatEndDate] = useState(null); // Date when recurrence ends
+
   // Initialize form from bookingToEdit (edit mode)
   useEffect(() => {
     if (!bookingToEdit) return;
@@ -667,6 +671,60 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
               ));
             })()}
           </div>
+        </div>
+      )}
+
+      {/* Step 4: Repeat (only for new bookings, not editing) */}
+      {selectedDate && selectedSlot && selectedDuration && !bookingToEdit && (
+        <div>
+          <Label>Repeat</Label>
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { value: "none", label: "None" },
+              { value: "daily", label: "Daily" },
+              { value: "weekly", label: "Weekly" },
+            ].map((option) => (
+              <Button
+                key={option.value}
+                type="button"
+                variant={repeatFrequency === option.value ? "primary" : "secondary"}
+                size="sm"
+                onClick={() => {
+                  setRepeatFrequency(option.value);
+                  if (option.value === "none") {
+                    setRepeatEndDate(null);
+                  }
+                }}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
+
+          {/* End Date for recurrence */}
+          {repeatFrequency !== "none" && (
+            <div className="mt-3">
+              <Label>End Date</Label>
+              <div className="relative">
+                <input
+                  type="date"
+                  value={repeatEndDate ? DateTime.fromJSDate(repeatEndDate).toFormat("yyyy-MM-dd") : ""}
+                  onChange={(e) => {
+                    const date = e.target.value ? new Date(e.target.value) : null;
+                    setRepeatEndDate(date);
+                  }}
+                  min={DateTime.fromJSDate(selectedDate).plus({ days: 1 }).toFormat("yyyy-MM-dd")}
+                  max={DateTime.fromJSDate(selectedDate).plus({ months: 3 }).toFormat("yyyy-MM-dd")}
+                  className="w-full px-4 py-3 rounded-xl border border-border-subtle bg-surface-base text-accent-secondary focus:ring-2 focus:outline-none focus:ring-accent-primary/30"
+                  required
+                />
+              </div>
+              <Text variant="small" className="mt-2 text-accent-secondary/60">
+                {repeatFrequency === "daily" && "Creates a booking for each day (excluding weekends)"}
+                {repeatFrequency === "weekly" && "Creates a booking for the same day each week"}
+              </Text>
+            </div>
+          )}
         </div>
       )}
 
