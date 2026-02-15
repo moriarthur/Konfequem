@@ -6,13 +6,16 @@ import { DateTime } from "luxon";
  * @param {DateTime} slotEnd - End of the slot to check
  * @param {Array} bookings - Array of existing bookings
  * @param {number|string} roomId - Room ID to filter bookings
+ * @param {number|string} excludeBookingId - Booking ID to exclude from conflict check (for editing)
  * @returns {Object|null} - Returns conflicting booking object or null if no conflict
  */
-export function checkBookingConflict(slotStart, slotEnd, bookings, roomId) {
+export function checkBookingConflict(slotStart, slotEnd, bookings, roomId, excludeBookingId = null) {
   // Filter bookings for the same room and day
   const relevantBookings = bookings.filter((booking) => {
     const bookingStart = DateTime.fromISO(booking.start_time);
     const bookingRoomId = booking.room?.id || booking.room;
+    // Exclude the current booking when editing
+    if (excludeBookingId && booking.id === excludeBookingId) return false;
     return (
       bookingRoomId === roomId &&
       bookingStart.hasSame(slotStart, "day")

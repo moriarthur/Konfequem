@@ -213,12 +213,13 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
       return;
     }
 
-    // Check for booking conflicts
+    // Check for booking conflicts (exclude current booking when editing)
     const conflict = checkBookingConflict(
       selectedSlot.start,
       selectedSlot.end,
       bookings,
-      roomId
+      roomId,
+      bookingToEdit?.id
     );
 
     if (conflict) {
@@ -230,7 +231,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
     } else {
       setConflictInfo(null);
     }
-  }, [selectedDate, selectedSlot, bookings, roomId]);
+  }, [selectedDate, selectedSlot, bookings, roomId, bookingToEdit?.id]);
 
   // Get available durations based on selected slot
   const getAvailableDurationsForSlot = useCallback(() => {
@@ -302,9 +303,21 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
         selectedSlot.start < bookingEnd &&
         selectedSlot.end > bookingStart
       ) {
-        setError(
-          "This time slot is no longer available. Please select a different time."
+        // Use the conflict detection system for nice warning
+        const conflict = checkBookingConflict(
+          selectedSlot.start,
+          selectedSlot.end,
+          bookings,
+          roomId,
+          bookingToEdit?.id
         );
+        if (conflict) {
+          setConflictInfo({
+            hasConflict: true,
+            message: getConflictMessage(conflict),
+            conflictData: conflict,
+          });
+        }
         setSelectedSlot(null);
         return;
       }
