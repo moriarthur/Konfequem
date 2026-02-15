@@ -8,6 +8,7 @@ export default defineConfig({
     postcss: './postcss.config.cjs',
   },
   server: {
-    port: 5173,
+    port: 5173,  // Standard Vite port
+    // Backend API URL is configured via VITE_BACKEND_URL in .env
   },
 })

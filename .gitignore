@@ -1,7 +1,23 @@
+# Python
 __pycache__/
 *.pyc
+
+# Environment files
 .env
-backend/venv/
+.env.*
+!.env.example
+!.env.*.example
+
+# Database
+*.sqlite3
+backend/db.sqlite3
+
+# Node
 frontend/node_modules/
+
+# Virtual environment
+backend/venv/
+
+# Claude/Serena
 .claude/
 .serena/

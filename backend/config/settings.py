@@ -18,11 +18,14 @@ import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load environment variables from .env file
-load_dotenv(BASE_DIR / ".env")  # ensure local .env is loaded
+load_dotenv(BASE_DIR / ".env")
 
 # ==== Django core settings ====
 SECRET_KEY = config("DJANGO_SECRET_KEY", default="unsafe-secret-key")
 DEBUG = config("DJANGO_DEBUG", default=False, cast=bool)
+
+# Check if running in Docker (used for conditional logic below)
+IS_DOCKER = config("DOCKER", default=False, cast=bool)
 
 # Allowed hosts from comma-separated .env variable
 ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "").split(",") if host.strip()]
@@ -31,9 +34,6 @@ ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "").split("
 if not ALLOWED_HOSTS:
     if DEBUG or IS_DOCKER:
         ALLOWED_HOSTS = ["*"]
-
-# Check if running in Docker (used for conditional logic if needed)
-IS_DOCKER = config("DOCKER", default=False, cast=bool)
 
 # ==== Database configuration ====
 # DATABASE_URL must be defined in .env; fallback handled safely

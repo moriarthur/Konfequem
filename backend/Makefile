@@ -1,4 +1,4 @@
-.PHONY: help test test-unit test-integration test-e2e test-cov lint format clean
+.PHONY: help test test-unit test-integration test-e2e test-cov lint format clean docker-build docker-up docker-down docker-logs docker-shell docker-migrate
 
 # Default target
 help:
@@ -126,3 +126,32 @@ ci: lint test-cov
 # Watch tests (requires pytest-watch)
 watch:
 	ptw tests/ -v
+
+# ==== Docker Commands ====
+# Build Docker containers
+docker-build:
+	cd .. && docker compose build
+
+# Start Docker services
+docker-up:
+	cd .. && docker compose up -d
+
+# Stop Docker services
+docker-down:
+	cd .. && docker compose down
+
+# View Docker logs
+docker-logs:
+	cd .. && docker compose logs -f backend
+
+# Open shell in Docker container
+docker-shell:
+	cd .. && docker compose exec backend bash
+
+# Run migrations in Docker
+docker-migrate:
+	cd .. && docker compose exec backend python manage.py migrate
+
+# Create superuser in Docker
+docker-createsuperuser:
+	cd .. && docker compose exec backend python manage.py createsuperuser

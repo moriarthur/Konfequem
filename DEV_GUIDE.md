@@ -2,37 +2,64 @@
 
 ## Quick Start
 
-### With Docker (Recommended)
+### Docker Mode (Windows/WSL with Docker)
 ```bash
+# Copy Docker environment file
+cp .env.docker.example .env
+
 # Start all services
-docker-compose up --build
+docker compose up -d
+
+# Run migrations
+docker compose exec backend python manage.py migrate
+
+# Create superuser (optional)
+docker compose exec backend python manage.py createsuperuser
 
 # Access applications
 # Frontend: http://localhost:5173
-# Backend API: http://localhost:8000
-# Admin: http://localhost:8000/admin/
+# Backend API: http://localhost:8000/api
+# Admin: http://localhost:8000/admin
 ```
 
-### Local Development (Mac - PostgreSQL via brew)
-1. Ensure PostgreSQL is running via Homebrew
-2. Create database:
-   ```bash
-   createdb konfequem
-   ```
-3. Copy `.env` from `.env.example` if needed
-4. Run backend:
-   ```bash
-   cd backend
-   pip install -r requirements.txt
-   python manage.py migrate
-   python manage.py runserver
-   ```
-5. Run frontend:
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
+### Local Mode (macOS/Windows without Docker)
+```bash
+# Copy Local environment file
+cp .env.local.example .env
+
+# Backend Setup
+cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\\Scripts\\activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py createsuperuser  # Optional
+python manage.py runserver
+
+# Frontend Setup (new terminal)
+cd frontend
+npm install
+npm run dev
+
+# Access applications (same URLs as Docker)
+```
+
+## Environment Switching
+
+The project uses two environment templates:
+
+- **`.env.docker.example`** - For Docker/PostgreSQL setup
+  - DATABASE_URL: `postgresql://admin:secret@db:5432/konfequem`
+  - DOCKER: `true`
+
+- **`.env.local.example`** - For local/SQLite setup
+  - DATABASE_URL: `sqlite:///backend/db.sqlite3`
+  - DOCKER: `false`
+
+To switch environments:
+1. Stop any running services
+2. Copy the appropriate example file: `cp .env.<environment>.example .env`
+3. Start services with the new configuration
 
 ## Common Commands
 
@@ -47,8 +74,13 @@ python manage.py migrate
 # Create superuser
 python manage.py createsuperuser
 
-# Run tests (if any)
-python manage.py test
+# Run development server
+python manage.py runserver
+
+# Run tests
+make test              # All tests
+make test-unit         # Unit tests only
+make test-cov          # With coverage
 ```
 
 ### Frontend (React)
@@ -62,28 +94,57 @@ npm run dev
 # Build for production
 npm run build
 
-# Lint code
-npm run lint
+# Run tests
+npm test               # All tests
+npm run test:coverage  # With coverage
+```
+
+### Docker Commands
+```bash
+# Start services
+docker compose up -d
+
+# Stop services
+docker compose down
+
+# View logs
+docker compose logs -f backend
+
+# Run commands in container
+docker compose exec backend python manage.py migrate
 ```
 
 ## Environment Variables
 
-### Required
-- `DJANGO_SECRET_KEY`: Django secret key
+### Required (Root .env)
+- `DJANGO_SECRET_KEY`: Django secret key (change in production)
 - `DJANGO_DEBUG`: True/False (development/production)
+- `ALLOWED_HOSTS`: Comma-separated list of allowed hosts
 - `DATABASE_URL`: Database connection string
-- `DOCKER`: true/false (Docker mode)
-- `VITE_BACKEND_URL`: Backend API URL
+- `DOCKER`: true/false (Docker detection)
 
-### Example .env
-```
-# Backend
-DJANGO_SECRET_KEY=your-secret-key
+### Frontend (Loaded from Root .env)
+- `VITE_BACKEND_URL`: Backend API URL (default: http://localhost:8000)
+
+### Example Configurations
+
+**Docker (.env.docker.example):**
+```bash
+DJANGO_SECRET_KEY=your-secret-key-here
 DJANGO_DEBUG=True
-DATABASE_URL=postgres://admin:secret@localhost:5432/konfequem
-DOCKER=false
+ALLOWED_HOSTS=localhost,127.0.0.1
+DOCKER=true
+DATABASE_URL=postgresql://admin:secret@db:5432/konfequem
+VITE_BACKEND_URL=http://localhost:8000
+```
 
-# Frontend
+**Local (.env.local.example):**
+```bash
+DJANGO_SECRET_KEY=your-secret-key-here
+DJANGO_DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
+DOCKER=false
+DATABASE_URL=sqlite:///backend/db.sqlite3
 VITE_BACKEND_URL=http://localhost:8000
 ```
 

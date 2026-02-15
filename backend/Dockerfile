@@ -1,18 +1,16 @@
-# Используем официальный Python образ, версия 3.11
+# Backend Dockerfile for Django
+# Usage: This file is used by docker-compose.yml
+# For local development without Docker, see .env.local.example
 FROM python:3.11-slim
 
-# Устанавливаем рабочую директорию внутри контейнера
 WORKDIR /app
 
-# Копируем файл с зависимостями в контейнер
 COPY requirements.txt .
 
-# Устанавливаем зависимости
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
-# Копируем весь проект в контейнер
 COPY . .
 
-# Команда для запуска сервера разработки Django (позже заменим на gunicorn)
+# Run Django development server on port 8000
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
