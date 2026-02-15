@@ -135,15 +135,16 @@ REST_FRAMEWORK = {
     # Pagination settings
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 100,
-    # Rate limiting (requests per minute)
-    "DEFAULT_THROTTLE_CLASSES": [
-        "rest_framework.throttling.AnonRateThrottle",
-        "rest_framework.throttling.UserRateThrottle"
-    ],
-    "DEFAULT_THROTTLE_RATES": {
-        "anon": "30/min",
-        "user": "60/min",
-    },
+    # Rate limiting - DISABLED for development
+    # Enable in production by uncommenting below
+    # "DEFAULT_THROTTLE_CLASSES": [
+    #     "rest_framework.throttling.AnonRateThrottle",
+    #     "rest_framework.throttling.UserRateThrottle"
+    # ],
+    # "DEFAULT_THROTTLE_RATES": {
+    #     "anon": "30/min",
+    #     "user": "60/min",
+    # },
 }
 
 # JWT settings for rest_framework_simplejwt
