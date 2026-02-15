@@ -30,7 +30,7 @@ import Button from "./ui/Button";
 import { Text, Label } from "./ui/Typography";
 import Card from "./ui/Card";
 
-export default function BookingForm({ roomId, onBookingCreated, onClose, onValidityChange, formRef, showSubmitButton = true }) {
+export default function BookingForm({ roomId, onBookingCreated, onClose, onValidityChange, formRef, showSubmitButton = true, bookingToEdit, onBookingUpdated }) {
   const { authFetch } = useAuth();
   const { showAlert } = useAlert();
   const [isBookingSuccessful, setIsBookingSuccessful] = useState(false);
@@ -46,6 +46,28 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
   const [filteredDates, setFilteredDates] = useState(new Map());
   const [expandedPeriod, setExpandedPeriod] = useState(null);
   const [conflictInfo, setConflictInfo] = useState(null); // { hasConflict: boolean, message: string, conflictData: object }
+
+  // Initialize form from bookingToEdit (edit mode)
+  useEffect(() => {
+    if (!bookingToEdit) return;
+
+    const start = DateTime.fromISO(bookingToEdit.start_time).setZone(OFFICE_TIMEZONE);
+    const end = DateTime.fromISO(bookingToEdit.end_time).setZone(OFFICE_TIMEZONE);
+    const durationMinutes = end.diff(start, 'minutes').minutes;
+
+    setSelectedDate(start.toJSDate());
+    setSelectedSlot(new TimeSlot(start, end));
+    setSelectedDuration({ minutes: durationMinutes, label: `${durationMinutes} min` });
+
+    // Determine period to expand
+    const slotHour = start.hour;
+    for (const [key, period] of Object.entries(TIME_PERIODS)) {
+      if (slotHour >= period.start && slotHour < period.end) {
+        setExpandedPeriod(key);
+        break;
+      }
+    }
+  }, [bookingToEdit]);
 
   // Calculate date limits (persist for session)
   const [minDate] = useState(() =>
@@ -259,6 +281,8 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
         OFFICE_TIMEZONE
       );
       const bookingRoomId = booking.room?.id || booking.room;
+      // Exclude current booking from conflict check when editing
+      if (bookingToEdit && booking.id === bookingToEdit.id) return false;
       return (
         bookingRoomId === roomId &&
         bookingStart.hasSame(selectedDateTime, "day")
@@ -288,9 +312,16 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
 
     setLoading(true);
     setError(null);
+    const isEditing = !!bookingToEdit;
+
     try {
-      const response = await authFetch("/api/bookings/", {
-        method: "POST",
+      const url = isEditing
+        ? `/api/bookings/${bookingToEdit.id}/`
+        : "/api/bookings/";
+      const method = isEditing ? "PATCH" : "POST";
+
+      const response = await authFetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           room: roomId,
@@ -299,14 +330,14 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
         }),
       });
 
-      const newBooking = response;
+      const booking = response;
 
       // Trigger success animation
       setIsBookingSuccessful(true);
 
       // Show success message after a brief delay
       setTimeout(
-        () => showAlert("Your booking was created successfully"),
+        () => showAlert(isEditing ? "Booking updated successfully" : "Your booking was created successfully"),
         300
       );
 
@@ -317,9 +348,14 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
       setError(null);
 
       // Notify parent component
-      if (onBookingCreated) onBookingCreated(newBooking);
+      if (isEditing) {
+        if (onBookingUpdated) onBookingUpdated(booking);
+        if (onClose) onClose();
+      } else {
+        if (onBookingCreated) onBookingCreated(booking);
+      }
     } catch (error) {
-      logError("Error creating booking:", error);
+      logError(`Error ${isEditing ? "updating" : "creating"} booking:`, error);
       if (error.status === 401) {
         setError(
           "Your session has expired. Please refresh the page and try again."
@@ -327,7 +363,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
       } else if (error.general && Array.isArray(error.general)) {
         setError(error.general.join(". "));
       } else {
-        setError(error.message || "Failed to create booking. Please try again.");
+        setError(error.message || `Failed to ${isEditing ? "update" : "create"} booking. Please try again.`);
       }
     } finally {
       setLoading(false);
@@ -341,12 +377,12 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
   // Format button label with booking info
   const getButtonLabel = () => {
     if (loading) return "Loading...";
-    if (isBookingSuccessful) return "✓ Booking Confirmed";
+    if (isBookingSuccessful) return bookingToEdit ? "✓ Booking Updated" : "✓ Booking Confirmed";
     if (conflictInfo?.hasConflict) return "Time Slot Unavailable";
-    if (!selectedDate || !selectedSlot || !selectedDuration) return "Book Room";
+    if (!selectedDate || !selectedSlot || !selectedDuration) return bookingToEdit ? "Update Booking" : "Book Room";
 
     const timeStr = selectedSlot.format().start;
-    return `Book for ${timeStr}`;
+    return bookingToEdit ? `Update for ${timeStr}` : `Book for ${timeStr}`;
   };
 
   // Notify parent when form validity changes

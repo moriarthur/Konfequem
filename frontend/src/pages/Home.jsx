@@ -18,10 +18,30 @@ export default function Home() {
   const [showQuickBook, setShowQuickBook] = useState(false);
   const [selectedRoomId, setSelectedRoomId] = useState(null);
   const [isFormValid, setIsFormValid] = useState(false);
+  const [bookingToEdit, setBookingToEdit] = useState(null);
   const bookingFormRef = useRef(null);
   const quickBookSectionRef = useRef(null);
 
+  // Handle edit booking
+  const handleEditBooking = (booking) => {
+    setBookingToEdit(booking);
+    setSelectedRoomId(booking.room?.id || booking.room);
+    setShowQuickBook(true);
+  };
 
+  // Close quick book modal and reset state
+  const closeQuickBook = () => {
+    setShowQuickBook(false);
+    setSelectedRoomId(null);
+    setBookingToEdit(null);
+  };
+
+  // Refresh bookings
+  const refreshBookings = () => {
+    authFetch("/api/bookings/")
+      .then(data => setBookings(data.results || data))
+      .catch(logError);
+  };
 
   // Get time-based greeting
   const getTimeBasedGreeting = () => {
@@ -314,7 +334,7 @@ export default function Home() {
                       return (
                         <button
                           key={booking.id}
-                          onClick={() => navigate(`/calendar?edit=${booking.id}`)}
+                          onClick={() => handleEditBooking(booking)}
                           className="w-full bg-surface-muted border border-border-subtle rounded-xl p-3 flex items-center justify-between gap-3 hover:ring-2 hover:ring-accent-primary/30 hover:bg-surface-base transition-all group"
                         >
                           <div className="flex-1 min-w-0 text-left">
@@ -362,10 +382,7 @@ export default function Home() {
                     Quick Book
                   </Heading>
                   <button
-                    onClick={() => {
-                      setShowQuickBook(false);
-                      setSelectedRoomId(null);
-                    }}
+                    onClick={closeQuickBook}
                     className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-surface-muted transition-colors"
                     aria-label="Close"
                   >
@@ -436,17 +453,17 @@ export default function Home() {
                           formRef={bookingFormRef}
                           showSubmitButton={false}
                           onValidityChange={setIsFormValid}
+                          bookingToEdit={bookingToEdit}
                           onBookingCreated={() => {
-                            // Refresh bookings
-                            authFetch("/api/bookings/")
-                              .then(data => setBookings(data.results || data))
-                              .catch(logError);
-                            setShowQuickBook(false);
-                            setSelectedRoomId(null);
+                            refreshBookings();
+                            closeQuickBook();
+                          }}
+                          onBookingUpdated={() => {
+                            refreshBookings();
+                            closeQuickBook();
                           }}
                           onCancel={() => {
-                            setShowQuickBook(false);
-                            setSelectedRoomId(null);
+                            closeQuickBook();
                           }}
                         />
                       </div>
@@ -465,7 +482,9 @@ export default function Home() {
                   // Trigger form submission
                   bookingFormRef.current?.requestSubmit();
                 } else {
-                  setShowQuickBook(!showQuickBook);
+                  // Opening for new booking - reset edit state
+                  setBookingToEdit(null);
+                  setShowQuickBook(true);
                 }
               }}
               className={`w-full flex items-center justify-center ${

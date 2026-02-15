@@ -9,7 +9,7 @@ import StatusBadge from "./StatusBadge";
 
 // BookingList is a controlled component - it renders directly from the `bookings` prop
 // and does not keep its own copy. This ensures it always reflects the parent state.
-export default function BookingList({ bookings = [], authFetch, onRefresh }) {
+export default function BookingList({ bookings = [], authFetch, onRefresh, onEdit }) {
   const [sortByUpcoming, setSortByUpcoming] = useState('date_asc');
   const [sortByHistory, setSortByHistory] = useState('date_desc');
   const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming' or 'history'
@@ -325,21 +325,33 @@ export default function BookingList({ bookings = [], authFetch, onRefresh }) {
                             </div>
                             <div className="flex items-center gap-2">
                               {activeTab === 'upcoming' && (
-                                <Button
-                                  variant="danger"
-                                  size="sm"
-                                  onClick={() => {
-                                    setConfirmCancel({
-                                      id: booking.id,
-                                      room_name: booking.room_name || 'Unknown Room',
-                                      start_time: booking.start_time,
-                                      end_time: booking.end_time
-                                    });
-                                  }}
-                                  aria-label={`Cancel booking for ${booking.room_name || 'room'} on ${DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE).toFormat('dd.MM.yyyy')}`}
-                                >
-                                  Cancel
-                                </Button>
+                                <>
+                                  {status === 'upcoming' && onEdit && (
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={() => onEdit(booking)}
+                                      aria-label={`Edit booking for ${booking.room_name || 'room'} on ${DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE).toFormat('dd.MM.yyyy')}`}
+                                    >
+                                      Edit
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="danger"
+                                    size="sm"
+                                    onClick={() => {
+                                      setConfirmCancel({
+                                        id: booking.id,
+                                        room_name: booking.room_name || 'Unknown Room',
+                                        start_time: booking.start_time,
+                                        end_time: booking.end_time
+                                      });
+                                    }}
+                                    aria-label={`Cancel booking for ${booking.room_name || 'room'} on ${DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE).toFormat('dd.MM.yyyy')}`}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </>
                               )}
                             </div>
                           </div>
