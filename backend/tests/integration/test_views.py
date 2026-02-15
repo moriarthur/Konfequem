@@ -29,34 +29,34 @@ class TestRoomViewSet:
     def test_list_rooms_public_access(self, db, api_client, rooms):
         """Test that listing rooms doesn't require authentication."""
         response = api_client.get('/api/rooms/')
-        
+
         assert response.status_code == 200
-        assert len(response.data) == 5
+        assert len(response.data['results']) == 5
 
     def test_list_rooms_returns_correct_fields(self, db, api_client, room):
         """Test that room list returns expected fields."""
         response = api_client.get('/api/rooms/')
-        
+
         assert response.status_code == 200
-        data = response.data[0]
-        assert set(data.keys()) == {'id', 'name', 'location', 'capacity'}
+        data = response.data['results'][0]
+        assert set(data.keys()) == {'id', 'name', 'location', 'capacity', 'features'}
 
     def test_list_rooms_empty(self, db, api_client):
         """Test listing rooms when no rooms exist."""
         response = api_client.get('/api/rooms/')
-        
+
         assert response.status_code == 200
-        assert len(response.data) == 0
+        assert len(response.data['results']) == 0
 
     def test_list_rooms_ordered(self, db, api_client):
         """Test that rooms are ordered consistently."""
         Room.objects.create(name='Z Room', location='Floor 1', capacity=5)
         Room.objects.create(name='A Room', location='Floor 2', capacity=10)
-        
+
         response = api_client.get('/api/rooms/')
-        
+
         assert response.status_code == 200
-        assert len(response.data) == 2
+        assert len(response.data['results']) == 2
 
     # ========================================================================
     # Retrieve Room Tests
@@ -126,15 +126,15 @@ class TestBookingViewSet:
         
         assert response.status_code == 401
 
-    def test_create_booking_requires_auth(self, db, api_client, room, utc_now):
+    def test_create_booking_requires_auth(self, db, api_client, room, future_start_time):
         """Test that creating a booking requires authentication."""
-        start = utc_now + timedelta(days=1, hours=10)
+        start = future_start_time
         response = api_client.post('/api/bookings/', {
             'room': room.id,
             'start_time': start.isoformat(),
             'end_time': (start + timedelta(hours=2)).isoformat()
         })
-        
+
         assert response.status_code == 401
 
     # ========================================================================
@@ -144,16 +144,16 @@ class TestBookingViewSet:
     def test_list_bookings_authenticated(self, db, authenticated_api_client, user, booking):
         """Test that authenticated users can list their bookings."""
         response = authenticated_api_client.get('/api/bookings/')
-        
+
         assert response.status_code == 200
-        assert len(response.data) >= 1
+        assert len(response.data['results']) >= 1
 
     def test_list_bookings_filters_by_user(self, db, api_client, user, staff_user, room):
         """Test that users only see their own bookings."""
         # Create bookings for different users
         from django.utils import timezone
         now = timezone.now()
-        
+
         user_booking = Booking.objects.create(
             room=room,
             user=user,
@@ -161,7 +161,7 @@ class TestBookingViewSet:
             date=(now + timedelta(days=1, hours=10)).date(),
             end_time=now + timedelta(days=1, hours=12)
         )
-        
+
         staff_booking = Booking.objects.create(
             room=room,
             user=staff_user,
@@ -169,15 +169,15 @@ class TestBookingViewSet:
             date=(now + timedelta(days=2, hours=10)).date(),
             end_time=now + timedelta(days=2, hours=12)
         )
-        
+
         # Authenticate as regular user
         refresh = RefreshToken.for_user(user)
         api_client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
-        
+
         response = api_client.get('/api/bookings/')
-        
+
         assert response.status_code == 200
-        booking_ids = [b['id'] for b in response.data]
+        booking_ids = [b['id'] for b in response.data['results']]
         assert user_booking.id in booking_ids
         assert staff_booking.id not in booking_ids
 
@@ -190,7 +190,7 @@ class TestBookingViewSet:
         # Create bookings for different rooms
         from django.utils import timezone
         now = timezone.now()
-        
+
         Booking.objects.create(
             room=room,
             user=user,
@@ -198,7 +198,7 @@ class TestBookingViewSet:
             date=(now + timedelta(days=1, hours=10)).date(),
             end_time=now + timedelta(days=1, hours=12)
         )
-        
+
         other_room = Room.objects.first()
         Booking.objects.create(
             room=other_room,
@@ -207,12 +207,12 @@ class TestBookingViewSet:
             date=(now + timedelta(days=2, hours=10)).date(),
             end_time=now + timedelta(days=2, hours=12)
         )
-        
+
         # Filter by room
         response = authenticated_api_client.get(f'/api/bookings/?room={room.id}')
-        
+
         assert response.status_code == 200
-        for booking_data in response.data:
+        for booking_data in response.data['results']:
             assert booking_data['room'] == room.id
 
     # ========================================================================
@@ -229,13 +229,13 @@ class TestBookingViewSet:
             start_time=tomorrow,
             end_time=tomorrow + timedelta(hours=2)
         )
-        
+
         # Filter by today's date
         today_str = booking.start_time.date().isoformat()
         response = authenticated_api_client.get(f'/api/bookings/?date={today_str}')
-        
+
         assert response.status_code == 200
-        for booking_data in response.data:
+        for booking_data in response.data['results']:
             assert booking.start_time.date().isoformat() in booking_data['start_time']
 
     # ========================================================================
@@ -253,39 +253,39 @@ class TestBookingViewSet:
         # All returned bookings should be in the specified month
 
     def test_filter_bookings_invalid_month_format(self, db, authenticated_api_client, user, room):
-        """Test that invalid month format is handled gracefully."""
+        """Test that invalid month format returns validation error."""
         response = authenticated_api_client.get('/api/bookings/?month=invalid')
-        
-        # Should return 200 with empty list (invalid format ignored)
-        assert response.status_code == 200
-        assert len(response.data) == 0
+
+        # Should return 400 with validation error
+        assert response.status_code == 400
+        assert 'Invalid month parameter' in str(response.data)
 
     # ========================================================================
     # Create Booking Tests
     # ========================================================================
 
-    def test_create_booking_success(self, db, authenticated_api_client, user, room, utc_now):
+    def test_create_booking_success(self, db, authenticated_api_client, user, room, future_start_time):
         """Test successful booking creation."""
-        start = utc_now + timedelta(days=1, hours=10)
+        start = future_start_time
         response = authenticated_api_client.post('/api/bookings/', {
             'room': room.id,
             'start_time': start.isoformat(),
             'end_time': (start + timedelta(hours=2)).isoformat()
         }, format='json')
-        
+
         assert response.status_code == 201
         assert response.data['room'] == room.id
         assert response.data['user'] == user.id
 
-    def test_create_booking_auto_assigns_user(self, db, authenticated_api_client, user, room, utc_now):
+    def test_create_booking_auto_assigns_user(self, db, authenticated_api_client, user, room, future_start_time):
         """Test that user is automatically assigned to booking."""
-        start = utc_now + timedelta(days=1, hours=10)
+        start = future_start_time
         response = authenticated_api_client.post('/api/bookings/', {
             'room': room.id,
             'start_time': start.isoformat(),
             'end_time': (start + timedelta(hours=2)).isoformat()
         }, format='json')
-        
+
         assert response.status_code == 201
         assert response.data['user'] == user.id
 
@@ -345,15 +345,23 @@ class TestBookingViewSet:
     # Update Booking Tests
     # ========================================================================
 
-    def test_update_own_booking(self, db, authenticated_api_client, user, booking, utc_now):
+    def test_update_own_booking(self, db, authenticated_api_client, user, booking, future_start_time):
         """Test updating a booking you own."""
-        new_start = utc_now + timedelta(days=2, hours=14)
+        # Use a time 2 days from now within office hours
+        from django.utils import timezone
+        berlin_tz = timezone.get_default_timezone()
+        new_start = future_start_time + timedelta(days=1)
+        # Ensure within office hours
+        new_start_local = new_start.astimezone(berlin_tz)
+        if new_start_local.hour >= 21:
+            new_start = new_start.replace(hour=14, minute=0)
+
         response = authenticated_api_client.put(f'/api/bookings/{booking.id}/', {
             'room': booking.room.id,
             'start_time': new_start.isoformat(),
             'end_time': (new_start + timedelta(hours=3)).isoformat()
         }, format='json')
-        
+
         assert response.status_code == 200
 
     def test_partial_update_booking(self, db, authenticated_api_client, booking):
@@ -401,3 +409,125 @@ class TestBookingViewSet:
         assert response.status_code == 200
         # Times should be in ISO format with timezone
         assert '+' in response.data['start_time'] or response.data['start_time'].endswith('Z')
+
+    # ========================================================================
+    # In-Progress Booking Protection Tests
+    # ========================================================================
+
+    def test_cannot_modify_booking_in_progress(self, db, authenticated_api_client, user, room):
+        """Test that a booking currently in progress cannot be modified."""
+        from django.utils import timezone
+        now = timezone.now()
+
+        # Create a booking that started 30 minutes ago and ends in 30 minutes (in progress)
+        booking = Booking.objects.create(
+            room=room,
+            user=user,
+            start_time=now - timedelta(minutes=30),
+            end_time=now + timedelta(minutes=30),
+            date=(now - timedelta(minutes=30)).date()
+        )
+
+        # Try to modify it
+        response = authenticated_api_client.patch(f'/api/bookings/{booking.id}/', {
+            'room': room.id,
+            'start_time': (now + timedelta(days=1, hours=10)).isoformat(),
+            'end_time': (now + timedelta(days=1, hours=12)).isoformat()
+        }, format='json')
+
+        # Should return 403 Forbidden
+        assert response.status_code == 403
+        assert 'currently in progress' in str(response.data).lower()
+
+    def test_cannot_modify_ended_booking(self, db, authenticated_api_client, user, room):
+        """Test that a booking that has ended cannot be modified."""
+        from django.utils import timezone
+        now = timezone.now()
+
+        # Create a booking that ended 1 hour ago
+        booking = Booking.objects.create(
+            room=room,
+            user=user,
+            start_time=now - timedelta(hours=2),
+            end_time=now - timedelta(hours=1),
+            date=(now - timedelta(hours=2)).date()
+        )
+
+        # Try to modify it
+        response = authenticated_api_client.patch(f'/api/bookings/{booking.id}/', {
+            'room': room.id,
+            'start_time': (now + timedelta(days=1, hours=10)).isoformat(),
+            'end_time': (now + timedelta(days=1, hours=12)).isoformat()
+        }, format='json')
+
+        # Should return 403 Forbidden
+        assert response.status_code == 403
+        assert 'already ended' in str(response.data).lower()
+
+    def test_cannot_delete_booking_in_progress(self, db, authenticated_api_client, user, room):
+        """Test that a booking currently in progress cannot be deleted."""
+        from django.utils import timezone
+        now = timezone.now()
+
+        # Create a booking that started 30 minutes ago and ends in 30 minutes (in progress)
+        booking = Booking.objects.create(
+            room=room,
+            user=user,
+            start_time=now - timedelta(minutes=30),
+            end_time=now + timedelta(minutes=30),
+            date=(now - timedelta(minutes=30)).date()
+        )
+
+        # Try to delete it
+        response = authenticated_api_client.delete(f'/api/bookings/{booking.id}/')
+
+        # Should return 403 Forbidden
+        assert response.status_code == 403
+        assert 'currently in progress' in str(response.data).lower()
+
+    def test_cannot_delete_ended_booking(self, db, authenticated_api_client, user, room):
+        """Test that a booking that has ended cannot be deleted."""
+        from django.utils import timezone
+        now = timezone.now()
+
+        # Create a booking that ended 1 hour ago
+        booking = Booking.objects.create(
+            room=room,
+            user=user,
+            start_time=now - timedelta(hours=2),
+            end_time=now - timedelta(hours=1),
+            date=(now - timedelta(hours=2)).date()
+        )
+
+        # Try to delete it
+        response = authenticated_api_client.delete(f'/api/bookings/{booking.id}/')
+
+        # Should return 403 Forbidden
+        assert response.status_code == 403
+        assert 'already ended' in str(response.data).lower()
+
+    def test_can_modify_upcoming_booking(self, db, authenticated_api_client, user, room):
+        """Test that an upcoming (not started) booking can still be modified."""
+        from django.utils import timezone
+        now = timezone.now()
+
+        # Create a booking that starts in 1 hour (upcoming)
+        booking = Booking.objects.create(
+            room=room,
+            user=user,
+            start_time=now + timedelta(hours=1),
+            end_time=now + timedelta(hours=3),
+            date=(now + timedelta(hours=1)).date()
+        )
+
+        # Try to modify it to a time further in the future (2 days from now)
+        # This ensures the new time is still in the future when test runs
+        new_start = now + timedelta(days=2, hours=10)
+        response = authenticated_api_client.patch(f'/api/bookings/{booking.id}/', {
+            'room': room.id,
+            'start_time': new_start.isoformat(),
+            'end_time': (new_start + timedelta(hours=2)).isoformat()
+        }, format='json')
+
+        # Should succeed (200 OK)
+        assert response.status_code == 200

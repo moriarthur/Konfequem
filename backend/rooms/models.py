@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
-from django.core.validators import MinValueValidator, MaxValueValidator, ValidationError
+from django.core.validators import MinValueValidator, MaxValueValidator, ValidationError, RegexValidator
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Q
@@ -26,7 +26,15 @@ class RoomFeature(models.Model):
 
 class Room(models.Model):
     """Room model."""
-    name = models.CharField(max_length=100)
+    name = models.CharField(
+        max_length=100,
+        validators=[
+            RegexValidator(
+                r'^[a-zA-Z0-9\s\-\.]+$',
+                message='Room name can only contain letters, numbers, spaces, hyphens, and periods.'
+            )
+        ]
+    )
     location = models.CharField(max_length=100, blank=True)
     capacity = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(50)])
     features = models.ManyToManyField(
@@ -46,7 +54,18 @@ class Booking(models.Model):
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
-    date = models.DateField()
+    updated_at = models.DateTimeField(auto_now=True)
+    status = models.CharField(
+        max_length=20,
+        default='ongoing',
+        choices=[
+            ('ongoing', 'Ongoing'),
+            ('completed', 'Completed'),
+            ('cancelled', 'Cancelled')
+        ],
+        help_text='Current status of the booking'
+    )
+    date = models.DateField(db_index=True)
 
     MAX_DAYS_AHEAD = 90
 

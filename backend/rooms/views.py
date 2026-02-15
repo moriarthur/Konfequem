@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from datetime import datetime
+from django.utils import timezone
 
 from .models import Room, Booking, RoomFeature
 from .serializers import RoomSerializer, BookingSerializer, RoomFeatureSerializer
@@ -42,14 +43,21 @@ class BookingViewSet(viewsets.ModelViewSet):
         if month_str:
             # Parse YYYY-MM format
             try:
-                year, month = map(int, month_str.split('-'))
+                parts = month_str.split('-')
+                if len(parts) != 2:
+                    raise ValueError("Month parameter must be in YYYY-MM format")
+                year, month = map(int, parts)
+                if not (1 <= month <= 12) or year < 2020 or year > 2100:
+                    raise ValueError("Invalid year or month values")
                 # Get all bookings for the month
                 queryset = queryset.filter(
                     start_time__year=year,
                     start_time__month=month
                 )
-            except ValueError:
-                pass
+            except (ValueError, TypeError) as e:
+                # Return proper error response instead of silent failure
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError(f"Invalid month parameter '{month_str}': {str(e)}")
         elif date_str:
             queryset = queryset.filter(start_time__date=date_str)
 
@@ -59,6 +67,77 @@ class BookingViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # Attach current user to booking
         serializer.save(user=self.request.user)
+
+    def update(self, request, *args, **kwargs):
+        """Override to check booking status before validation runs."""
+        # Get the booking instance first
+        instance = self.get_object()
+        now = timezone.now()
+
+        # Check if booking is in progress or ended before allowing update
+        if now >= instance.end_time:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Cannot modify a booking that has already ended.")
+        if now >= instance.start_time:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Cannot modify a booking that is currently in progress.")
+
+        # Proceed with normal update flow
+        return super().update(request, *args, **kwargs)
+
+    def perform_update(self, serializer):
+        # Ensure user can only modify their own bookings
+        if serializer.instance.user != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You can only modify your own bookings")
+
+        # Prevent modification of bookings that are currently in progress or already ended
+        now = timezone.now()
+        booking = serializer.instance
+
+        if now >= booking.end_time:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Cannot modify a booking that has already ended.")
+        if now >= booking.start_time:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Cannot modify a booking that is currently in progress.")
+
+        return super().perform_update(serializer)
+
+    def destroy(self, request, *args, **kwargs):
+        """Override to check booking status before deletion."""
+        # Get the booking instance first
+        instance = self.get_object()
+        now = timezone.now()
+
+        # Check if booking is in progress or ended before allowing deletion
+        if now >= instance.end_time:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Cannot delete a booking that has already ended.")
+        if now >= instance.start_time:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Cannot delete a booking that is currently in progress.")
+
+        # Proceed with normal delete flow
+        return super().destroy(request, *args, **kwargs)
+
+    def perform_destroy(self, instance):
+        # Ensure user can only delete their own bookings
+        if instance.user != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You can only delete your own bookings")
+
+        # Prevent deletion of bookings that are currently in progress or already ended
+        now = timezone.now()
+
+        if now >= instance.end_time:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Cannot delete a booking that has already ended.")
+        if now >= instance.start_time:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Cannot delete a booking that is currently in progress.")
+
+        return super().perform_destroy(instance)
 
 
 class CurrentUserView(APIView):

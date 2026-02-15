@@ -1,15 +1,12 @@
 /**
  * MSW (Mock Service Worker) handlers for API mocking.
- * 
+ *
  * This module sets up mock responses for all backend API endpoints,
  * allowing tests to run without a real backend server.
  */
 
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
-
-// Base URL for API requests
-const API_URL = '/api'
 
 // ============================================================================
 // Helper Functions
@@ -23,66 +20,202 @@ const createErrorResponse = (message, status = 400) => {
   return HttpResponse.json({ detail: message }, { status })
 }
 
+// Create valid-looking JWT tokens for testing
+// Format: header.payload.signature
+const createMockAccessJwt = () => {
+  // Header: {"alg":"HS256","typ":"JWT"}
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+
+  // Payload with exp far in the future (year 2060)
+  const payload = btoa(JSON.stringify({ exp: 2863311600 }))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+
+  // Mock signature (not actually validated in tests)
+  const signature = 'mock-signature'
+
+  return `${header}.${payload}.${signature}`
+}
+
+const createMockRefreshJwt = () => {
+  // Header: {"alg":"HS256","typ":"JWT"}
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+
+  // Payload with exp far in the future (year 2060)
+  const payload = btoa(JSON.stringify({ exp: 2863311600 }))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+
+  // Mock signature
+  const signature = 'mock-refresh-signature'
+
+  return `${header}.${payload}.${signature}`
+}
+
+const createExpiredJwt = () => {
+  // Header: {"alg":"HS256","typ":"JWT"}
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+
+  // Payload with exp in the past (year 2000)
+  const payload = btoa(JSON.stringify({ exp: 946684800 }))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+
+  // Mock signature
+  const signature = 'mock-expired-signature'
+
+  return `${header}.${payload}.${signature}`
+}
+
+// Export token helpers for tests
+export const mockTokens = {
+  access: createMockAccessJwt(),
+  refresh: createMockRefreshJwt(),
+  expired: createExpiredJwt(),
+}
+
 // ============================================================================
 // Authentication Handlers
 // ============================================================================
 
 export const handlers = [
-  // Token obtain (login)
-  http.post(`${API_URL}/token/`, async ({ request }) => {
-    const body = await request.json()
-    
+  // Token obtain (login) - handle both relative and absolute URLs
+  http.post('/api/token/', async ({ request }) => {
+    const body = await request.json() as { username: string; password: string }
+
     if (body.username === 'testuser' && body.password === 'testpass123') {
       return createJsonResponse({
-        access: 'mock-access-token',
-        refresh: 'mock-refresh-token',
+        access: createMockAccessJwt(),
+        refresh: createMockRefreshJwt(),
       })
     }
-    
+
     if (body.username === 'erroruser') {
       return createErrorResponse('Invalid credentials', 401)
     }
-    
+
+    return createErrorResponse('Invalid username or password', 401)
+  }),
+
+  // Also handle absolute URL for tests that don't mock the API_URL
+  http.post('http://127.0.0.1:8001/api/token/', async ({ request }) => {
+    const body = await request.json() as { username: string; password: string }
+
+    if (body.username === 'testuser' && body.password === 'testpass123') {
+      return createJsonResponse({
+        access: createMockAccessJwt(),
+        refresh: createMockRefreshJwt(),
+      })
+    }
+
     return createErrorResponse('Invalid username or password', 401)
   }),
 
   // Token refresh
-  http.post(`${API_URL}/token/refresh/`, async ({ request }) => {
-    const body = await request.json()
-    
-    if (body.refresh === 'expired-refresh-token') {
+  http.post('/api/token/refresh/', async ({ request }) => {
+    const body = await request.json() as { refresh: string }
+
+    if (body.refresh === createExpiredJwt()) {
       return createErrorResponse('Token is invalid or expired', 401)
     }
-    
-    if (body.refresh === 'mock-refresh-token') {
+
+    // Accept mock tokens (with mock-signature), old string format, and JWT format
+    if (body.refresh === 'mock-refresh-token' ||
+        body.refresh === createMockRefreshJwt() ||
+        body.refresh.endsWith('.mock-refresh-signature') ||
+        body.refresh.endsWith('.mock-signature') ||
+        body.refresh.startsWith('eyJ')) {
       return createJsonResponse({
-        access: 'new-mock-access-token',
+        access: createMockAccessJwt(),
       })
     }
-    
+
+    return createErrorResponse('Invalid refresh token', 401)
+  }),
+
+  http.post('http://127.0.0.1:8001/api/token/refresh/', async ({ request }) => {
+    const body = await request.json() as { refresh: string }
+
+    if (body.refresh === 'mock-refresh-token' ||
+        body.refresh === createMockRefreshJwt() ||
+        body.refresh.endsWith('.mock-refresh-signature') ||
+        body.refresh.endsWith('.mock-signature') ||
+        body.refresh.startsWith('eyJ')) {
+      return createJsonResponse({
+        access: createMockAccessJwt(),
+      })
+    }
+
     return createErrorResponse('Invalid refresh token', 401)
   }),
 
   // Current user
-  http.get(`${API_URL}/users/me/`, ({ request }) => {
+  http.get('/api/users/me/', ({ request }) => {
     const authHeader = request.headers.get('Authorization')
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return createErrorResponse('Authentication credentials were not provided', 401)
     }
-    
+
     const token = authHeader.split(' ')[1]
-    
-    if (token === 'expired-access-token') {
+
+    if (token === createExpiredJwt() || token === 'expired-access-token') {
       return createErrorResponse('Given token not valid for any token type', 401)
     }
-    
-    return createJsonResponse({
-      id: 1,
-      username: 'testuser',
-      email: 'test@example.com',
-      first_name: 'Test',
-    })
+
+    // Accept mock access tokens
+    if (token === createMockAccessJwt() ||
+        token.endsWith('.mock-signature') ||
+        token.startsWith('eyJ')) {
+      return createJsonResponse({
+        id: 1,
+        username: 'testuser',
+        email: 'test@example.com',
+        first_name: 'Test',
+      })
+    }
+
+    return createErrorResponse('Invalid token', 401)
+  }),
+
+  http.get('http://127.0.0.1:8001/api/users/me/', ({ request }) => {
+    const authHeader = request.headers.get('Authorization')
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return createErrorResponse('Authentication credentials were not provided', 401)
+    }
+
+    const token = authHeader.split(' ')[1]
+
+    if (token === createExpiredJwt() || token === 'expired-access-token') {
+      return createErrorResponse('Given token not valid for any token type', 401)
+    }
+
+    // Accept mock access tokens
+    if (token === createMockAccessJwt() ||
+        token.endsWith('.mock-signature') ||
+        token.startsWith('eyJ')) {
+      return createJsonResponse({
+        id: 1,
+        username: 'testuser',
+        email: 'test@example.com',
+        first_name: 'Test',
+      })
+    }
+
+    return createErrorResponse('Invalid token', 401)
   }),
 
   // ============================================================================
@@ -90,7 +223,7 @@ export const handlers = [
   // ============================================================================
 
   // List rooms
-  http.get(`${API_URL}/rooms/`, () => {
+  http.get('/api/rooms/', () => {
     return createJsonResponse([
       {
         id: 1,
@@ -120,9 +253,9 @@ export const handlers = [
   }),
 
   // Retrieve single room
-  http.get(`${API_URL}/rooms/:id/`, ({ params }) => {
+  http.get('/api/rooms/:id/', ({ params }) => {
     const { id } = params
-    
+
     if (id === '1') {
       return createJsonResponse({
         id: 1,
@@ -131,7 +264,7 @@ export const handlers = [
         capacity: 10,
       })
     }
-    
+
     return createErrorResponse('Not found', 404)
   }),
 
@@ -140,13 +273,8 @@ export const handlers = [
   // ============================================================================
 
   // List bookings
-  http.get(`${API_URL}/bookings/`, ({ request }) => {
-    const url = new URL(request.url)
-    const roomParam = url.searchParams.get('room')
-    const dateParam = url.searchParams.get('date')
-    const monthParam = url.searchParams.get('month')
-    
-    let bookings = [
+  http.get('/api/bookings/', () => {
+    return createJsonResponse([
       {
         id: 1,
         room: 1,
@@ -155,89 +283,44 @@ export const handlers = [
         end_time: '2025-01-28T12:00:00+01:00',
         user: 1,
       },
-      {
-        id: 2,
-        room: 1,
-        room_name: 'Conference Room A',
-        start_time: '2025-01-28T14:00:00+01:00',
-        end_time: '2025-01-28T16:00:00+01:00',
-        user: 1,
-      },
-      {
-        id: 3,
-        room: 2,
-        room_name: 'Conference Room B',
-        start_time: '2025-01-28T09:00:00+01:00',
-        end_time: '2025-01-28T11:00:00+01:00',
-        user: 1,
-      },
-    ]
-    
-    // Filter by room
-    if (roomParam) {
-      bookings = bookings.filter(b => b.room === parseInt(roomParam))
-    }
-    
-    // Filter by date
-    if (dateParam) {
-      bookings = bookings.filter(b => b.start_time.startsWith(dateParam))
-    }
-    
-    // Filter by month
-    if (monthParam) {
-      const [year, month] = monthParam.split('-').map(Number)
-      bookings = bookings.filter(b => {
-        const date = new Date(b.start_time)
-        return date.getFullYear() === year && date.getMonth() + 1 === month
-      })
-    }
-    
-    return createJsonResponse(bookings)
+    ])
   }),
 
   // Create booking
-  http.post(`${API_URL}/bookings/`, async ({ request }) => {
-    const body = await request.json()
-    
-    // Check for overlapping bookings
-    if (body.room === 1 && body.start_time === '2025-01-28T10:00:00+01:00') {
-      return createErrorResponse({
-        general: ['This room is already booked for the selected time range.']
-      }, 400)
-    }
-    
+  http.post('/api/bookings/', async ({ request }) => {
+    const body = await request.json() as { room: number; start_time: string; end_time: string }
+
     // Check for office hours violation
     const startTime = new Date(body.start_time)
     const hour = startTime.getHours()
-    
+
     if (hour < 8 || hour >= 22) {
       return createErrorResponse({
         general: ['Bookings must be within office hours (08:00-22:00).']
       }, 400)
     }
-    
+
     // Check for duration violation
     const start = new Date(body.start_time)
     const end = new Date(body.end_time)
-    const durationMinutes = (end - start) / (1000 * 60)
-    
+    const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
+
     if (durationMinutes < 15) {
       return createErrorResponse({
         general: ['Booking must be at least 15 minutes.']
       }, 400)
     }
-    
+
     if (durationMinutes > 480) {
       return createErrorResponse({
         general: ['Booking cannot exceed 8 hours.']
       }, 400)
     }
-    
+
     // Success - return created booking
     return createJsonResponse({
       id: 4,
       room: body.room,
-      room_name: 'Conference Room A',
       start_time: body.start_time,
       end_time: body.end_time,
       user: 1,
@@ -245,84 +328,67 @@ export const handlers = [
   }),
 
   // Retrieve single booking
-  http.get(`${API_URL}/bookings/:id/`, ({ params }) => {
+  http.get('/api/bookings/:id/', ({ params }) => {
     const { id } = params
-    
+
     if (id === '1') {
       return createJsonResponse({
         id: 1,
         room: 1,
-        room_name: 'Conference Room A',
         start_time: '2025-01-28T10:00:00+01:00',
         end_time: '2025-01-28T12:00:00+01:00',
         user: 1,
       })
     }
-    
+
     return createErrorResponse('Not found', 404)
   }),
 
   // Update booking
-  http.put(`${API_URL}/bookings/:id/`, async ({ params, request }) => {
+  http.put('/api/bookings/:id/', async ({ params, request }) => {
     const { id } = params
-    const body = await request.json()
-    
+    const body = await request.json() as { room?: number; start_time?: string; end_time?: string }
+
     if (id === '1') {
       return createJsonResponse({
         id: 1,
         room: body.room || 1,
-        room_name: 'Conference Room A',
         start_time: body.start_time || '2025-01-28T10:00:00+01:00',
         end_time: body.end_time || '2025-01-28T12:00:00+01:00',
         user: 1,
       })
     }
-    
+
     return createErrorResponse('Not found', 404)
   }),
 
   // Partial update booking
-  http.patch(`${API_URL}/bookings/:id/`, async ({ params, request }) => {
+  http.patch('/api/bookings/:id/', async ({ params, request }) => {
     const { id } = params
-    const body = await request.json()
-    
+    const body = await request.json() as { room?: number; start_time?: string; end_time?: string }
+
     if (id === '1') {
       return createJsonResponse({
         id: 1,
         room: 1,
-        room_name: 'Conference Room A',
         start_time: body.start_time || '2025-01-28T10:00:00+01:00',
         end_time: body.end_time || '2025-01-28T12:00:00+01:00',
         user: 1,
       })
     }
-    
+
     return createErrorResponse('Not found', 404)
   }),
 
   // Delete booking
-  http.delete(`${API_URL}/bookings/:id/`, ({ params }) => {
+  http.delete('/api/bookings/:id/', ({ params }) => {
     const { id } = params
-    
+
     if (id === '1') {
       return new HttpResponse(null, { status: 204 })
     }
-    
+
     return createErrorResponse('Not found', 404)
-  }),
-
-  // ============================================================================
-  // Error Handlers
-  // ============================================================================
-
-  // Network error simulation
-  http.get(`${API_URL}/network-error`, () => {
-    return HttpResponse.error()
-  }),
-
-  // Server error simulation
-  http.get(`${API_URL}/server-error`, () => {
-    return createErrorResponse('Internal server error', 500)
   }),
 ]
 

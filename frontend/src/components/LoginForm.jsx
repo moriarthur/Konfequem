@@ -234,10 +234,11 @@ export default function LoginForm() {
 
         <form onSubmit={handleSubmit} className="space-y-5" aria-busy={submitting}>
           <div>
-            <label className="block text-sm font-medium text-accent-secondary mb-1">
+            <label htmlFor="username" className="block text-sm font-medium text-accent-secondary mb-1">
               Username
             </label>
             <input
+              id="username"
               ref={usernameRef}
               type="text"
               value={username}
@@ -266,11 +267,12 @@ export default function LoginForm() {
           </div>
 
           <div className="relative">
-            <label className="block text-sm font-medium text-accent-secondary mb-1">
+            <label htmlFor="password" className="block text-sm font-medium text-accent-secondary mb-1">
               Password
             </label>
             <div className="relative">
               <input
+                id="password"
                 ref={passwordRef}
                 type={showPassword ? "text" : "password"}
                 value={password}
@@ -293,7 +295,7 @@ export default function LoginForm() {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-4 top-1/2 -translate-y-1/2 text-accent-secondary/60 hover:text-accent-secondary flex items-center justify-center"
-                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-label={showPassword ? "Hide" : "Show"}
                 aria-pressed={showPassword}
               >
                 {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}

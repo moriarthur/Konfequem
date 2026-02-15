@@ -1,6 +1,6 @@
 /**
  * Global test setup file for Vitest.
- * 
+ *
  * This file runs before each test file and configures:
  * - Global test cleanup
  * - MSW (Mock Service Worker) for API mocking
@@ -11,8 +11,19 @@
 
 import '@testing-library/jest-dom'
 import { cleanup } from '@testing-library/react'
-import { afterEach, vi, beforeAll, afterEach as afterEachHook } from 'vitest'
+import { afterEach, vi, beforeAll, afterAll, beforeEach } from 'vitest'
 import { server } from './mocks/handlers'
+
+// ============================================================================
+// Mock modules
+// ============================================================================
+
+// Mock authConfig to return empty API_URL for MSW to intercept requests
+// This must be done before any imports that use the config
+vi.mock('../src/context/authConfig.js', () => ({
+  API_URL: '',
+  default: { API_URL: '' },
+}))
 
 // ============================================================================
 // Cleanup after each test
@@ -30,23 +41,38 @@ afterEach(() => {
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 
 // Reset handlers after each test
-afterEachHook(() => server.resetHandlers())
+afterEach(() => server.resetHandlers())
 
-// Close server after all tests
-afterEachHook(() => server.close())
+// Close server after ALL tests (not after each test)
+afterAll(() => server.close())
 
 // ============================================================================
-// localStorage mock
+// localStorage mock - implements actual storage
 // ============================================================================
 
-const localStorageMock = {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
-  length: 0,
-  key: vi.fn(),
-}
+const localStorageMock = (function () {
+  let store: Record<string, string> = {}
+
+  return {
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: string) => {
+      store[key] = value.toString()
+    },
+    removeItem: (key: string) => {
+      delete store[key]
+    },
+    clear: () => {
+      store = {}
+    },
+    get length() {
+      return Object.keys(store).length
+    },
+    key: (index: number) => {
+      const keys = Object.keys(store)
+      return keys[index] ?? null
+    },
+  }
+})()
 
 Object.defineProperty(window, 'localStorage', {
   value: localStorageMock,
@@ -54,10 +80,7 @@ Object.defineProperty(window, 'localStorage', {
 
 // Clear localStorage before each test
 beforeEach(() => {
-  localStorageMock.getItem.mockClear()
-  localStorageMock.setItem.mockClear()
-  localStorageMock.removeItem.mockClear()
-  localStorageMock.clear.mockClear()
+  localStorage.clear()
 })
 
 // ============================================================================

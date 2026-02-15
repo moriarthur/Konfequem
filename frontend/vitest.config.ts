@@ -6,7 +6,7 @@ export default defineConfig({
   test: {
     // Use jsdom environment for DOM testing
     environment: 'jsdom',
-    
+
     // Global setup file
     setupFiles: ['./__tests__/setup.ts'],
     

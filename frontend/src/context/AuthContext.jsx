@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 /*
   The react-refresh ESLint rule (only-export-components) can warn when a file
   exports hooks/constants alongside components which breaks Fast Refresh.
@@ -9,42 +9,125 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 /* eslint-disable react-refresh/only-export-components */
 import { API_URL } from "./authConfig";
 
+// Token management helpers
+const TOKEN_STORAGE = {
+  get: () => {
+    try {
+      return {
+        access: localStorage.getItem("access"),
+        refresh: localStorage.getItem("refresh"),
+      };
+    } catch {
+      return { access: null, refresh: null };
+    }
+  },
+  set: (access, refresh) => {
+    try {
+      if (access) localStorage.setItem("access", access);
+      else localStorage.removeItem("access");
+      if (refresh) localStorage.setItem("refresh", refresh);
+      else localStorage.removeItem("refresh");
+    } catch (e) {
+      console.error("Failed to store tokens:", e);
+    }
+  },
+  clear: () => {
+    try {
+      localStorage.removeItem("access");
+      localStorage.removeItem("refresh");
+    } catch (e) {
+      console.error("Failed to clear tokens:", e);
+    }
+  },
+};
+
+// Simple JWT parser (for expiration checking)
+function parseJWT(token) {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64));
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
+// Check if token is expired (actually expired, not "will expire soon")
+function isTokenExpired(token) {
+  if (!token) return true;
+  const payload = parseJWT(token);
+  if (!payload || !payload.exp) return true;
+
+  const now = Math.floor(Date.now() / 1000);
+  // Consider expired only if actually expired (exp time has passed)
+  // Add 30 second buffer to account for clock skew
+  return payload.exp - now < 30;
+}
+
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [access, setAccess] = useState(localStorage.getItem("access") || null);
-  const [refresh, setRefresh] = useState(localStorage.getItem("refresh") || null);
-  const [isAuthenticated, setIsAuthenticated] = useState(!!access);
+  const [access, setAccess] = useState(null);
+  const [refresh, setRefresh] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
+  const refreshPromise = useRef(null);
+  // Track if we've already fetched user for current access token to prevent duplicate fetches
+  const userFetchedRef = useRef(false);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setAccess(null);
     setRefresh(null);
     setIsAuthenticated(false);
     setUser(null);
-    localStorage.removeItem("access");
-    localStorage.removeItem("refresh");
-  };
+    TOKEN_STORAGE.clear();
+    // Reset the user fetched flag so logging in again works properly
+    userFetchedRef.current = false;
+  }, []);
 
   const refreshAccessToken = useCallback(async () => {
-    if (!refresh) { logout(); return null; }
+    // Prevent concurrent refresh attempts
+    if (!refresh || refreshPromise.current) {
+      if (!refresh) logout();
+      return null;
+    }
+
     try {
-      const res = await fetch(`${API_URL}/api/token/refresh/`, {
+      refreshPromise.current = fetch(`${API_URL}/api/token/refresh/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh }),
       });
-      if (!res.ok) { logout(); return null; }
+
+      const res = await refreshPromise.current;
+      refreshPromise.current = null;
+
+      if (!res.ok) {
+        // Only logout on authentication failures, not network errors
+        if (res.status === 401 || res.status === 403) {
+          logout();
+        }
+        return null;
+      }
+
       const data = await res.json();
       setAccess(data.access);
-      localStorage.setItem("access", data.access); // ⚡ FIX
+      // Handle rotated refresh tokens (backend may return new refresh token)
+      const newRefresh = data.refresh || refresh;
+      setRefresh(newRefresh);
+      TOKEN_STORAGE.set(data.access, newRefresh);
       return data.access;
-    } catch {
-      logout();
+    } catch (error) {
+      // Only logout on authentication errors, not network errors
+      const status = error?.status;
+      if (status === 401 || status === 403) {
+        logout();
+      }
       return null;
     }
-  }, [refresh]);
+  }, [refresh, logout]);
 
   const authFetch = useCallback(
     async (url, options = {}) => {
@@ -124,6 +207,8 @@ export function AuthProvider({ children }) {
           if (!retryRes.ok) throw new Error("Failed to fetch user data");
           const data = await retryRes.json();
           setUser(data);
+          // Mark that we've successfully fetched user for this access token
+          userFetchedRef.current = true;
           return;
         }
 
@@ -144,7 +229,7 @@ export function AuthProvider({ children }) {
     [access, refreshAccessToken]
   );
 
-  const login = async (username, password) => {
+  const login = useCallback(async (username, password) => {
     let res;
     try {
       res = await fetch(`${API_URL}/api/token/`, {
@@ -179,25 +264,73 @@ export function AuthProvider({ children }) {
     }
 
     const data = await res.json();
+
+    // Validate JWT before storing
+    if (!data.access || isTokenExpired(data.access)) {
+      throw new Error("Received invalid or expired token");
+    }
+
     setAccess(data.access);
     setRefresh(data.refresh);
     setIsAuthenticated(true);
+    TOKEN_STORAGE.set(data.access, data.refresh);
+    // Mark that we've fetched user for this access token
+    userFetchedRef.current = true;
 
     await fetchUser(data.access);
 
-    localStorage.setItem("access", data.access);
-    localStorage.setItem("refresh", data.refresh);
-
     return data;
-  };
+  }, [fetchUser, logout]);
 
+  // Initialize auth state from localStorage
   useEffect(() => {
-    setIsAuthenticated(!!access);
-    setLoading(false);
-    if (access) localStorage.setItem("access", access);
-    if (refresh) localStorage.setItem("refresh", refresh);
-    if (access && !user) fetchUser();
-  }, [access, refresh]); // Removed fetchUser from dependencies
+    const initializeAuth = async () => {
+      const storedTokens = TOKEN_STORAGE.get();
+      const access = storedTokens.access;
+      const refresh = storedTokens.refresh;
+
+      // Validate tokens before using
+      const isValidAccess = access && !isTokenExpired(access);
+      const hasRefresh = refresh && !isTokenExpired(refresh);
+
+      if (isValidAccess) {
+        setAccess(access);
+        setRefresh(refresh);
+        setIsAuthenticated(true);
+        // Set user fetched flag synchronously to prevent race condition
+        userFetchedRef.current = false;
+        // Fetch user will be triggered by the second useEffect when access changes
+        setLoading(false);
+      } else if (hasRefresh) {
+        // Access token expired but refresh is valid - try to refresh
+        const newAccess = await refreshAccessToken();
+        if (newAccess) {
+          setIsAuthenticated(true);
+          // User fetch will be triggered by the second useEffect
+        } else {
+          // Refresh failed - clear state
+          logout();
+        }
+        setLoading(false);
+      } else {
+        // No valid tokens - clear state and set loading to false
+        setAccess(null);
+        setRefresh(null);
+        setIsAuthenticated(false);
+        setUser(null);
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
+  }, []); // Run once on mount
+
+  // Fetch user when access changes and we're authenticated
+  useEffect(() => {
+    if (access && isAuthenticated && !user && !userFetchedRef.current) {
+      fetchUser(access);
+    }
+  }, [access, isAuthenticated, user]); // fetchUser is stable - defined with useCallback and only depends on access/refreshAccessToken
 
   return (
     <AuthContext.Provider value={{ access, refresh, isAuthenticated, loading, login, logout, authFetch, user }}>

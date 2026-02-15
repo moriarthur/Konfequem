@@ -28,10 +28,11 @@ class TestRoomSerializer:
         """Test that RoomSerializer serializes all expected fields."""
         serializer = RoomSerializer(room)
         data = serializer.data
-        
-        assert set(data.keys()) == {'id', 'name', 'location', 'capacity'}
+
+        assert set(data.keys()) == {'id', 'name', 'location', 'capacity', 'features'}
         assert data['name'] == room.name
         assert data['capacity'] == room.capacity
+        assert 'features' in data
 
     def test_room_serializer_serializes_multiple_rooms(self, db, rooms):
         """Test that RoomSerializer handles multiple rooms."""
@@ -264,22 +265,23 @@ class TestBookingSerializerValidation:
         assert any('already booked' in str(e).lower()
                    for e in serializer.errors.get('general', []))
 
-    def test_booking_overlap_allowed_for_staff(self, db, room, staff_user, make_request, booking):
-        """Test that staff can create overlapping bookings (based on serializer logic)."""
-        # Note: The serializer allows overlap for staff (user.is_staff)
+    def test_booking_overlap_rejected_for_staff(self, db, room, staff_user, make_request, booking):
+        """Test that staff users cannot create overlapping bookings."""
+        # Staff users should also respect overlap constraints
         class StaffRequest:
             user = staff_user
-        
+
         data = {
             'room': room.id,
             'start_time': booking.start_time.isoformat(),
             'end_time': booking.end_time.isoformat()
         }
-        
+
         serializer = BookingSerializer(data=data, context={'request': StaffRequest()})
-        # Should be valid for staff (based on serializer logic)
-        is_valid = serializer.is_valid()
-        # This depends on your business rules - adjust test based on requirements
+        # Overlapping bookings should be rejected for all users including staff
+        assert not serializer.is_valid()
+        assert any('already booked' in str(e).lower()
+                   for e in serializer.errors.get('general', []))
 
     # ========================================================================
     # 90-Day Advance Limit Tests

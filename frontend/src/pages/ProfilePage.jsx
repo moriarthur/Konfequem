@@ -11,6 +11,7 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalBookings: 0,
+    currentBookings: 0,
     upcomingBookings: 0,
     totalRooms: 0,
   });
@@ -31,15 +32,25 @@ export default function ProfilePage() {
           authFetch("/api/rooms/"),
         ]);
 
+        // Extract results arrays from paginated responses
+        const bookings = bookingsData.results || bookingsData;
+        const rooms = roomsData.results || roomsData;
+
         const now = new Date();
-        const upcoming = bookingsData.filter(
-          (b) => new Date(b.start_time) >= now
+        // Current/ongoing bookings: happening right now
+        const current = bookings.filter(
+          (b) => new Date(b.start_time) <= now && new Date(b.end_time) > now
+        ).length;
+        // Upcoming bookings: starting in the future (not ongoing)
+        const upcoming = bookings.filter(
+          (b) => new Date(b.start_time) > now
         ).length;
 
         setStats({
-          totalBookings: bookingsData.length,
+          totalBookings: bookingsData.count || bookings.length,
+          currentBookings: current,
           upcomingBookings: upcoming,
-          totalRooms: roomsData.length,
+          totalRooms: roomsData.count || rooms.length,
         });
       } catch (err) {
         logError("Error fetching profile data:", err);
@@ -129,16 +140,16 @@ export default function ProfilePage() {
               <p className="text-xs text-accent-secondary/60 mt-1">Total bookings</p>
             </div>
             <div className="bg-surface-base border border-border-subtle rounded-xl p-4 text-center">
+              <p className="text-2xl font-semibold text-status-success">
+                {stats.currentBookings}
+              </p>
+              <p className="text-xs text-accent-secondary/60 mt-1">Current</p>
+            </div>
+            <div className="bg-surface-base border border-border-subtle rounded-xl p-4 text-center">
               <p className="text-2xl font-semibold text-accent-secondary">
                 {stats.upcomingBookings}
               </p>
               <p className="text-xs text-accent-secondary/60 mt-1">Upcoming</p>
-            </div>
-            <div className="bg-surface-base border border-border-subtle rounded-xl p-4 text-center">
-              <p className="text-2xl font-semibold text-accent-secondary">
-                {stats.totalRooms}
-              </p>
-              <p className="text-xs text-accent-secondary/60 mt-1">Rooms</p>
             </div>
           </div>
         )}

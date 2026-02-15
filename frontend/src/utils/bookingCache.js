@@ -1,12 +1,33 @@
 import { DateTime } from "luxon";
 import { OFFICE_TIMEZONE, OFFICE_HOURS } from "./bookingUtils";
 
+// Cache configuration
+const MAX_CACHE_SIZE = 6; // Maximum months to cache (6 months = current + 5 future)
+const MAX_LISTENERS_PER_MONTH = 10; // Prevent listener leaks
+
 // Cache structure to store booking data
 const bookingCache = {
   data: new Map(),
   loading: new Set(),
   listeners: new Map(),
 };
+
+// Clean up old cache entries when size limit is reached
+function cleanupOldestEntries() {
+  if (bookingCache.data.size <= MAX_CACHE_SIZE) return;
+
+  const entries = Array.from(bookingCache.data.entries());
+  // Sort by month key (oldest first)
+  entries.sort((a, b) => a[0].localeCompare(b[0]));
+
+  // Remove oldest entries beyond limit
+  const toRemove = entries.slice(0, entries.length - MAX_CACHE_SIZE);
+  toRemove.forEach(([monthKey]) => {
+    bookingCache.data.delete(monthKey);
+    bookingCache.listeners.delete(monthKey);
+    bookingCache.loading.delete(monthKey);
+  });
+}
 
 // Convert date to YYYY-MM-DD string
 function dateToKey(date) {
@@ -45,29 +66,35 @@ async function fetchMonthBookings(date, roomId, authFetch) {
   const monthKey = monthStart.toFormat('yyyy-MM');
 
   if (bookingCache.loading.has(monthKey)) return;
-  
+
   bookingCache.loading.add(monthKey);
-  
+
   try {
     const response = await authFetch(
       `/api/bookings/?room=${roomId}&month=${monthStart.toFormat('yyyy-MM')}`
     );
-    
+
+    // Handle pagination - extract results array from paginated response
+    const bookings = response.results || response;
+
     // Group bookings by date
     const bookingsByDate = new Map();
-    response.forEach(booking => {
+    bookings.forEach(booking => {
       const dateKey = DateTime.fromISO(booking.start_time)
         .setZone(OFFICE_TIMEZONE)
         .toFormat('yyyy-MM-dd');
-      
+
       if (!bookingsByDate.has(dateKey)) {
         bookingsByDate.set(dateKey, []);
       }
       bookingsByDate.get(dateKey).push(booking);
     });
-    
+
     bookingCache.data.set(monthKey, bookingsByDate);
-    
+
+    // Clean up old entries if cache is too large
+    cleanupOldestEntries();
+
     // Notify listeners
     const listeners = bookingCache.listeners.get(monthKey) || [];
     listeners.forEach(callback => callback(bookingsByDate));
@@ -81,18 +108,26 @@ function subscribeToMonth(date, callback) {
   const monthKey = DateTime.fromJSDate(date)
     .setZone(OFFICE_TIMEZONE)
     .toFormat('yyyy-MM');
-  
+
   if (!bookingCache.listeners.has(monthKey)) {
     bookingCache.listeners.set(monthKey, new Set());
   }
-  
-  bookingCache.listeners.get(monthKey).add(callback);
-  
+
+  const listeners = bookingCache.listeners.get(monthKey);
+
+  // Prevent unbounded listener growth
+  if (listeners.size >= MAX_LISTENERS_PER_MONTH) {
+    console.warn(`Max listeners (${MAX_LISTENERS_PER_MONTH}) reached for month ${monthKey}. Cleanup may be needed.`);
+    return () => {};
+  }
+
+  listeners.add(callback);
+
   return () => {
-    const listeners = bookingCache.listeners.get(monthKey);
-    if (listeners) {
-      listeners.delete(callback);
-      if (listeners.size === 0) {
+    const currentListeners = bookingCache.listeners.get(monthKey);
+    if (currentListeners) {
+      currentListeners.delete(callback);
+      if (currentListeners.size === 0) {
         bookingCache.listeners.delete(monthKey);
       }
     }

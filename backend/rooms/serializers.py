@@ -11,11 +11,12 @@ class RoomFeatureSerializer(serializers.ModelSerializer):
 
 class BookingSerializer(serializers.ModelSerializer):
     room_name = serializers.CharField(source="room.name", read_only=True)
-    
+    user = serializers.PrimaryKeyRelatedField(read_only=True)
+    status = serializers.CharField(read_only=True)
+
     class Meta:
         model = Booking
-        fields = ['id', 'room', 'room_name', 'start_time', 'end_time', 'user']
-        read_only_fields = ['user']
+        fields = ['id', 'room', 'room_name', 'start_time', 'end_time', 'user', 'status']
         
     def to_representation(self, instance):
         """Convert times to Berlin timezone for consistent display"""
@@ -59,8 +60,11 @@ class BookingSerializer(serializers.ModelSerializer):
             end_local = end.astimezone(berlin_tz)
 
             # Office hours: 08:00 – 22:00 (Berlin time)
-            if start_local.hour < 8 or start_local.hour >= 22 or end_local.hour > 22 or end_local.hour < 8:
-                errors.append("Bookings must be within office hours (08:00–22:00).")
+            # Bookings can start from 08:00 until 21:45 (to end by 22:00)
+            if start_local.hour < 8 or start_local.hour >= 22:
+                errors.append("Bookings must start between 08:00 and 21:45.")
+            if end_local.hour > 22 or (end_local.hour == 22 and end_local.minute > 0):
+                errors.append("Bookings must end by 22:00.")
 
             # Duration limits: 15 min – 8 hours
             duration = (end - start).total_seconds() / 60
@@ -76,12 +80,17 @@ class BookingSerializer(serializers.ModelSerializer):
 
         # --- Logical validation ---
         if room and start and end:
+            # Check for overlapping bookings
+            # Note: There is a theoretical race condition where two users could
+            # validate simultaneously and both see no overlaps, then both create.
+            # This is rare in practice. A proper fix would require database
+            # constraints or different locking strategy.
             overlapping = Booking.objects.filter(room=room).filter(
                 Q(start_time__lt=end) & Q(end_time__gt=start)
             )
             if self.instance:
                 overlapping = overlapping.exclude(pk=self.instance.pk)
-            if overlapping.exists() and not user.is_staff:
+            if overlapping.exists():
                 errors.append("This room is already booked for the selected time range.")
 
         # --- Company rules ---

@@ -40,9 +40,10 @@ export default function RoomsPage() {
           authFetch("/api/room-features/"),
           authFetch("/api/bookings/"),
         ]);
-        setRooms(roomsData);
-        setFeatures(featuresData);
-        setBookings(bookingsData);
+        // Handle pagination - extract results array from paginated response
+        setRooms(roomsData.results || roomsData);
+        setFeatures(featuresData.results || featuresData);
+        setBookings(bookingsData.results || bookingsData);
       } catch (err) {
         logError("Error fetching data:", err);
       } finally {
@@ -72,7 +73,8 @@ export default function RoomsPage() {
   const handleBookingCreated = async () => {
     try {
       const bookingsData = await authFetch("/api/bookings/");
-      setBookings(bookingsData);
+      // Handle pagination - extract results array from paginated response
+      setBookings(bookingsData.results || bookingsData);
       setShowBookingForm(false);
       setSelectedRoomId(null);
       setIsFormValid(false);

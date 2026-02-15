@@ -45,11 +45,13 @@ export default function CalendarPage() {
 
         // Fetch month bookings for calendar display
         const bookingsData = await authFetch(`/api/bookings/?month=${monthStr}`);
-        if (isMountedRef.current) setBookings(bookingsData);
+        // Handle pagination - extract results array from paginated response
+        if (isMountedRef.current) setBookings(bookingsData.results || bookingsData);
 
         // Fetch all bookings for current/next calculation
         const allBookingsData = await authFetch("/api/bookings/");
-        if (isMountedRef.current) setAllBookings(allBookingsData);
+        // Handle pagination - extract results array from paginated response
+        if (isMountedRef.current) setAllBookings(allBookingsData.results || allBookingsData);
       } catch (err) {
         if (isMountedRef.current) logError("Error fetching bookings:", err);
       } finally {
@@ -147,6 +149,22 @@ export default function CalendarPage() {
    * Start editing a booking
    */
   const handleEditBooking = (booking) => {
+    const now = DateTime.now().setZone(OFFICE_TIMEZONE);
+    const bookingStart = DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE);
+    const bookingEnd = DateTime.fromISO(booking.end_time).setZone(OFFICE_TIMEZONE);
+    const isPast = bookingEnd < now;
+    const isCurrent = now >= bookingStart && now < bookingEnd;
+
+    // Prevent editing bookings that are in progress or already ended
+    if (isPast) {
+      showAlert("Cannot edit a booking that has already ended.", { type: "error" });
+      return;
+    }
+    if (isCurrent) {
+      showAlert("Cannot edit a booking that is currently in progress.", { type: "error" });
+      return;
+    }
+
     setEditingBooking(booking);
     setEditForm({
       start_time: booking.start_time,
@@ -211,10 +229,11 @@ export default function CalendarPage() {
 
     // Check for overlapping bookings in the same room (handle room ID or object)
     const editingRoomId = editingBooking.room?.id || editingBooking.room;
-    const roomBookings = allBookings.filter(b => {
+    // Ensure allBookings is an array before filtering
+    const roomBookings = Array.isArray(allBookings) ? allBookings.filter(b => {
       const bookingRoomId = b.room?.id || b.room;
       return bookingRoomId === editingRoomId && b.id !== editingBooking.id;
-    });
+    }) : [];
     const hasOverlap = roomBookings.some(booking => {
       const bookingStart = DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE);
       const bookingEnd = DateTime.fromISO(booking.end_time).setZone(OFFICE_TIMEZONE);
@@ -228,7 +247,7 @@ export default function CalendarPage() {
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       const firstError = Object.values(errors)[0];
-      showAlert(firstError, "error");
+      showAlert(firstError, { type: "error" });
       return;
     }
 
@@ -251,12 +270,15 @@ export default function CalendarPage() {
           authFetch(`/api/bookings/?month=${monthStr}`),
           authFetch("/api/bookings/"),
         ]);
-        setBookings(bookingsData);
-        setAllBookings(allBookingsData);
+        // Handle pagination - extract results array from paginated response
+        const bookingsArray = bookingsData.results || bookingsData;
+        const allBookingsArray = allBookingsData.results || allBookingsData;
+        setBookings(bookingsArray);
+        setAllBookings(allBookingsArray);
 
         // Update expanded day bookings
         if (expandedDay) {
-          const updatedBooking = bookingsData.find(b => b.id === editingBooking.id) || response;
+          const updatedBooking = bookingsArray.find(b => b.id === editingBooking.id) || response;
           setExpandedDay({
             ...expandedDay,
             dayBookings: expandedDay.dayBookings.map(b =>
@@ -274,21 +296,28 @@ export default function CalendarPage() {
 
       // Handle specific error cases
       if (err.status === 409) {
-        showAlert("This time slot was just booked by someone else. Please choose a different time.", "error");
+        showAlert("This time slot was just booked by someone else. Please choose a different time.", { type: "error" });
         setValidationErrors({ overlap: "This time slot is no longer available" });
       } else if (err.status === 400) {
         if (err.overlap || err.message?.includes?.('overlap')) {
-          showAlert("This time slot conflicts with an existing booking.", "error");
+          showAlert("This time slot conflicts with an existing booking.", { type: "error" });
           setValidationErrors({ overlap: "This time slot is already booked" });
         } else if (err.message) {
-          showAlert(err.message, "error");
+          showAlert(err.message, { type: "error" });
         } else {
-          showAlert("Invalid booking data. Please check your input.", "error");
+          showAlert("Invalid booking data. Please check your input.", { type: "error" });
         }
       } else if (err.status === 401) {
         showAlert("Your session has expired. Please refresh the page.", "error");
       } else if (err.status === 403) {
-        showAlert("You don't have permission to modify this booking.", "error");
+        // Show specific error message from backend
+        if (err.message && err.message.includes("currently in progress")) {
+          showAlert("Cannot modify a booking that is currently in progress.", "error");
+        } else if (err.message && err.message.includes("already ended")) {
+          showAlert("Cannot modify a booking that has already ended.", "error");
+        } else {
+          showAlert(err.message || "You don't have permission to modify this booking.", "error");
+        }
       } else if (err.status === 404) {
         showAlert("This booking no longer exists.", "error");
         setEditingBooking(null);
@@ -346,7 +375,14 @@ export default function CalendarPage() {
       if (err.status === 401) {
         showAlert("Your session has expired. Please refresh the page.", "error");
       } else if (err.status === 403) {
-        showAlert("You don't have permission to delete this booking.", "error");
+        // Show specific error message from backend
+        if (err.message && err.message.includes("currently in progress")) {
+          showAlert("Cannot delete a booking that is currently in progress.", "error");
+        } else if (err.message && err.message.includes("already ended")) {
+          showAlert("Cannot delete a booking that has already ended.", "error");
+        } else {
+          showAlert(err.message || "You don't have permission to delete this booking.", "error");
+        }
       } else if (err.status === 404) {
         showAlert("This booking no longer exists.", "error");
         setDeleteConfirmBooking(null);
@@ -369,63 +405,69 @@ export default function CalendarPage() {
    */
   useEffect(() => {
     const editBookingId = searchParams.get("edit");
-    if (editBookingId && allBookings.length > 0) {
+    if (editBookingId && allBookings.length > 0 && !expandedDay && !editingBooking) {
       const booking = allBookings.find(b => b.id === parseInt(editBookingId));
       if (booking) {
         const bookingDate = DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE);
+        const now = DateTime.now().setZone(OFFICE_TIMEZONE).startOf("day");
+        const dayDate = bookingDate.startOf("day");
+        const bookingEnd = DateTime.fromISO(booking.end_time).setZone(OFFICE_TIMEZONE);
+
+        // Check if booking is editable (not in progress and not ended)
+        const isPast = bookingEnd < now;
+        const isCurrent = now >= bookingDate && now < bookingEnd;
+
+        if (isPast) {
+          showAlert("Cannot edit a booking that has already ended.", "error");
+          // Clear URL param without opening edit
+          Promise.resolve().then(() => {
+            navigate("/calendar", { replace: true });
+          });
+          return;
+        }
+
+        if (isCurrent) {
+          showAlert("Cannot edit a booking that is currently in progress.", "error");
+          // Clear URL param without opening edit
+          Promise.resolve().then(() => {
+            navigate("/calendar", { replace: true });
+          });
+          return;
+        }
+
+        // Create dayInfo directly without waiting for month bookings to load
+        const dayInfo = {
+          date: bookingDate,
+          isCurrentMonth: true,
+          isToday: bookingDate.hasSame(DateTime.now(), "day"),
+          isPast: dayDate < now,
+          dayBookings: [booking],
+        };
+
+        // Batch all state updates together to prevent multiple re-renders
         setCurrentMonth(bookingDate);
+        setExpandedDay(dayInfo);
+        setEditingBooking(booking);
+        setEditForm({
+          start_time: booking.start_time,
+          end_time: booking.end_time,
+        });
 
-        // Find the day info
-        setTimeout(() => {
-          const startOfMonth = currentMonth.startOf("month");
-          const endOfMonth = currentMonth.endOf("month");
-          const startOfGrid = startOfMonth.startOf("week");
-          const endOfGrid = endOfMonth.endOf("week");
-
-          const days = [];
-          let current = startOfGrid;
-          while (current <= endOfGrid) {
-            const dayDate = current.startOf("day");
-            const dayBookings = bookings.filter((b) => {
-              if (!b?.start_time) return false;
-              const bDate = DateTime.fromISO(b.start_time);
-              return bDate.hasSame(current, "day");
-            });
-
-            if (dayBookings.length > 0) {
-              days.push({
-                date: current,
-                isCurrentMonth: current.month === currentMonth.month,
-                isToday: current.hasSame(DateTime.now(), "day"),
-                isPast: dayDate < DateTime.now().setZone(OFFICE_TIMEZONE).startOf("day"),
-                dayBookings,
-              });
-            }
-            current = current.plus({ days: 1 });
-          }
-
-          const dayInfo = days.find(d => d.dayBookings.some(b => b.id === booking.id));
-          if (dayInfo) {
-            setExpandedDay(dayInfo);
-            setEditingBooking(booking);
-            setEditForm({
-              start_time: booking.start_time,
-              end_time: booking.end_time,
-            });
-          }
-
-          // Clear URL param
+        // Clear URL param after state updates
+        Promise.resolve().then(() => {
           navigate("/calendar", { replace: true });
-        }, 100);
+        });
       }
     }
-  }, [searchParams, allBookings, bookings, currentMonth]);
+  }, [searchParams, allBookings, expandedDay, editingBooking, navigate]);
 
   /**
    * Find current and next upcoming bookings (from ALL bookings, not just current month)
    */
   const { currentBooking, nextBooking } = useMemo(() => {
-    if (!allBookings || allBookings.length === 0) return { currentBooking: null, nextBooking: null };
+    if (!allBookings || !Array.isArray(allBookings) || allBookings.length === 0) {
+      return { currentBooking: null, nextBooking: null };
+    }
 
     const now = DateTime.now().setZone(OFFICE_TIMEZONE);
 
@@ -471,11 +513,11 @@ export default function CalendarPage() {
         isCurrentMonth: current.month === currentMonth.month,
         isToday: current.hasSame(DateTime.now(), "day"),
         isPast: dayDate < today,
-        dayBookings: bookings.filter((booking) => {
+        dayBookings: Array.isArray(bookings) ? bookings.filter((booking) => {
           if (!booking?.start_time) return false;
           const bookingDate = DateTime.fromISO(booking.start_time);
           return bookingDate.hasSame(current, "day");
-        }),
+        }) : [],
       });
       current = current.plus({ days: 1 });
     }
@@ -621,6 +663,8 @@ export default function CalendarPage() {
                     const isNext = nextBooking?.id === booking.id;
                     const status = isPast ? "past" : isCurrent ? "current" : isNext ? "next" : "future";
                     const isEditing = editingBooking?.id === booking.id;
+                    // Disable editing for current/past bookings
+                    const canEdit = !isPast && !isCurrent;;
 
                   const statusStyles = {
                     past: "bg-surface-muted border-border-subtle text-accent-secondary/40",
@@ -640,7 +684,7 @@ export default function CalendarPage() {
                     <div
                       key={booking.id}
                       className={`border rounded-xl transition-all ${statusStyles[status]} ${
-                        !isEditing && !isPast ? "cursor-pointer hover:ring-2 hover:ring-accent-primary/30" : ""
+                        !isEditing && canEdit ? "cursor-pointer hover:ring-2 hover:ring-accent-primary/30" : ""
                       }`}
                     >
                       {isEditing ? (
@@ -797,7 +841,7 @@ export default function CalendarPage() {
                         // Normal booking card view
                         <div
                           className="p-4"
-                          onClick={() => !isPast && handleEditBooking(booking)}
+                          onClick={() => canEdit && handleEditBooking(booking)}
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
@@ -828,8 +872,8 @@ export default function CalendarPage() {
                               </div>
                             </div>
 
-                            {/* Edit button icon */}
-                            {!isPast && (
+                            {/* Edit button icon - only for editable bookings */}
+                            {canEdit && (
                               <div className="flex-shrink-0 p-1">
                                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 opacity-40">
                                   <path d="M13.5203 3.83582C14.0787 3.27745 14.9871 3.27745 15.5455 3.83582L20.1642 8.4545C20.7225 9.01287 20.7225 9.92127 20.1642 10.4796L18.9497 11.6942L12.3058 5.05025L13.5203 3.83582ZM10.8984 6.45762L3.02019 14.3358L2.75166 18.9834L7.39929 18.7149L15.2775 10.8367L10.8984 6.45762Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>

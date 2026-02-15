@@ -242,22 +242,21 @@ class TestJWTAuthentication:
         new_me_response = api_client.get('/api/users/me/')
         assert new_me_response.status_code == 200
 
-    def test_token_works_for_booking_operations(self, db, api_client, user, room):
+    def test_token_works_for_booking_operations(self, db, api_client, user, room, future_start_time):
         """Test that JWT tokens work for booking CRUD operations."""
         refresh = RefreshToken.for_user(user)
         api_client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
 
         # Create booking (requires auth)
-        from django.utils import timezone
         from datetime import timedelta
 
-        start = timezone.now() + timedelta(days=1, hours=10)  # Within office hours (10:00)
+        start = future_start_time
         response = api_client.post('/api/bookings/', {
             'room': room.id,
             'start_time': start.isoformat(),
             'end_time': (start + timedelta(hours=2)).isoformat()
         }, format='json')
-        
+
         assert response.status_code == 201
 
     # ========================================================================

@@ -54,13 +54,18 @@ class TestBookingFlowE2E:
         response = client.get('/api/rooms/')
 
         assert response.status_code == 200
-        rooms = response.data
+        rooms = response.data['results']
         assert len(rooms) >= 1
         room_id = rooms[0]['id']
 
-        # Step 4: Create a booking
+        # Step 4: Create a booking (ensure it's within Berlin office hours)
+        berlin_tz = timezone.get_default_timezone()
         start_time = timezone.now() + timedelta(days=1)
-        start_time = start_time.replace(hour=10, minute=0, second=0, microsecond=0)
+        # Convert to Berlin time and set to 10:00 AM
+        start_time_berlin = start_time.astimezone(berlin_tz)
+        start_time_berlin = start_time_berlin.replace(hour=10, minute=0, second=0, microsecond=0)
+        # Convert back to UTC for the API
+        start_time = start_time_berlin.astimezone(timezone.utc)
         end_time = start_time + timedelta(hours=2)
 
         response = client.post('/api/bookings/', {
@@ -78,13 +83,13 @@ class TestBookingFlowE2E:
         assert response.status_code == 200
         assert response.data['id'] == booking_id
         assert response.data['room'] == room_id
-        
+
         # Step 6: List all bookings for the user
         response = client.get('/api/bookings/')
-        
+
         assert response.status_code == 200
-        assert len(response.data) >= 1
-        booking_ids = [b['id'] for b in response.data]
+        assert len(response.data['results']) >= 1
+        booking_ids = [b['id'] for b in response.data['results']]
         assert booking_id in booking_ids
 
     # ========================================================================
@@ -177,7 +182,7 @@ class TestBookingFlowE2E:
         user1 = User.objects.create_user(username='user1', password='pass123')
         user2 = User.objects.create_user(username='user2', password='pass123')
         room = Room.objects.create(name='Test Room', capacity=10)
-        
+
         # Create booking for user1
         start_time = timezone.now() + timedelta(days=1)
         start_time = start_time.replace(hour=10, minute=0, second=0, microsecond=0)
@@ -187,7 +192,7 @@ class TestBookingFlowE2E:
             start_time=start_time,
             end_time=start_time + timedelta(hours=2)
         )
-        
+
         # Create booking for user2
         booking2 = Booking.objects.create(
             room=room,
@@ -195,7 +200,7 @@ class TestBookingFlowE2E:
             start_time=start_time + timedelta(hours=3),
             end_time=start_time + timedelta(hours=5)
         )
-        
+
         # Login as user1
         client1 = APIClient()
         response = client1.post('/api/token/', {
@@ -203,10 +208,10 @@ class TestBookingFlowE2E:
             'password': 'pass123'
         })
         client1.credentials(HTTP_AUTHORIZATION=f'Bearer {response.data["access"]}')
-        
+
         response = client1.get('/api/bookings/')
-        booking_ids = [b['id'] for b in response.data]
-        
+        booking_ids = [b['id'] for b in response.data['results']]
+
         assert booking1.id in booking_ids
         assert booking2.id not in booking_ids
 
@@ -308,11 +313,13 @@ class TestBookingFlowE2E:
         })
         client.credentials(HTTP_AUTHORIZATION=f'Bearer {response.data["access"]}')
 
-        # Create booking with explicit timezone (use future date)
-        from datetime import datetime
-        import pytz
-        berlin_tz = pytz.timezone('Europe/Berlin')
-        berlin_time = berlin_tz.localize(datetime(2026, 2, 15, 10, 0))
+        # Create booking with explicit timezone (use future date within office hours)
+        # Get a future date within 90 days
+        future_date = timezone.now() + timedelta(days=10)
+        # Create time at 10:00 AM Berlin time
+        berlin_tz = timezone.get_default_timezone()
+        berlin_time = future_date.astimezone(berlin_tz)
+        berlin_time = berlin_time.replace(hour=10, minute=0, second=0, microsecond=0)
 
         response = client.post('/api/bookings/', {
             'room': room.id,
@@ -384,7 +391,7 @@ class TestBookingFlowE2E:
         # Setup
         user = User.objects.create_user(username='testuser', password='testpass123')
         room = Room.objects.create(name='Test Room', capacity=10)
-        
+
         # Login and create booking
         client = APIClient()
         response = client.post('/api/token/', {
@@ -392,27 +399,31 @@ class TestBookingFlowE2E:
             'password': 'testpass123'
         })
         client.credentials(HTTP_AUTHORIZATION=f'Bearer {response.data["access"]}')
-        
+
+        # Use Berlin time for office hours
+        berlin_tz = timezone.get_default_timezone()
         start_time = timezone.now() + timedelta(days=1)
-        start_time = start_time.replace(hour=10, minute=0, second=0, microsecond=0)
-        
+        start_time_berlin = start_time.astimezone(berlin_tz)
+        start_time_berlin = start_time_berlin.replace(hour=10, minute=0, second=0, microsecond=0)
+        start_time = start_time_berlin.astimezone(timezone.utc)
+
         response = client.post('/api/bookings/', {
             'room': room.id,
             'start_time': start_time.isoformat(),
             'end_time': (start_time + timedelta(hours=2)).isoformat()
         }, format='json')
-        
+
         booking_id = response.data['id']
-        
+
         # Delete the booking
         response = client.delete(f'/api/bookings/{booking_id}/')
         assert response.status_code == 204
-        
+
         # Verify it's deleted
         response = client.get(f'/api/bookings/{booking_id}/')
         assert response.status_code == 404
-        
+
         # Verify it's not in the list
         response = client.get('/api/bookings/')
-        booking_ids = [b['id'] for b in response.data]
+        booking_ids = [b['id'] for b in response.data['results']]
         assert booking_id not in booking_ids

@@ -173,8 +173,13 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
         setLoading(false);
       });
 
-      return () => unsubscribe();
+      return () => {
+        unsubscribe();
+      };
     }
+
+    // No cleanup needed for cached data path
+    return undefined;
   }, [selectedDate, roomId]);
 
   // Get available durations based on selected slot

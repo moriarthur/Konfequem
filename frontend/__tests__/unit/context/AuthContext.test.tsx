@@ -1,6 +1,6 @@
 /**
  * Integration tests for AuthContext.
- * 
+ *
  * Tests validate:
  * - Login success and failure
  * - Logout functionality
@@ -14,6 +14,47 @@ import { renderHook, act, waitFor } from '@testing-library/react'
 import { AuthProvider, useAuth } from '@/context/AuthContext'
 import { server } from '../../mocks/handlers'
 import { http, HttpResponse } from 'msw'
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+// Create valid-looking JWT tokens for testing
+const createMockAccessJwt = () => {
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+  const payload = btoa(JSON.stringify({ exp: 2863311600 }))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+  return `${header}.${payload}.mock-signature`
+}
+
+const createMockRefreshJwt = () => {
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+  const payload = btoa(JSON.stringify({ exp: 2863311600 }))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+  return `${header}.${payload}.mock-refresh-signature`
+}
+
+const createExpiredJwt = () => {
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+  const payload = btoa(JSON.stringify({ exp: 946684800 }))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+  return `${header}.${payload}.mock-expired-signature`
+}
 
 // Wrapper component for testing hooks
 function createWrapper() {
@@ -51,15 +92,18 @@ describe('AuthContext', () => {
     })
 
     it('should have correct initial state when tokens exist in localStorage', () => {
-      localStorage.setItem('access', 'stored-access-token')
-      localStorage.setItem('refresh', 'stored-refresh-token')
+      const mockAccess = createMockAccessJwt()
+      const mockRefresh = createMockRefreshJwt()
+      localStorage.setItem('access', mockAccess)
+      localStorage.setItem('refresh', mockRefresh)
 
       const { result } = renderHook(() => useAuth(), {
         wrapper: createWrapper(),
       })
 
-      expect(result.current.access).toBe('stored-access-token')
-      expect(result.current.refresh).toBe('stored-refresh-token')
+      expect(result.current.access).toBe(mockAccess)
+      expect(result.current.refresh).toBe(mockRefresh)
+      expect(result.current.isAuthenticated).toBe(true)
     })
   })
 
@@ -78,8 +122,9 @@ describe('AuthContext', () => {
       })
 
       expect(result.current.isAuthenticated).toBe(true)
-      expect(result.current.access).toBe('mock-access-token')
-      expect(result.current.refresh).toBe('mock-refresh-token')
+      // Token should be a valid JWT (starts with eyJ)
+      expect(result.current.access).toMatch(/^eyJ/)
+      expect(result.current.refresh).toMatch(/^eyJ/)
       expect(result.current.user).toEqual({
         id: 1,
         username: 'testuser',
@@ -97,8 +142,8 @@ describe('AuthContext', () => {
         await result.current.login('testuser', 'testpass123')
       })
 
-      expect(localStorage.getItem('access')).toBe('mock-access-token')
-      expect(localStorage.getItem('refresh')).toBe('mock-refresh-token')
+      expect(localStorage.getItem('access')).toMatch(/^eyJ/)
+      expect(localStorage.getItem('refresh')).toMatch(/^eyJ/)
     })
 
     it('should fail login with invalid credentials', async () => {
@@ -360,13 +405,22 @@ describe('AuthContext', () => {
 
   describe('user data', () => {
     it('should fetch user data on mount when token exists', async () => {
-      localStorage.setItem('access', 'mock-access-token')
-      localStorage.setItem('refresh', 'mock-refresh-token')
+      const mockAccess = createMockAccessJwt()
+      const mockRefresh = createMockRefreshJwt()
+      localStorage.setItem('access', mockAccess)
+      localStorage.setItem('refresh', mockRefresh)
 
       const { result } = renderHook(() => useAuth(), {
         wrapper: createWrapper(),
       })
 
+      // First check that the hook returns something
+      await waitFor(() => {
+        expect(result.current).not.toBeNull()
+        expect(result.current).toBeDefined()
+      })
+
+      // Then check that user is fetched
       await waitFor(() => {
         expect(result.current.user).not.toBeNull()
         expect(result.current.user?.username).toBe('testuser')
@@ -374,8 +428,9 @@ describe('AuthContext', () => {
     })
 
     it('should handle failed user fetch gracefully', async () => {
-      localStorage.setItem('access', 'invalid-token')
-      localStorage.setItem('refresh', 'invalid-refresh')
+      const invalidToken = createExpiredJwt()
+      localStorage.setItem('access', invalidToken)
+      localStorage.setItem('refresh', invalidToken)
 
       // Mock user endpoint to return 401
       server.use(

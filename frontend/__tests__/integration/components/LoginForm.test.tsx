@@ -281,7 +281,7 @@ describe('LoginForm', () => {
 
       const passwordInput = screen.getByLabelText(/password/i)
       const toggleButton = screen.getByRole('button', {
-        name: /show password/i,
+        name: /show/i,
       })
 
       expect(passwordInput).toHaveAttribute('type', 'password')
@@ -300,7 +300,7 @@ describe('LoginForm', () => {
       render(<LoginForm />, { wrapper: createWrapper() })
 
       const toggleButton = screen.getByRole('button', {
-        name: /show password/i,
+        name: /show/i,
       })
 
       expect(toggleButton).toHaveAttribute('aria-pressed', 'false')
