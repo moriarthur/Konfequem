@@ -113,7 +113,7 @@ describe('bookingUtils', () => {
   // ========================================================================
 
   describe('findAvailableSlots', () => {
-    let testDate
+    let testDate: Date
 
     beforeEach(() => {
       testDate = new Date('2025-01-28T00:00:00+01:00')
@@ -155,7 +155,7 @@ describe('bookingUtils', () => {
       const bookingStart = DateTime.fromISO(bookings[0].start_time).setZone(OFFICE_TIMEZONE)
       const bookingEnd = DateTime.fromISO(bookings[0].end_time).setZone(OFFICE_TIMEZONE)
       
-      slots.forEach(slot => {
+      slots.forEach((slot: DateTime) => {
         const slotEnd = slot.plus({ minutes: OFFICE_HOURS.minDuration })
         expect(slotEnd <= bookingStart || slot >= bookingEnd).toBe(true)
       })
@@ -239,8 +239,8 @@ describe('bookingUtils', () => {
   // ========================================================================
 
   describe('getAvailableDurations', () => {
-    let testDate
-    let startTime
+    let testDate: Date
+    let startTime: Date
 
     beforeEach(() => {
       testDate = new Date('2025-01-28T00:00:00+01:00')
@@ -298,11 +298,11 @@ describe('bookingUtils', () => {
       expect(durations[1].label).toBe('30 min')
       
       // Find 60 min (1 hour)
-      const hourDuration = durations.find(d => d.minutes === 60)
+      const hourDuration = durations.find((d: { minutes: number }) => d.minutes === 60)
       expect(hourDuration?.label).toBe('1h')
-      
+
       // Find 90 min (1h 30m)
-      const hourHalfDuration = durations.find(d => d.minutes === 90)
+      const hourHalfDuration = durations.find((d: { minutes: number }) => d.minutes === 90)
       expect(hourHalfDuration?.label).toBe('1h 30m')
     })
 

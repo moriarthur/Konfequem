@@ -1,0 +1,34 @@
+export const BOOKING_CONSTANTS = {
+  MIN_DURATION: 15,
+  MAX_DURATION: 480,
+  MAX_ADVANCE_DAYS: 90,
+  CANCEL_BEFORE_START_MINUTES: 15,
+} as const;
+
+export const OFFICE_HOURS = {
+  START: 8,
+  END: 22,
+  TIMEZONE: "Europe/Berlin",
+} as const;
+
+export const TIME_SLOT = {
+  INTERVAL_MINUTES: 15,
+} as const;
+
+export const AUTH = {
+  ACCESS_TOKEN_LIFETIME_MINUTES: 30,
+  TOKEN_REFRESH_BUFFER_SECONDS: 30,
+} as const;
+
+export const PAGINATION = {
+  INITIAL_PAGE_SIZE: 10,
+  PAGE_INCREMENT: 10,
+} as const;
+
+export const UI = {
+  TOAST_DURATION_MS: 3000,
+  DEBOUNCE_DELAY_MS: 300,
+  ANIMATION_DURATION_MS: 300,
+} as const;
+
+export const { TOAST_DURATION_MS, DEBOUNCE_DELAY_MS, ANIMATION_DURATION_MS } = UI;

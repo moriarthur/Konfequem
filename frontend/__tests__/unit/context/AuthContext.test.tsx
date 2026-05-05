@@ -72,6 +72,8 @@ describe('AuthContext', () => {
     // Clear localStorage before each test
     localStorage.clear()
     vi.clearAllMocks()
+    // Reset MSW handlers to prevent handler leakage from server.use() calls
+    server.resetHandlers()
   })
 
   // ========================================================================
@@ -287,7 +289,8 @@ describe('AuthContext', () => {
         await result.current.login('testuser', 'testpass123')
       })
 
-      const originalToken = result.current.access
+      // Verify token is set after login
+      expect(result.current.access).not.toBeNull()
 
       // Make a request that triggers 401 then refresh
       // This would be tested through authFetch in a real scenario
@@ -337,12 +340,12 @@ describe('AuthContext', () => {
         })
       )
 
-      let response
+      let response: Record<string, unknown> | undefined
       await act(async () => {
         response = await result.current.authFetch('/api/test')
       })
 
-      expect(response.success).toBe(true)
+      expect(response!.success).toBe(true)
     })
 
     it('should handle 401 and refresh token', async () => {
@@ -367,44 +370,19 @@ describe('AuthContext', () => {
         })
       )
 
-      let response
+      let response: Record<string, unknown> | undefined
       await act(async () => {
         response = await result.current.authFetch('/api/test')
       })
 
-      expect(response.success).toBe(true)
+      expect(response!.success).toBe(true)
       expect(requestCount).toBe(2) // First 401, then success after refresh
     })
 
     it('should throw error when refresh fails', async () => {
-      const { result } = renderHook(() => useAuth(), {
-        wrapper: createWrapper(),
-      })
-
-      // Set an expired token that will fail refresh
-      localStorage.setItem('refresh', 'expired-refresh-token')
-      localStorage.setItem('access', 'expired-access-token')
-
-      server.use(
-        http.post('/api/token/refresh/', () => {
-          return HttpResponse.json({ error: 'Invalid token' }, { status: 401 })
-        })
-      )
-
-      await expect(
-        act(async () => {
-          await result.current.authFetch('/api/test')
-        })
-      ).rejects.toThrow()
-    })
-  })
-
-  // ========================================================================
-  // User Data Tests
-  // ========================================================================
-
-  describe('user data', () => {
-    it('should fetch user data on mount when token exists', async () => {
+      // This test verifies that authFetch throws when the refresh token is invalid.
+      // We test this by pre-setting tokens in localStorage and having the refresh
+      // endpoint return 401, simulating an expired refresh token scenario.
       const mockAccess = createMockAccessJwt()
       const mockRefresh = createMockRefreshJwt()
       localStorage.setItem('access', mockAccess)
@@ -414,16 +392,60 @@ describe('AuthContext', () => {
         wrapper: createWrapper(),
       })
 
-      // First check that the hook returns something
+      // Wait for initialization
       await waitFor(() => {
-        expect(result.current).not.toBeNull()
-        expect(result.current).toBeDefined()
+        expect(result.current.isAuthenticated).toBe(true)
       })
 
-      // Then check that user is fetched
+      // Override refresh endpoint to fail for this test
+      server.use(
+        http.post('http://localhost:8000/api/token/refresh/', () => {
+          return HttpResponse.json({ error: 'Invalid token' }, { status: 401 })
+        })
+      )
+
+      // Override test endpoint to return 401 (triggers refresh attempt)
+      server.use(
+        http.get('http://localhost:8000/api/test', () => {
+          return HttpResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        })
+      )
+
+      await expect(
+        result.current.authFetch('/api/test')
+      ).rejects.toThrow()
+    })
+  })
+
+  // ========================================================================
+  // User Data Tests
+  // ========================================================================
+
+  describe('user data', () => {
+    beforeEach(() => {
+      server.resetHandlers()
+    })
+
+    it('should fetch user data on mount when token exists', async () => {
+      const mockAccess = createMockAccessJwt()
+      const mockRefresh = createMockRefreshJwt()
+      localStorage.setItem('access', mockAccess)
+      localStorage.setItem('refresh', mockRefresh)
+
+      let result: ReturnType<typeof renderHook<ReturnType<typeof useAuth>, () => ReturnType<typeof useAuth>>>['result']
+
+      await act(async () => {
+        const hookResult = renderHook(() => useAuth(), {
+          wrapper: createWrapper(),
+        })
+        result = hookResult.result
+      })
+
       await waitFor(() => {
-        expect(result.current.user).not.toBeNull()
-        expect(result.current.user?.username).toBe('testuser')
+        if (!result!.current) throw new Error('Hook returned null')
+        expect(result!.current.isAuthenticated).toBe(true)
+        expect(result!.current.user).not.toBeNull()
+        expect(result!.current.user?.username).toBe('testuser')
       })
     })
 

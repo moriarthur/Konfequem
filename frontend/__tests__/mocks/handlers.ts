@@ -218,6 +218,43 @@ export const handlers = [
     return createErrorResponse('Invalid token', 401)
   }),
 
+  // Handle localhost:8000 variant (default API_URL in tests)
+  http.get('http://localhost:8000/api/users/me/', ({ request }) => {
+    const authHeader = request.headers.get('Authorization')
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return createErrorResponse('Authentication credentials were not provided', 401)
+    }
+
+    const token = authHeader.split(' ')[1]
+
+    if (token === createMockAccessJwt() ||
+        token.endsWith('.mock-signature') ||
+        token.startsWith('eyJ')) {
+      return createJsonResponse({
+        id: 1,
+        username: 'testuser',
+        email: 'test@example.com',
+        first_name: 'Test',
+      })
+    }
+
+    return createErrorResponse('Invalid token', 401)
+  }),
+
+  http.post('http://localhost:8000/api/token/refresh/', async ({ request }) => {
+    const body = await request.json() as { refresh: string }
+
+    if (body.refresh === createMockRefreshJwt() ||
+        body.refresh.endsWith('.mock-refresh-signature') ||
+        body.refresh.endsWith('.mock-signature') ||
+        body.refresh.startsWith('eyJ')) {
+      return createJsonResponse({ access: createMockAccessJwt() })
+    }
+
+    return createErrorResponse('Invalid refresh token', 401)
+  }),
+
   // ============================================================================
   // Room Handlers
   // ============================================================================
