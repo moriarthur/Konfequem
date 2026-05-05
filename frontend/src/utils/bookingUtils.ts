@@ -9,6 +9,8 @@ export const OFFICE_HOURS = {
   maxDuration: 8 * 60,
 };
 
+export const TOAST_DURATION_MS = 3000;
+
 export interface BookingData {
   start_time: string;
   end_time: string;

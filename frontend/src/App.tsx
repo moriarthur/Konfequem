@@ -3,10 +3,12 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import LoginForm from "./components/LoginForm";
 import Home from "./pages/Home";
 import RoomsPage from "./pages/RoomsPage";
+import NotFound from "./pages/NotFound";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { AlertProvider } from "./context/AlertContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { PageHeaderSkeleton } from "./components/ui/Skeleton";
+import LoadingSpinner from "./components/ui/LoadingSpinner";
 import "./index.css";
 
 const CalendarPage = lazy(() => import("./pages/CalendarPage"));
@@ -14,7 +16,13 @@ const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 
 function PrivateRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface-muted">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
   return isAuthenticated ? children : <Navigate to="/login" />;
 }
 
@@ -66,7 +74,7 @@ export default function App() {
                   </PrivateRoute>
                 }
               />
-              <Route path="*" element={<Navigate to="/" />} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </Router>
         </AlertProvider>

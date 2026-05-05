@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { FiX, FiCheckCircle, FiAlertCircle, FiAlertTriangle, FiInfo } from "react-icons/fi";
-import { TOAST_DURATION_MS } from "../../config/booking";
+import { TOAST_DURATION_MS } from "../../utils/bookingUtils";
 
 type ToastType = "success" | "error" | "warning" | "info";
 

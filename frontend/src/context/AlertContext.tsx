@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useRef, type ReactNode } from "react";
-import { TOAST_DURATION_MS } from "../config/booking";
+import { TOAST_DURATION_MS } from "../utils/bookingUtils";
 import ToastContainer from "../components/ui/ToastContainer";
 
 interface Toast {
