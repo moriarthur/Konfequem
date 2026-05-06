@@ -151,3 +151,52 @@ class CurrentUserView(APIView):
             "email": user.email,
             "first_name": user.first_name,
         })
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        old_password = request.data.get("old_password", "")
+        new_password = request.data.get("new_password", "")
+        confirm_password = request.data.get("confirm_password", "")
+
+        if not old_password or not new_password or not confirm_password:
+            return Response(
+                {"error": "All fields are required."},
+                status=400,
+            )
+
+        if not user.check_password(old_password):
+            return Response(
+                {"error": "Current password is incorrect."},
+                status=400,
+            )
+
+        if new_password != confirm_password:
+            return Response(
+                {"error": "New passwords do not match."},
+                status=400,
+            )
+
+        if old_password == new_password:
+            return Response(
+                {"error": "New password must be different from current password."},
+                status=400,
+            )
+
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        try:
+            validate_password(new_password, user=user)
+        except DjangoValidationError as e:
+            return Response(
+                {"error": e.messages[0]},
+                status=400,
+            )
+
+        user.set_password(new_password)
+        user.save()
+        return Response({"message": "Password changed successfully."})
