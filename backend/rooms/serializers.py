@@ -4,10 +4,12 @@ from datetime import timedelta
 from .models import Booking, Room, RoomFeature
 from django.db.models import Q
 
+
 class RoomFeatureSerializer(serializers.ModelSerializer):
     class Meta:
         model = RoomFeature
-        fields = ['id', 'name', 'icon']
+        fields = ["id", "name", "icon"]
+
 
 class BookingSerializer(serializers.ModelSerializer):
     room_name = serializers.CharField(source="room.name", read_only=True)
@@ -16,29 +18,27 @@ class BookingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Booking
-        fields = ['id', 'room', 'room_name', 'start_time', 'end_time', 'user', 'status']
-        
+        fields = ["id", "room", "room_name", "start_time", "end_time", "user", "status"]
+
     def to_representation(self, instance):
         """Convert times to Berlin timezone for consistent display"""
         ret = super().to_representation(instance)
         berlin_tz = timezone.get_default_timezone()
-        ret['start_time'] = instance.start_time.astimezone(berlin_tz).isoformat()
-        ret['end_time'] = instance.end_time.astimezone(berlin_tz).isoformat()
+        ret["start_time"] = instance.start_time.astimezone(berlin_tz).isoformat()
+        ret["end_time"] = instance.end_time.astimezone(berlin_tz).isoformat()
         return ret
-    
+
     def validate(self, data):
         errors = []
         # For partial updates, use instance values for missing fields
         if self.partial and self.instance:
-            start = data.get('start_time', self.instance.start_time)
-            end = data.get('end_time', self.instance.end_time)
-            room = data.get('room', self.instance.room)
+            start = data.get("start_time", self.instance.start_time)
+            end = data.get("end_time", self.instance.end_time)
+            room = data.get("room", self.instance.room)
         else:
-            start = data.get('start_time')
-            end = data.get('end_time')
-            room = data.get('room')
-
-        user = self.context['request'].user
+            start = data.get("start_time")
+            end = data.get("end_time")
+            room = data.get("room")
 
         now = timezone.now()
 
@@ -70,13 +70,15 @@ class BookingSerializer(serializers.ModelSerializer):
             duration = (end - start).total_seconds() / 60
             if duration < 15:
                 errors.append("Booking must be at least 15 minutes.")
-            if duration > 8*60:
+            if duration > 8 * 60:
                 errors.append("Booking cannot exceed 8 hours.")
 
             # Max advance booking
-            max_days = getattr(Booking, 'MAX_DAYS_AHEAD', 90)
+            max_days = getattr(Booking, "MAX_DAYS_AHEAD", 90)
             if start > now + timedelta(days=max_days):
-                errors.append(f"Booking cannot be more than {max_days} days in advance.")
+                errors.append(
+                    f"Booking cannot be more than {max_days} days in advance."
+                )
 
         # --- Logical validation ---
         if room and start and end:
@@ -91,7 +93,9 @@ class BookingSerializer(serializers.ModelSerializer):
             if self.instance:
                 overlapping = overlapping.exclude(pk=self.instance.pk)
             if overlapping.exists():
-                errors.append("This room is already booked for the selected time range.")
+                errors.append(
+                    "This room is already booked for the selected time range."
+                )
 
         # --- Company rules ---
         # Resource validation can be added here if needed in the future
@@ -103,9 +107,10 @@ class BookingSerializer(serializers.ModelSerializer):
 
     # User is assigned in the viewset's perform_create
 
+
 class RoomSerializer(serializers.ModelSerializer):
     features = RoomFeatureSerializer(many=True, read_only=True)
 
     class Meta:
         model = Room
-        fields = ['id', 'name', 'location', 'capacity', 'features']
+        fields = ["id", "name", "location", "capacity", "features"]

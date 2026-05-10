@@ -12,11 +12,11 @@ import { setupServer } from 'msw/node'
 // Helper Functions
 // ============================================================================
 
-const createJsonResponse = (data, status = 200) => {
+const createJsonResponse = (data: Record<string, unknown> | Record<string, unknown>[], status = 200) => {
   return HttpResponse.json(data, { status })
 }
 
-const createErrorResponse = (message, status = 400) => {
+const createErrorResponse = (message: string | Record<string, string[]>, status = 400) => {
   return HttpResponse.json({ detail: message }, { status })
 }
 

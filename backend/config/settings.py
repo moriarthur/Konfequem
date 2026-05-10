@@ -28,7 +28,9 @@ DEBUG = config("DJANGO_DEBUG", default=False, cast=bool)
 IS_DOCKER = config("DOCKER", default=False, cast=bool)
 
 # Allowed hosts from comma-separated .env variable
-ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "").split(",") if host.strip()]
+ALLOWED_HOSTS = [
+    host.strip() for host in os.getenv("ALLOWED_HOSTS", "").split(",") if host.strip()
+]
 
 # If ALLOWED_HOSTS is empty and we're in DEBUG or running inside Docker, allow all hosts
 if not ALLOWED_HOSTS:
@@ -51,7 +53,7 @@ DATABASES = {
 }
 
 # ==== Timezone settings ====
-TIME_ZONE = 'Europe/Berlin'
+TIME_ZONE = "Europe/Berlin"
 USE_TZ = True
 
 # ==== Application definition ====
@@ -103,7 +105,12 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {
+        "NAME": (  # noqa: E501
+            "django.contrib.auth.password_validation."
+            "UserAttributeSimilarityValidator"
+        )
+    },
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
@@ -148,7 +155,8 @@ REST_FRAMEWORK = {
 }
 
 # JWT settings for rest_framework_simplejwt
-from datetime import timedelta
+from datetime import timedelta  # noqa: E402
+
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
@@ -164,7 +172,7 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS",
     default="http://localhost:5173,http://localhost:5174,http://localhost:5175",
-    cast=lambda v: [origin.strip() for origin in v.split(",")]
+    cast=lambda v: [origin.strip() for origin in v.split(",")],
 )
 CORS_ALLOW_CREDENTIALS = True  # Required for cookies
 
@@ -172,7 +180,7 @@ CORS_ALLOW_CREDENTIALS = True  # Required for cookies
 CSRF_TRUSTED_ORIGINS = config(
     "CSRF_TRUSTED_ORIGINS",
     default="http://localhost:5173,http://localhost:5174,http://localhost:5175",
-    cast=lambda v: [origin.strip() for origin in v.split(",")]
+    cast=lambda v: [origin.strip() for origin in v.split(",")],
 )
 
 # Cookie security settings for production
@@ -180,7 +188,7 @@ CSRF_TRUSTED_ORIGINS = config(
 if not DEBUG:
     CSRF_COOKIE_SECURE = True
     CSRF_COOKIE_HTTPONLY = True
-    CSRF_COOKIE_SAMESITE = 'Lax'
+    CSRF_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_SAMESITE = "Lax"

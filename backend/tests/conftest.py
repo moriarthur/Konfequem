@@ -6,7 +6,7 @@ including database fixtures, authentication helpers, and test data factories.
 """
 
 import pytest
-from datetime import datetime, timedelta, time
+from datetime import timedelta, time
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
@@ -22,10 +22,10 @@ User = get_user_model()
 # Timezone Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def berlin_tz():
     """Return the Berlin timezone object."""
-    from django.conf import settings
     return timezone.get_default_timezone()
 
 
@@ -57,15 +57,16 @@ def office_hours_end():
 # Authentication Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def user(db):
     """Create a standard test user."""
     return User.objects.create_user(
-        username='testuser',
-        email='testuser@example.com',
-        password='testpass123',
-        first_name='Test',
-        last_name='User'
+        username="testuser",
+        email="testuser@example.com",
+        password="testpass123",
+        first_name="Test",
+        last_name="User",
     )
 
 
@@ -73,12 +74,12 @@ def user(db):
 def staff_user(db):
     """Create a staff user for admin tests."""
     return User.objects.create_user(
-        username='staffuser',
-        email='staff@example.com',
-        password='staffpass123',
-        first_name='Staff',
-        last_name='User',
-        is_staff=True
+        username="staffuser",
+        email="staff@example.com",
+        password="staffpass123",
+        first_name="Staff",
+        last_name="User",
+        is_staff=True,
     )
 
 
@@ -86,7 +87,7 @@ def staff_user(db):
 def authenticated_client(client, user):
     """Return an authenticated APIClient for the given user."""
     refresh = RefreshToken.for_user(user)
-    client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
     return client
 
 
@@ -100,7 +101,7 @@ def api_client():
 def authenticated_api_client(api_client, user):
     """Return an authenticated APIClient instance."""
     refresh = RefreshToken.for_user(user)
-    api_client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
     return api_client
 
 
@@ -108,41 +109,32 @@ def authenticated_api_client(api_client, user):
 # Model Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def room(db):
     """Create a standard test room."""
     return Room.objects.create(
-        name='Conference Room A',
-        location='Floor 1',
-        capacity=10
+        name="Conference Room A", location="Floor 1", capacity=10
     )
 
 
 @pytest.fixture
 def small_room(db):
     """Create a small room (capacity 2)."""
-    return Room.objects.create(
-        name='Huddle Room',
-        location='Floor 2',
-        capacity=2
-    )
+    return Room.objects.create(name="Huddle Room", location="Floor 2", capacity=2)
 
 
 @pytest.fixture
 def large_room(db):
     """Create a large room (capacity 50)."""
-    return Room.objects.create(
-        name='Main Hall',
-        location='Ground Floor',
-        capacity=50
-    )
+    return Room.objects.create(name="Main Hall", location="Ground Floor", capacity=50)
 
 
 @pytest.fixture
 def rooms(db):
     """Create multiple test rooms."""
     rooms = [
-        Room(name=f'Room {i}', location=f'Floor {i % 3}', capacity=5 + i * 5)
+        Room(name=f"Room {i}", location=f"Floor {i % 3}", capacity=5 + i * 5)
         for i in range(1, 6)
     ]
     return Room.objects.bulk_create(rooms)
@@ -151,6 +143,7 @@ def rooms(db):
 # ============================================================================
 # Booking Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def future_start_time(utc_now):
@@ -162,7 +155,9 @@ def future_start_time(utc_now):
     if local_time.hour < 8:
         future = future.replace(hour=8, minute=0, second=0, microsecond=0)
     elif local_time.hour >= 22:
-        future = future.replace(hour=8, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        future = future.replace(hour=8, minute=0, second=0, microsecond=0) + timedelta(
+            days=1
+        )
     return future
 
 
@@ -173,7 +168,7 @@ def booking(db, user, room, future_start_time):
         room=room,
         user=user,
         start_time=future_start_time,
-        end_time=future_start_time + timedelta(hours=2)
+        end_time=future_start_time + timedelta(hours=2),
     )
 
 
@@ -185,7 +180,7 @@ def past_booking(db, user, room):
         room=room,
         user=user,
         start_time=past_time,
-        end_time=past_time + timedelta(hours=1)
+        end_time=past_time + timedelta(hours=1),
     )
 
 
@@ -194,23 +189,26 @@ def today_bookings(db, user, room, berlin_now):
     """Create multiple bookings for today for testing overlap logic."""
     bookings = []
     base_time = berlin_now.replace(hour=9, minute=0, second=0, microsecond=0)
-    
+
     # Create non-overlapping bookings
     for i in range(3):
         start = base_time + timedelta(hours=i * 3)
-        bookings.append(Booking(
-            room=room,
-            user=user,
-            start_time=start,
-            end_time=start + timedelta(hours=2)
-        ))
-    
+        bookings.append(
+            Booking(
+                room=room,
+                user=user,
+                start_time=start,
+                end_time=start + timedelta(hours=2),
+            )
+        )
+
     return Booking.objects.bulk_create(bookings)
 
 
 # ============================================================================
 # Time-based fixtures for testing edge cases
 # ============================================================================
+
 
 @pytest.fixture
 def frozen_time():
@@ -246,14 +244,12 @@ def beyond_max_booking_date(utc_now):
 # JWT Token Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def jwt_tokens(user):
     """Return access and refresh tokens for the given user."""
     refresh = RefreshToken.for_user(user)
-    return {
-        'access': str(refresh.access_token),
-        'refresh': str(refresh)
-    }
+    return {"access": str(refresh.access_token), "refresh": str(refresh)}
 
 
 @pytest.fixture
@@ -267,13 +263,14 @@ def expired_token():
 # Test Data Generators
 # ============================================================================
 
+
 @pytest.fixture
 def booking_data(room, future_start_time):
     """Return valid booking data dict for API requests."""
     return {
-        'room': room.id,
-        'start_time': future_start_time.isoformat(),
-        'end_time': (future_start_time + timedelta(hours=2)).isoformat()
+        "room": room.id,
+        "start_time": future_start_time.isoformat(),
+        "end_time": (future_start_time + timedelta(hours=2)).isoformat(),
     }
 
 
@@ -281,9 +278,9 @@ def booking_data(room, future_start_time):
 def invalid_booking_data(room, utc_now):
     """Return invalid booking data for testing validation."""
     return {
-        'room': room.id,
-        'start_time': (utc_now - timedelta(hours=1)).isoformat(),  # Past time
-        'end_time': utc_now.isoformat()
+        "room": room.id,
+        "start_time": (utc_now - timedelta(hours=1)).isoformat(),  # Past time
+        "end_time": utc_now.isoformat(),
     }
 
 
@@ -291,10 +288,12 @@ def invalid_booking_data(room, utc_now):
 # Cleanup
 # ============================================================================
 
+
 @pytest.fixture(autouse=True)
 def clear_cache():
     """Clear Django cache before each test."""
     from django.core.cache import cache
+
     cache.clear()
     yield
     cache.clear()

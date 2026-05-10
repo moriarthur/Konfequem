@@ -1,17 +1,20 @@
 from rest_framework import viewsets
-from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from datetime import datetime
 from django.utils import timezone
 
 from .models import Room, Booking, RoomFeature
-from .serializers import RoomSerializer, BookingSerializer, RoomFeatureSerializer
+from .serializers import (
+    RoomSerializer,
+    BookingSerializer,
+    RoomFeatureSerializer,
+)
 
 
 class RoomViewSet(viewsets.ReadOnlyModelViewSet):
     """Read-only view for rooms."""
+
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
     permission_classes = [AllowAny]
@@ -19,6 +22,7 @@ class RoomViewSet(viewsets.ReadOnlyModelViewSet):
 
 class RoomFeatureViewSet(viewsets.ReadOnlyModelViewSet):
     """Read-only view for room features."""
+
     queryset = RoomFeature.objects.all()
     serializer_class = RoomFeatureSerializer
     permission_classes = [AllowAny]
@@ -26,6 +30,7 @@ class RoomFeatureViewSet(viewsets.ReadOnlyModelViewSet):
 
 class BookingViewSet(viewsets.ModelViewSet):
     """CRUD view for bookings; user must be authenticated."""
+
     serializer_class = BookingSerializer
     permission_classes = [IsAuthenticated]
 
@@ -33,17 +38,17 @@ class BookingViewSet(viewsets.ModelViewSet):
         user = self.request.user
         queryset = Booking.objects.filter(user=user)
 
-        room_id = self.request.query_params.get('room')
-        date_str = self.request.query_params.get('date')
-        month_str = self.request.query_params.get('month')  # YYYY-MM format
+        room_id = self.request.query_params.get("room")
+        date_str = self.request.query_params.get("date")
+        month_str = self.request.query_params.get("month")  # YYYY-MM format
 
         if room_id:
             queryset = queryset.filter(room_id=room_id)
-        
+
         if month_str:
             # Parse YYYY-MM format
             try:
-                parts = month_str.split('-')
+                parts = month_str.split("-")
                 if len(parts) != 2:
                     raise ValueError("Month parameter must be in YYYY-MM format")
                 year, month = map(int, parts)
@@ -51,18 +56,19 @@ class BookingViewSet(viewsets.ModelViewSet):
                     raise ValueError("Invalid year or month values")
                 # Get all bookings for the month
                 queryset = queryset.filter(
-                    start_time__year=year,
-                    start_time__month=month
+                    start_time__year=year, start_time__month=month
                 )
             except (ValueError, TypeError) as e:
                 # Return proper error response instead of silent failure
                 from rest_framework.exceptions import ValidationError
-                raise ValidationError(f"Invalid month parameter '{month_str}': {str(e)}")
+
+                raise ValidationError(
+                    f"Invalid month parameter '{month_str}': {str(e)}"
+                )
         elif date_str:
             queryset = queryset.filter(start_time__date=date_str)
 
-        return queryset.select_related('room')
-
+        return queryset.select_related("room")
 
     def perform_create(self, serializer):
         # Attach current user to booking
@@ -77,10 +83,14 @@ class BookingViewSet(viewsets.ModelViewSet):
         # Check if booking is in progress or ended before allowing update
         if now >= instance.end_time:
             from rest_framework.exceptions import PermissionDenied
+
             raise PermissionDenied("Cannot modify a booking that has already ended.")
         if now >= instance.start_time:
             from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied("Cannot modify a booking that is currently in progress.")
+
+            raise PermissionDenied(
+                "Cannot modify a booking that is currently in progress."
+            )
 
         # Proceed with normal update flow
         return super().update(request, *args, **kwargs)
@@ -89,18 +99,23 @@ class BookingViewSet(viewsets.ModelViewSet):
         # Ensure user can only modify their own bookings
         if serializer.instance.user != self.request.user:
             from rest_framework.exceptions import PermissionDenied
+
             raise PermissionDenied("You can only modify your own bookings")
 
-        # Prevent modification of bookings that are currently in progress or already ended
+        # Prevent modification of bookings in progress or already ended
         now = timezone.now()
         booking = serializer.instance
 
         if now >= booking.end_time:
             from rest_framework.exceptions import PermissionDenied
+
             raise PermissionDenied("Cannot modify a booking that has already ended.")
         if now >= booking.start_time:
             from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied("Cannot modify a booking that is currently in progress.")
+
+            raise PermissionDenied(
+                "Cannot modify a booking that is currently in progress."
+            )
 
         return super().perform_update(serializer)
 
@@ -113,10 +128,14 @@ class BookingViewSet(viewsets.ModelViewSet):
         # Check if booking is in progress or ended before allowing deletion
         if now >= instance.end_time:
             from rest_framework.exceptions import PermissionDenied
+
             raise PermissionDenied("Cannot delete a booking that has already ended.")
         if now >= instance.start_time:
             from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied("Cannot delete a booking that is currently in progress.")
+
+            raise PermissionDenied(
+                "Cannot delete a booking that is currently in progress."
+            )
 
         # Proceed with normal delete flow
         return super().destroy(request, *args, **kwargs)
@@ -125,6 +144,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         # Ensure user can only delete their own bookings
         if instance.user != self.request.user:
             from rest_framework.exceptions import PermissionDenied
+
             raise PermissionDenied("You can only delete your own bookings")
 
         # Prevent deletion of bookings that are currently in progress or already ended
@@ -132,10 +152,14 @@ class BookingViewSet(viewsets.ModelViewSet):
 
         if now >= instance.end_time:
             from rest_framework.exceptions import PermissionDenied
+
             raise PermissionDenied("Cannot delete a booking that has already ended.")
         if now >= instance.start_time:
             from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied("Cannot delete a booking that is currently in progress.")
+
+            raise PermissionDenied(
+                "Cannot delete a booking that is currently in progress."
+            )
 
         return super().perform_destroy(instance)
 
@@ -145,12 +169,14 @@ class CurrentUserView(APIView):
 
     def get(self, request):
         user = request.user
-        return Response({
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "first_name": user.first_name,
-        })
+        return Response(
+            {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+            }
+        )
 
 
 class ChangePasswordView(APIView):

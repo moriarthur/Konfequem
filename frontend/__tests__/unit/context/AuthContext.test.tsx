@@ -58,7 +58,7 @@ const createExpiredJwt = () => {
 
 // Wrapper component for testing hooks
 function createWrapper() {
-  return function AuthWrapper({ children }) {
+  return function AuthWrapper({ children }: { children: React.ReactNode }) {
     return <AuthProvider>{children}</AuthProvider>
   }
 }

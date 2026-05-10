@@ -1,19 +1,30 @@
 from django.db import models
 from django.contrib.auth import get_user_model
-from django.core.validators import MinValueValidator, MaxValueValidator, ValidationError, RegexValidator
+from django.core.validators import (
+    MinValueValidator,
+    MaxValueValidator,
+    ValidationError,
+    RegexValidator,
+)
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Q
 
 User = get_user_model()
 
+
 class RoomFeature(models.Model):
     """Features/amenities that rooms can have."""
+
     name = models.CharField(max_length=100)
     icon = models.CharField(
         max_length=50,
         blank=True,
-        help_text="Icon name for UI (e.g., 'projector', 'wifi', 'coffee', 'capacity', 'whiteboard', 'phone', 'tv')"
+        help_text=(
+            "Icon name for UI "
+            "(e.g., 'projector', 'wifi', 'coffee', 'capacity', "
+            "'whiteboard', 'phone', 'tv')"
+        ),
     )
 
     def __str__(self):
@@ -24,46 +35,55 @@ class RoomFeature(models.Model):
         verbose_name_plural = "Room Features"
         ordering = ["name"]
 
+
 class Room(models.Model):
     """Room model."""
+
     name = models.CharField(
         max_length=100,
         validators=[
             RegexValidator(
-                r'^[a-zA-Z0-9\s\-\.]+$',
-                message='Room name can only contain letters, numbers, spaces, hyphens, and periods.'
+                r"^[a-zA-Z0-9\s\-\.]+$",
+                message=(
+                    "Room name can only contain letters, numbers, "
+                    "spaces, hyphens, and periods."
+                ),
             )
-        ]
+        ],
     )
     location = models.CharField(max_length=100, blank=True)
-    capacity = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(50)])
+    capacity = models.PositiveIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(50)]
+    )
     features = models.ManyToManyField(
         RoomFeature,
         blank=True,
         related_name="rooms",
-        help_text="Amenities and equipment available in this room"
+        help_text="Amenities and equipment available in this room",
     )
 
     def __str__(self):
         return self.name
 
+
 class Booking(models.Model):
     """Booking model with minimal backend validation."""
-    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name='bookings')
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bookings')
+
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="bookings")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="bookings")
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     status = models.CharField(
         max_length=20,
-        default='ongoing',
+        default="ongoing",
         choices=[
-            ('ongoing', 'Ongoing'),
-            ('completed', 'Completed'),
-            ('cancelled', 'Cancelled')
+            ("ongoing", "Ongoing"),
+            ("completed", "Completed"),
+            ("cancelled", "Cancelled"),
         ],
-        help_text='Current status of the booking'
+        help_text="Current status of the booking",
     )
     date = models.DateField(db_index=True)
 
@@ -74,11 +94,18 @@ class Booking(models.Model):
         now = timezone.now()
 
         if self.start_time < now:
-            raise ValidationError({'start_time': "Start time cannot be in the past."})
+            raise ValidationError({"start_time": "Start time cannot be in the past."})
         if self.end_time <= self.start_time:
-            raise ValidationError({'end_time': "End time must be after start time."})
+            raise ValidationError({"end_time": "End time must be after start time."})
         if self.start_time > now + timedelta(days=self.MAX_DAYS_AHEAD):
-            raise ValidationError({'start_time': f"Booking cannot be more than {self.MAX_DAYS_AHEAD} days in advance."})
+            raise ValidationError(
+                {
+                    "start_time": (
+                        f"Booking cannot be more than "
+                        f"{self.MAX_DAYS_AHEAD} days in advance."
+                    )
+                }
+            )
 
         overlapping = Booking.objects.filter(room=self.room).filter(
             Q(start_time__lt=self.end_time) & Q(end_time__gt=self.start_time)
@@ -86,7 +113,13 @@ class Booking(models.Model):
         if self.pk:
             overlapping = overlapping.exclude(pk=self.pk)
         if overlapping.exists():
-            raise ValidationError({'non_field_errors': "This room is already booked for the selected time range."})
+            raise ValidationError(
+                {
+                    "non_field_errors": (
+                        "This room is already booked for " "the selected time range."
+                    )
+                }
+            )
 
     def save(self, *args, **kwargs):
         if self.start_time:
@@ -97,4 +130,3 @@ class Booking(models.Model):
         start_str = self.start_time.strftime("%H:%M")
         end_str = self.end_time.strftime("%H:%M")
         return f"{self.room.name} — {start_str} to {end_str}"
-
