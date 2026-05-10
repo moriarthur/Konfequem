@@ -33,7 +33,17 @@ export default function ProfilePage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Password strength calculation
+  // Password requirements checks (matching Django validators)
+  const pw = passwordForm.new_password;
+  const pwChecks = [
+    { met: pw.length >= 8, label: "At least 8 characters" },
+    { met: /[A-Z]/.test(pw) && /[a-z]/.test(pw), label: "Uppercase and lowercase letters" },
+    { met: /[0-9]/.test(pw), label: "At least one number" },
+    { met: !/^\d+$/.test(pw), label: "Not entirely numeric" },
+  ];
+  const allPwMet = pw.length > 0 && pwChecks.every((c) => c.met);
+
+  // Password strength
   const getPasswordStrength = (password: string): { level: number; label: string; color: string } => {
     if (!password) return { level: 0, label: "", color: "" };
     let score = 0;
@@ -303,7 +313,7 @@ export default function ProfilePage() {
                     onChange={(e) => setPasswordForm(f => ({ ...f, old_password: e.target.value }))}
                     className="w-full px-3 py-2 pr-10 border border-border-subtle rounded-lg bg-surface-base text-accent-secondary"
                   />
-                  <button type="button" onClick={() => setShowOldPassword(!showOldPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-accent-secondary/60 hover:text-accent-secondary" aria-label={showOldPassword ? "Hide" : "Show"}>
+                  <button type="button" tabIndex={-1} onClick={() => setShowOldPassword(!showOldPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-accent-secondary/60 hover:text-accent-secondary" aria-label={showOldPassword ? "Hide" : "Show"}>
                     {showOldPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
                   </button>
                 </div>
@@ -317,13 +327,13 @@ export default function ProfilePage() {
                     onChange={(e) => setPasswordForm(f => ({ ...f, new_password: e.target.value }))}
                     className="w-full px-3 py-2 pr-10 border border-border-subtle rounded-lg bg-surface-base text-accent-secondary"
                   />
-                  <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-accent-secondary/60 hover:text-accent-secondary" aria-label={showNewPassword ? "Hide" : "Show"}>
+                  <button type="button" tabIndex={-1} onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-accent-secondary/60 hover:text-accent-secondary" aria-label={showNewPassword ? "Hide" : "Show"}>
                     {showNewPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
                   </button>
                 </div>
                 {passwordForm.new_password && (
-                  <div className="mt-2">
-                    <div className="flex gap-1 mb-1">
+                  <div className="mt-2 space-y-1.5">
+                    <div className="flex gap-1">
                       {[1, 2, 3, 4].map((i) => (
                         <div
                           key={i}
@@ -333,9 +343,20 @@ export default function ProfilePage() {
                         />
                       ))}
                     </div>
-                    <p className={`text-xs ${strength.level <= 1 ? "text-status-danger" : strength.level <= 2 ? "text-status-warning" : "text-status-success"}`}>
-                      {strength.label}
-                    </p>
+                    <ul className="space-y-0.5">
+                      {pwChecks.map((c) => (
+                        <li key={c.label} className={`flex items-center gap-1.5 text-xs ${c.met ? "text-status-success" : "text-accent-secondary/50"}`}>
+                          <svg viewBox="0 0 16 16" className="w-3.5 h-3.5 flex-shrink-0" fill="none">
+                            {c.met ? (
+                              <path d="M3 8.5L6.5 12L13 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            ) : (
+                              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5"/>
+                            )}
+                          </svg>
+                          {c.label}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>
@@ -349,7 +370,7 @@ export default function ProfilePage() {
                     onKeyDown={(e) => { if (e.key === "Enter") handleChangePassword(); }}
                     className="w-full px-3 py-2 pr-10 border border-border-subtle rounded-lg bg-surface-base text-accent-secondary"
                   />
-                  <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-accent-secondary/60 hover:text-accent-secondary" aria-label={showConfirmPassword ? "Hide" : "Show"}>
+                  <button type="button" tabIndex={-1} onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-accent-secondary/60 hover:text-accent-secondary" aria-label={showConfirmPassword ? "Hide" : "Show"}>
                     {showConfirmPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
                   </button>
                 </div>
