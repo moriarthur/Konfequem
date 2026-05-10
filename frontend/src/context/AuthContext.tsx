@@ -29,7 +29,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   loading: boolean;
   login: (username: string, password: string) => Promise<Record<string, unknown>>;
-  logout: () => void;
+  logout: () => Promise<void>;
   authFetch: <T = unknown>(url: string, options?: RequestInit) => Promise<T>;
   authFetchRef: React.RefObject<((url: string, options?: RequestInit) => Promise<unknown>) | null>;
   user: Record<string, unknown> | null;
@@ -54,16 +54,16 @@ const TOKEN_STORAGE = {
       else localStorage.removeItem("access");
       if (refresh) localStorage.setItem("refresh", refresh);
       else localStorage.removeItem("refresh");
-    } catch (e) {
-      console.error("Failed to store tokens:", e);
+    } catch {
+      // localStorage unavailable (private browsing, quota exceeded)
     }
   },
   clear() {
     try {
       localStorage.removeItem("access");
       localStorage.removeItem("refresh");
-    } catch (e) {
-      console.error("Failed to clear tokens:", e);
+    } catch {
+      // localStorage unavailable
     }
   },
 };
@@ -101,14 +101,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const userFetchedRef = useRef(false);
   const authFetchRef = useRef<((url: string, options?: RequestInit) => Promise<unknown>) | null>(null);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    const currentRefresh = refresh;
     setAccess(null);
     setRefresh(null);
     setIsAuthenticated(false);
     setUser(null);
     TOKEN_STORAGE.clear();
     userFetchedRef.current = false;
-  }, []);
+
+    if (currentRefresh) {
+      try {
+        await fetch(`${API_URL}/api/token/blacklist/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh: currentRefresh }),
+        });
+      } catch {
+        // Best-effort — don't block logout if blacklist fails
+      }
+    }
+  }, [refresh]);
 
   const refreshAccessToken = useCallback(async (): Promise<string | null> => {
     if (!refresh || refreshPromise.current) {

@@ -8,6 +8,7 @@ from .views import (
     ChangePasswordView,
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.views import TokenBlacklistView
 
 router = DefaultRouter()
 router.register(r"rooms", RoomViewSet)
@@ -18,6 +19,7 @@ urlpatterns = [
     path("", include(router.urls)),
     path("token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("token/blacklist/", TokenBlacklistView.as_view(), name="token_blacklist"),
     path("users/me/", CurrentUserView.as_view(), name="current_user"),
     path(
         "users/change-password/", ChangePasswordView.as_view(), name="change_password"

@@ -147,21 +147,28 @@ def rooms(db):
 
 @pytest.fixture
 def future_start_time(utc_now):
-    """Return a start time 1 hour in the future (within office hours)."""
-    future = utc_now + timedelta(hours=1)
-    # Ensure we're within office hours (8:00 - 22:00 Berlin time)
+    """Return a start time in the future, within office hours (8-22 Berlin)."""
     berlin_tz = timezone.get_default_timezone()
-    local_time = future.astimezone(berlin_tz)
-    if local_time.hour < 8:
-        future = future.replace(hour=8, minute=0, second=0, microsecond=0)
-    elif local_time.hour >= 20:
-        # Ensure at least 2 hours of buffer before office close (22:00)
-        future = (
-            (future + timedelta(days=1))
-            .astimezone(berlin_tz)
-            .replace(hour=10, minute=0, second=0, microsecond=0)
+    local_time = utc_now.astimezone(berlin_tz)
+
+    # Start with tomorrow 10:00 as safe default, then try today if possible
+    candidate = (local_time + timedelta(days=1)).replace(
+        hour=10, minute=0, second=0, microsecond=0
+    )
+
+    # If there's still time today (before 20:00), use today at +1h rounded up
+    if local_time.hour < 20:
+        today_candidate = local_time + timedelta(hours=1)
+        today_candidate = today_candidate.replace(
+            minute=0, second=0, microsecond=0
         )
-    return future
+        if today_candidate.hour < 8:
+            today_candidate = today_candidate.replace(hour=8)
+        # Make sure it's actually in the future
+        if today_candidate > local_time:
+            candidate = today_candidate
+
+    return candidate
 
 
 @pytest.fixture
@@ -188,10 +195,10 @@ def past_booking(db, user, room):
 
 
 @pytest.fixture
-def today_bookings(db, user, room, berlin_now):
-    """Create multiple bookings for today for testing overlap logic."""
+def today_bookings(db, user, room, future_start_time):
+    """Create multiple bookings starting from future_start_time."""
     bookings = []
-    base_time = berlin_now.replace(hour=9, minute=0, second=0, microsecond=0)
+    base_time = future_start_time
 
     # Create non-overlapping bookings
     for i in range(3):
