@@ -6,6 +6,9 @@ Imports from main settings and overrides database for SQLite testing.
 
 from config.settings import *  # noqa: F403,F405
 
+# Allow test server host
+ALLOWED_HOSTS = ["*"]
+
 # Override database to use SQLite for local testing
 DATABASES = {
     "default": {

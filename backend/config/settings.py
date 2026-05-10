@@ -21,7 +21,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 # ==== Django core settings ====
-SECRET_KEY = config("DJANGO_SECRET_KEY", default="unsafe-secret-key")
+SECRET_KEY = config("DJANGO_SECRET_KEY")
 DEBUG = config("DJANGO_DEBUG", default=False, cast=bool)
 
 # Check if running in Docker (used for conditional logic below)
@@ -123,6 +123,7 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -142,16 +143,15 @@ REST_FRAMEWORK = {
     # Pagination settings
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 100,
-    # Rate limiting - DISABLED for development
-    # Enable in production by uncommenting below
-    # "DEFAULT_THROTTLE_CLASSES": [
-    #     "rest_framework.throttling.AnonRateThrottle",
-    #     "rest_framework.throttling.UserRateThrottle"
-    # ],
-    # "DEFAULT_THROTTLE_RATES": {
-    #     "anon": "30/min",
-    #     "user": "60/min",
-    # },
+    # Rate limiting
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "30/min",
+        "user": "60/min",
+    },
 }
 
 # JWT settings for rest_framework_simplejwt
@@ -184,7 +184,6 @@ CSRF_TRUSTED_ORIGINS = config(
 )
 
 # Cookie security settings for production
-# Only apply these settings when not in DEBUG mode
 if not DEBUG:
     CSRF_COOKIE_SECURE = True
     CSRF_COOKIE_HTTPONLY = True
@@ -192,3 +191,32 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = "DENY"
+
+# Logging
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {"format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"},
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}

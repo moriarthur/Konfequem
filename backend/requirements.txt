@@ -7,3 +7,4 @@ django-admin-interface
 djangorestframework-simplejwt
 python-dotenv
 python-decouple
+gunicorn>=21.2.0

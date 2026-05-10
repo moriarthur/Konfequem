@@ -154,9 +154,12 @@ def future_start_time(utc_now):
     local_time = future.astimezone(berlin_tz)
     if local_time.hour < 8:
         future = future.replace(hour=8, minute=0, second=0, microsecond=0)
-    elif local_time.hour >= 22:
-        future = future.replace(hour=8, minute=0, second=0, microsecond=0) + timedelta(
-            days=1
+    elif local_time.hour >= 20:
+        # Ensure at least 2 hours of buffer before office close (22:00)
+        future = (
+            (future + timedelta(days=1))
+            .astimezone(berlin_tz)
+            .replace(hour=10, minute=0, second=0, microsecond=0)
         )
     return future
 
@@ -297,3 +300,12 @@ def clear_cache():
     cache.clear()
     yield
     cache.clear()
+
+
+@pytest.fixture(autouse=True)
+def disable_throttling(settings):
+    """Disable rate limiting during tests."""
+    settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
+        "anon": None,
+        "user": None,
+    }
