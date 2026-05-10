@@ -3,16 +3,21 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { error as logError } from "../utils/logger";
+import { OFFICE_TIMEZONE } from "../utils/bookingUtils";
+import { useAlert } from "../context/AlertContext";
 import BottomNav from "../components/BottomNav";
 import Button from "../components/ui/Button";
 import BookingForm from "../components/BookingForm";
 import Logo from "../components/Logo";
 import { Heading, Text } from "../components/ui/Typography";
 import { Skeleton, StatCardSkeleton, BookingListSkeleton } from "../components/ui/Skeleton";
+import EmptyState from "../components/ui/EmptyState";
+import BookingDetailsModal from "../components/booking/BookingDetailsModal";
 import { DateTime } from "luxon";
 
 export default function Home() {
   const { authFetch, authFetchRef, isAuthenticated, loading, user } = useAuth();
+  const { success, error: showError } = useAlert();
   const navigate = useNavigate();
   const [rooms, setRooms] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -23,6 +28,8 @@ export default function Home() {
   const [hasBookingConflict, setHasBookingConflict] = useState(false);
   const bookingFormRef = useRef(null);
   const quickBookSectionRef = useRef(null);
+  const [detailsBooking, setDetailsBooking] = useState(null);
+  const [confirmCancel, setConfirmCancel] = useState(null);
 
   // Handle edit booking
   const handleEditBooking = (booking) => {
@@ -38,6 +45,27 @@ export default function Home() {
     setSelectedRoomId(null);
     setBookingToEdit(null);
     setHasBookingConflict(false);
+  };
+
+  // Cancel a booking
+  const handleCancelBooking = async (booking) => {
+    try {
+      await authFetch(`/api/bookings/${booking.id}/`, { method: "DELETE" });
+      success("Booking cancelled successfully");
+      setConfirmCancel(null);
+      setDetailsBooking(null);
+      refreshBookings();
+    } catch (err) {
+      const msg = err?.message || "";
+      if (msg.includes("JSON.parse") || msg.includes("unexpected end of data")) {
+        success("Booking cancelled successfully");
+        setConfirmCancel(null);
+        setDetailsBooking(null);
+        refreshBookings();
+      } else {
+        showError("Failed to cancel booking. Please try again.");
+      }
+    }
   };
 
   // Refresh bookings
@@ -296,15 +324,28 @@ export default function Home() {
               </Heading>
 
               {upcomingBookings.upcoming.length === 0 && !upcomingBookings.current ? (
-                <div className="text-center py-4">
-                  <Text variant="muted">No upcoming bookings</Text>
-                  <button
-                    onClick={() => navigate("/rooms")}
-                    className="mt-4 text-accent-primary hover:underline text-sm font-medium"
-                  >
-                    Book a room →
-                  </button>
-                </div>
+                <EmptyState
+                  icon={
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-12 h-12">
+                      <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                      <path d="M3 10H21" stroke="currentColor" strokeWidth="1.5"/>
+                      <path d="M8 2V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                      <path d="M16 2V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                      <path d="M12 14V14.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      <circle cx="12" cy="17" r="0.5" fill="currentColor"/>
+                    </svg>
+                  }
+                  title="No upcoming bookings"
+                  description="Your schedule is clear. Book a room to get started."
+                  action={
+                    <button
+                      onClick={() => navigate("/rooms")}
+                      className="px-4 py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-primary/90 text-sm font-medium"
+                    >
+                      Book a room
+                    </button>
+                  }
+                />
               ) : (
                 <>
                   <div className="space-y-2">
@@ -338,7 +379,7 @@ export default function Home() {
                       return (
                         <button
                           key={booking.id}
-                          onClick={() => handleEditBooking(booking)}
+                          onClick={() => setDetailsBooking(booking)}
                           className="w-full bg-surface-muted border border-border-subtle rounded-xl p-3 flex items-center justify-between gap-3 hover:ring-2 hover:ring-accent-primary/30 hover:bg-surface-base transition-all group"
                         >
                           <div className="flex-1 min-w-0 text-left">
@@ -562,6 +603,43 @@ export default function Home() {
 
       {/* Bottom Navigation */}
       {isAuthenticated && <BottomNav />}
+
+      {/* Booking details modal */}
+      {detailsBooking && (
+        <BookingDetailsModal
+          booking={detailsBooking}
+          onClose={() => setDetailsBooking(null)}
+          onEdit={(booking) => {
+            setDetailsBooking(null);
+            handleEditBooking(booking);
+          }}
+          onCancel={(booking) => {
+            setConfirmCancel(booking);
+          }}
+        />
+      )}
+
+      {/* Cancel confirmation modal */}
+      {confirmCancel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmCancel(null)} aria-hidden="true" />
+          <div className="relative bg-surface-base border border-border-subtle rounded-2xl shadow-soft p-6 max-w-md w-full">
+            <Heading level={3} className="text-lg font-semibold text-accent-secondary mb-4">Cancel Booking</Heading>
+            <p className="text-accent-secondary/70 mb-6">Are you sure you want to cancel this booking?</p>
+            <div className="bg-surface-muted rounded-xl p-4 mb-6">
+              <div className="space-y-2 text-sm">
+                <div className="font-medium">Room: {confirmCancel.room_name || confirmCancel.room}</div>
+                <div>Date: {DateTime.fromISO(confirmCancel.start_time).setZone(OFFICE_TIMEZONE).toFormat("dd.MM.yyyy")}</div>
+                <div>Time: {DateTime.fromISO(confirmCancel.start_time).setZone(OFFICE_TIMEZONE).toFormat("HH:mm")} — {DateTime.fromISO(confirmCancel.end_time).setZone(OFFICE_TIMEZONE).toFormat("HH:mm")}</div>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Button variant="secondary" className="flex-1" onClick={() => setConfirmCancel(null)}>Keep Booking</Button>
+              <Button variant="danger" className="flex-1" onClick={() => handleCancelBooking(confirmCancel)}>Cancel Booking</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

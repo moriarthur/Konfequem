@@ -9,6 +9,7 @@ import RoomFilters from "../components/RoomFilters";
 import BookingForm from "../components/BookingForm";
 import { Heading, Text } from "../components/ui/Typography";
 import { Skeleton, RoomCardSkeleton } from "../components/ui/Skeleton";
+import EmptyState from "../components/ui/EmptyState";
 
 export default function RoomsPage() {
   const { authFetch, authFetchRef, isAuthenticated } = useAuth();
@@ -190,15 +191,25 @@ export default function RoomsPage() {
         {!loading && (
           <>
             {filteredRooms.length === 0 ? (
-              <div className="bg-surface-base border border-border-subtle rounded-xl p-8 text-center">
-                <Text variant="muted">No rooms match your filters.</Text>
-                <button
-                  onClick={() => setActiveFilters({ capacity: null, features: [] })}
-                  className="mt-4 text-sm text-accent-primary hover:underline"
-                >
-                  Clear filters
-                </button>
-              </div>
+              <EmptyState
+                icon={
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-12 h-12">
+                    <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M21 21L16.65 16.65" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    <path d="M8 11H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                }
+                title="No rooms match your filters"
+                description="Try adjusting or clearing your filters to see available rooms."
+                action={
+                  <button
+                    onClick={() => setActiveFilters({ capacity: null, features: [] })}
+                    className="px-4 py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-primary/90 text-sm font-medium"
+                  >
+                    Clear filters
+                  </button>
+                }
+              />
             ) : (
               <RoomList
                 rooms={filteredRooms}

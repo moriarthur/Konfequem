@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { error as logError } from "../utils/logger";
 import { OFFICE_TIMEZONE } from "../utils/bookingUtils";
 import { useAlert } from "../context/AlertContext";
+import { FiEye, FiEyeOff } from "react-icons/fi";
 import BottomNav from "../components/BottomNav";
 import Button from "../components/ui/Button";
 import Logo from "../components/Logo";
@@ -28,6 +29,28 @@ export default function ProfilePage() {
   const [passwordForm, setPasswordForm] = useState({ old_password: "", new_password: "", confirm_password: "" });
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState("");
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Password strength calculation
+  const getPasswordStrength = (password: string): { level: number; label: string; color: string } => {
+    if (!password) return { level: 0, label: "", color: "" };
+    let score = 0;
+    if (password.length >= 8) score++;
+    if (/[A-Z]/.test(password)) score++;
+    if (/[0-9]/.test(password)) score++;
+    if (/[^A-Za-z0-9]/.test(password)) score++;
+    const levels = [
+      { level: 1, label: "Weak", color: "bg-status-danger" },
+      { level: 2, label: "Fair", color: "bg-status-warning" },
+      { level: 3, label: "Good", color: "bg-yellow-400" },
+      { level: 4, label: "Strong", color: "bg-status-success" },
+    ];
+    return levels[score - 1] || { level: 0, label: "", color: "" };
+  };
+
+  const strength = getPasswordStrength(passwordForm.new_password);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -273,37 +296,69 @@ export default function ProfilePage() {
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-accent-secondary mb-1">Current password</label>
-                <input
-                  type="password"
-                  value={passwordForm.old_password}
-                  onChange={(e) => setPasswordForm(f => ({ ...f, old_password: e.target.value }))}
-                  className="w-full px-3 py-2 border border-border-subtle rounded-lg bg-surface-base text-accent-secondary"
-                />
+                <div className="relative">
+                  <input
+                    type={showOldPassword ? "text" : "password"}
+                    value={passwordForm.old_password}
+                    onChange={(e) => setPasswordForm(f => ({ ...f, old_password: e.target.value }))}
+                    className="w-full px-3 py-2 pr-10 border border-border-subtle rounded-lg bg-surface-base text-accent-secondary"
+                  />
+                  <button type="button" onClick={() => setShowOldPassword(!showOldPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-accent-secondary/60 hover:text-accent-secondary" aria-label={showOldPassword ? "Hide" : "Show"}>
+                    {showOldPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-accent-secondary mb-1">New password</label>
-                <input
-                  type="password"
-                  value={passwordForm.new_password}
-                  onChange={(e) => setPasswordForm(f => ({ ...f, new_password: e.target.value }))}
-                  className="w-full px-3 py-2 border border-border-subtle rounded-lg bg-surface-base text-accent-secondary"
-                />
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    value={passwordForm.new_password}
+                    onChange={(e) => setPasswordForm(f => ({ ...f, new_password: e.target.value }))}
+                    className="w-full px-3 py-2 pr-10 border border-border-subtle rounded-lg bg-surface-base text-accent-secondary"
+                  />
+                  <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-accent-secondary/60 hover:text-accent-secondary" aria-label={showNewPassword ? "Hide" : "Show"}>
+                    {showNewPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                  </button>
+                </div>
+                {passwordForm.new_password && (
+                  <div className="mt-2">
+                    <div className="flex gap-1 mb-1">
+                      {[1, 2, 3, 4].map((i) => (
+                        <div
+                          key={i}
+                          className={`h-1.5 flex-1 rounded-full transition-all ${
+                            i <= strength.level ? strength.color : "bg-border-subtle"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <p className={`text-xs ${strength.level <= 1 ? "text-status-danger" : strength.level <= 2 ? "text-status-warning" : "text-status-success"}`}>
+                      {strength.label}
+                    </p>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-accent-secondary mb-1">Confirm new password</label>
-                <input
-                  type="password"
-                  value={passwordForm.confirm_password}
-                  onChange={(e) => setPasswordForm(f => ({ ...f, confirm_password: e.target.value }))}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleChangePassword(); }}
-                  className="w-full px-3 py-2 border border-border-subtle rounded-lg bg-surface-base text-accent-secondary"
-                />
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={passwordForm.confirm_password}
+                    onChange={(e) => setPasswordForm(f => ({ ...f, confirm_password: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleChangePassword(); }}
+                    className="w-full px-3 py-2 pr-10 border border-border-subtle rounded-lg bg-surface-base text-accent-secondary"
+                  />
+                  <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-accent-secondary/60 hover:text-accent-secondary" aria-label={showConfirmPassword ? "Hide" : "Show"}>
+                    {showConfirmPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                  </button>
+                </div>
               </div>
             </div>
 
             <div className="flex gap-2 mt-4">
               <button
-                onClick={() => { setShowPasswordModal(false); setPasswordForm({ old_password: "", new_password: "", confirm_password: "" }); }}
+                onClick={() => { setShowPasswordModal(false); setPasswordForm({ old_password: "", new_password: "", confirm_password: "" }); setShowOldPassword(false); setShowNewPassword(false); setShowConfirmPassword(false); }}
                 className="flex-1 px-4 py-2 border border-border-subtle rounded-lg hover:bg-surface-muted text-accent-secondary"
               >
                 Cancel

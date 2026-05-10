@@ -18,8 +18,11 @@ function PrivateRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-surface-muted">
-        <LoadingSpinner size="lg" />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-surface-muted gap-4">
+        <div className="flex items-center gap-1 animate-pulse">
+          <span className="text-2xl font-bold tracking-wide" style={{ color: "#61b390" }}>KONFEQUEM</span>
+        </div>
+        <LoadingSpinner size="md" />
       </div>
     );
   }

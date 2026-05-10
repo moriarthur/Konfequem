@@ -6,6 +6,7 @@ import Card from "./ui/Card";
 import Button from "./ui/Button";
 import { Text, Subheading } from "./ui/Typography";
 import StatusBadge from "./StatusBadge";
+import EmptyState from "./ui/EmptyState";
 
 interface Booking {
   id: number;
@@ -213,9 +214,18 @@ export default function BookingList({ bookings = [], authFetch, onRefresh, onEdi
 
   if (!bookings || bookings.length === 0) {
     return (
-      <Card className="text-center py-8">
-        <Text variant="muted">No bookings found.</Text>
-      </Card>
+      <EmptyState
+        icon={
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-12 h-12">
+            <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M3 10H21" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M8 2V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            <path d="M16 2V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        }
+        title="No bookings yet"
+        description="You haven't made any bookings. Start by booking a room."
+      />
     );
   }
 
@@ -273,11 +283,17 @@ export default function BookingList({ bookings = [], authFetch, onRefresh, onEdi
       </div>
 
       {filteredBookings.length === 0 ? (
-        <Card className="text-center py-12 border border-border-subtle">
-          <Text variant="muted">
-            {activeTab === "upcoming" ? "No upcoming bookings found." : "No booking history found."}
-          </Text>
-        </Card>
+        <EmptyState
+          icon={
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-12 h-12">
+              <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M21 21L16.65 16.65" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M8 11H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          }
+          title={activeTab === "upcoming" ? "No upcoming bookings" : "No booking history"}
+          description={activeTab === "upcoming" ? "All your upcoming bookings will appear here." : "Your past bookings will appear here."}
+        />
       ) : (
         <>
           {dateKeys.map((dateKey) => {
