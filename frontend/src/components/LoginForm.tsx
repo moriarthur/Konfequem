@@ -50,6 +50,7 @@ export default function LoginForm() {
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [lockoutRemaining, setLockoutRemaining] = useState(0);
+  const [showResetInfo, setShowResetInfo] = useState(false);
 
   const usernameRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -277,6 +278,23 @@ export default function LoginForm() {
           Don&apos;t have an account?{" "}
           <a href="#" onClick={handleSignUpClick} className="text-accent-primary hover:underline">Sign up</a>
         </p>
+
+        <p className="text-center text-sm text-accent-secondary/40 mt-2">
+          <button type="button" onClick={() => setShowResetInfo(!showResetInfo)} className="hover:text-accent-secondary/60 hover:underline">
+            Forgot password?
+          </button>
+        </p>
+
+        {showResetInfo && (
+          <div className="mt-3 p-3 bg-surface-muted rounded-xl border border-border-subtle text-center">
+            <p className="text-sm text-accent-secondary/70">
+              Contact your administrator to reset your password.
+            </p>
+            <button type="button" onClick={() => setShowResetInfo(false)} className="mt-2 text-xs text-accent-primary hover:underline">
+              Back to login
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

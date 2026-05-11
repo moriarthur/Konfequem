@@ -122,6 +122,30 @@ class CurrentUserView(APIView):
                 "username": user.username,
                 "email": user.email,
                 "first_name": user.first_name,
+                "last_name": user.last_name,
+            }
+        )
+
+    def put(self, request):
+        user = request.user
+        first_name = request.data.get("first_name", user.first_name)
+        last_name = request.data.get("last_name", user.last_name)
+        email = request.data.get("email", user.email)
+
+        if email and "@" not in email:
+            return Response({"error": "Enter a valid email."}, status=400)
+
+        user.first_name = first_name
+        user.last_name = last_name
+        user.email = email
+        user.save()
+        return Response(
+            {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
             }
         )
 
