@@ -17,9 +17,7 @@ def _check_booking_modifiable(booking, action="modify"):
     """Raise PermissionDenied if booking is in progress or already ended."""
     now = timezone.now()
     if now >= booking.end_time:
-        raise PermissionDenied(
-            f"Cannot {action} a booking that has already ended."
-        )
+        raise PermissionDenied(f"Cannot {action} a booking that has already ended.")
     if now >= booking.start_time:
         raise PermissionDenied(
             f"Cannot {action} a booking that is currently in progress."

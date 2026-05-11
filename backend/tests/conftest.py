@@ -159,9 +159,7 @@ def future_start_time(utc_now):
     # If there's still time today (before 20:00), use today at +1h rounded up
     if local_time.hour < 20:
         today_candidate = local_time + timedelta(hours=1)
-        today_candidate = today_candidate.replace(
-            minute=0, second=0, microsecond=0
-        )
+        today_candidate = today_candidate.replace(minute=0, second=0, microsecond=0)
         if today_candidate.hour < 8:
             today_candidate = today_candidate.replace(hour=8)
         # Make sure it's actually in the future
