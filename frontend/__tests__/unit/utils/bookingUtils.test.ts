@@ -213,23 +213,23 @@ describe('bookingUtils', () => {
 
   describe('formatSlot', () => {
     it('should format slot time in HH:mm format', () => {
-      const dateTime = DateTime.fromISO('2025-01-28T10:30:00+01:00')
+      const dateTime = DateTime.fromISO('2025-01-28T10:30:00+01:00').setZone(OFFICE_TIMEZONE)
       const result = formatSlot(dateTime)
-      
+
       expect(result).toBe('10:30')
     })
 
     it('should handle single-digit hours', () => {
-      const dateTime = DateTime.fromISO('2025-01-28T08:05:00+01:00')
+      const dateTime = DateTime.fromISO('2025-01-28T08:05:00+01:00').setZone(OFFICE_TIMEZONE)
       const result = formatSlot(dateTime)
-      
+
       expect(result).toBe('08:05')
     })
 
     it('should handle midnight', () => {
-      const dateTime = DateTime.fromISO('2025-01-28T00:00:00+01:00')
+      const dateTime = DateTime.fromISO('2025-01-28T00:00:00+01:00').setZone(OFFICE_TIMEZONE)
       const result = formatSlot(dateTime)
-      
+
       expect(result).toBe('00:00')
     })
   })

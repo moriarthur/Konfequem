@@ -73,8 +73,8 @@ export function getConflictMessage(conflict: ConflictResult | null): string | nu
   if (!conflict) return null;
 
   const { booking, conflictType } = conflict;
-  const startTime = DateTime.fromISO(booking.start_time).toFormat("HH:mm");
-  const endTime = DateTime.fromISO(booking.end_time).toFormat("HH:mm");
+  const startTime = DateTime.fromISO(booking.start_time).setZone("Europe/Berlin").toFormat("HH:mm");
+  const endTime = DateTime.fromISO(booking.end_time).setZone("Europe/Berlin").toFormat("HH:mm");
 
   switch (conflictType) {
     case "completely_inside":
