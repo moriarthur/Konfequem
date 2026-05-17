@@ -13,7 +13,7 @@ import { Room, Feature, ActiveFilters, PaginatedResponse } from "../types";
 import { BookingData } from "../utils/bookingUtils";
 
 export default function RoomsPage() {
-  const { authFetch, authFetchRef, isAuthenticated } = useAuth();
+  const { authFetch, authFetchRef, isAuthenticated, access } = useAuth();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [features, setFeatures] = useState<Feature[]>([]);
   const [bookings, setBookings] = useState<BookingData[]>([]);
@@ -61,7 +61,7 @@ export default function RoomsPage() {
     };
 
     fetchData();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, access]);
 
   useEffect(() => {
     if (showBookingForm) {

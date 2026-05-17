@@ -22,7 +22,7 @@ function roomDisplayName(room: number | { id: number } | undefined): string {
 }
 
 export default function Home() {
-  const { authFetch, authFetchRef, isAuthenticated, loading, user } = useAuth();
+  const { authFetch, authFetchRef, isAuthenticated, loading, user, access } = useAuth();
   const { success, error: showError } = useAlert();
   const navigate = useNavigate();
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -114,7 +114,7 @@ export default function Home() {
     };
 
     fetchData();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, access]);
 
   const upcomingBookings = useMemo(() => {
     if (!bookings || !Array.isArray(bookings) || bookings.length === 0) {

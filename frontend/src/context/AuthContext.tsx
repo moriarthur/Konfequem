@@ -124,8 +124,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   const refreshAccessToken = useCallback(async (): Promise<string | null> => {
-    if (!refresh || refreshPromise.current) {
-      if (!refresh) logout();
+    if (!refresh) {
+      logout();
+      return null;
+    }
+
+    // If a refresh is already in progress, wait for it
+    if (refreshPromise.current) {
+      try {
+        const res = await refreshPromise.current;
+        if (res.ok) {
+          const data = await res.json();
+          return data.access;
+        }
+      } catch {
+        // Pending refresh failed, fall through to start a new one
+      }
       return null;
     }
 
@@ -153,6 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       TOKEN_STORAGE.set(data.access, newRefresh);
       return data.access;
     } catch (error) {
+      refreshPromise.current = null;
       const status = (error as { status?: number })?.status;
       if (status === 401 || status === 403) {
         logout();
