@@ -1,23 +1,42 @@
-// @ts-nocheck
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { error as logError } from "../utils/logger";
-import { OFFICE_TIMEZONE } from "../utils/bookingUtils";
+import { OFFICE_TIMEZONE, BookingData } from "../utils/bookingUtils";
 import { useAlert } from "../context/AlertContext";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import BottomNav from "../components/BottomNav";
 import Button from "../components/ui/Button";
 import Logo from "../components/Logo";
 import { Heading, Text } from "../components/ui/Typography";
-import { Skeleton, StatCardSkeleton } from "../components/ui/Skeleton";
+import { StatCardSkeleton } from "../components/ui/Skeleton";
 import { DateTime } from "luxon";
+import { PaginatedResponse, Room } from "../types";
+
+interface UserStats {
+  totalBookings: number;
+  currentBookings: number;
+  upcomingBookings: number;
+  totalRooms: number;
+}
+
+interface PasswordForm {
+  old_password: string;
+  new_password: string;
+  confirm_password: string;
+}
+
+interface ProfileForm {
+  first_name: string;
+  last_name: string;
+  email: string;
+}
 
 export default function ProfilePage() {
   const { user, authFetch, logout, isAuthenticated } = useAuth();
   const { showAlert } = useAlert();
   const navigate = useNavigate();
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<UserStats>({
     totalBookings: 0,
     currentBookings: 0,
     upcomingBookings: 0,
@@ -26,28 +45,24 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [passwordForm, setPasswordForm] = useState({ old_password: "", new_password: "", confirm_password: "" });
+  const [passwordForm, setPasswordForm] = useState<PasswordForm>({ old_password: "", new_password: "", confirm_password: "" });
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState("");
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const [profileForm, setProfileForm] = useState({ first_name: "", last_name: "", email: "" });
+  const [profileForm, setProfileForm] = useState<ProfileForm>({ first_name: "", last_name: "", email: "" });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState("");
 
-  // Password requirements checks (matching Django validators)
   const pw = passwordForm.new_password;
-  const pwChecks = [
+  const pwChecks: { met: boolean; label: string }[] = [
     { met: pw.length >= 8, label: "At least 8 characters" },
     { met: /[A-Z]/.test(pw) && /[a-z]/.test(pw), label: "Uppercase and lowercase letters" },
     { met: /[0-9]/.test(pw), label: "At least one number" },
     { met: !/^\d+$/.test(pw), label: "Not entirely numeric" },
   ];
-  const allPwMet = pw.length > 0 && pwChecks.every((c) => c.met);
-
-  // Password strength
   const getPasswordStrength = (password: string): { level: number; label: string; color: string } => {
     if (!password) return { level: 0, label: "", color: "" };
     let score = 0;
@@ -80,25 +95,24 @@ export default function ProfilePage() {
           authFetch("/api/rooms/"),
         ]);
 
-        // Extract results arrays from paginated responses
-        const bookings = bookingsData.results || bookingsData;
-        const rooms = roomsData.results || roomsData;
+        const bookingsResp = bookingsData as PaginatedResponse<BookingData>;
+        const roomsResp = roomsData as PaginatedResponse<Room>;
+        const bookings = bookingsResp.results || [];
+        const rooms = roomsResp.results || [];
 
         const now = DateTime.now().setZone(OFFICE_TIMEZONE);
-        // Current/ongoing bookings: happening right now
         const current = bookings.filter(
           (b) => { const s = DateTime.fromISO(b.start_time).setZone(OFFICE_TIMEZONE); const e = DateTime.fromISO(b.end_time).setZone(OFFICE_TIMEZONE); return now >= s && now < e; }
         ).length;
-        // Upcoming bookings: starting in the future (not ongoing)
         const upcoming = bookings.filter(
           (b) => DateTime.fromISO(b.start_time).setZone(OFFICE_TIMEZONE) > now
         ).length;
 
         setStats({
-          totalBookings: bookingsData.count || bookings.length,
+          totalBookings: bookingsResp.count || bookings.length,
           currentBookings: current,
           upcomingBookings: upcoming,
-          totalRooms: roomsData.count || rooms.length,
+          totalRooms: roomsResp.count || rooms.length,
         });
       } catch (err) {
         logError("Error fetching profile data:", err);
@@ -110,9 +124,6 @@ export default function ProfilePage() {
     fetchData();
   }, [authFetch, isAuthenticated]);
 
-  /**
-   * Handle logout
-   */
   const handleLogout = async () => {
     try {
       setLoggingOut(true);
@@ -155,13 +166,19 @@ export default function ProfilePage() {
         setShowPasswordModal(false);
         setPasswordForm({ old_password: "", new_password: "", confirm_password: "" });
       }
-    } catch (err: any) {
-      const msg = err?.message || err?.error || "Failed to change password.";
+    } catch (err: unknown) {
+      const e = err as { message?: string; error?: string };
+      const msg = e?.message || e?.error || "Failed to change password.";
       setPasswordError(typeof msg === "string" ? msg : "Failed to change password.");
     } finally {
       setPasswordSaving(false);
     }
   };
+
+  const firstName = user?.first_name as string | undefined;
+  const lastName = user?.last_name as string | undefined;
+  const username = user?.username as string | undefined;
+  const email = user?.email as string | undefined;
 
   if (!isAuthenticated) {
     return (
@@ -176,7 +193,6 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-surface-muted pb-20">
       <div className="px-4 py-6 max-w-4xl mx-auto">
-        {/* Header */}
         <div className="mb-6">
           <Heading level={1} className="text-2xl font-semibold text-accent-secondary">
             Profile
@@ -186,18 +202,17 @@ export default function ProfilePage() {
           </Text>
         </div>
 
-        {/* User info card */}
         <div className="bg-surface-base border border-border-subtle rounded-xl p-6 mb-6">
           <div className="flex items-center gap-4 mb-6">
             <Logo size="md" />
             <div className="flex-1">
               <Heading level={2} className="text-lg font-semibold text-accent-secondary">
-                {user?.first_name && user?.last_name
-                  ? `${user.first_name} ${user.last_name}`
-                  : user?.username || "User"}
+                {firstName && lastName
+                  ? `${firstName} ${lastName}`
+                  : username || "User"}
               </Heading>
               <Text variant="muted" className="text-sm">
-                @{user?.username || "user"}
+                @{username || "user"}
               </Text>
             </div>
             <button
@@ -207,9 +222,9 @@ export default function ProfilePage() {
                   setProfileError("");
                 } else {
                   setProfileForm({
-                    first_name: (user?.first_name as string) || "",
-                    last_name: (user?.last_name as string) || "",
-                    email: (user?.email as string) || "",
+                    first_name: firstName || "",
+                    last_name: lastName || "",
+                    email: email || "",
                   });
                   setEditMode(true);
                 }
@@ -269,8 +284,9 @@ export default function ProfilePage() {
                     });
                     showAlert("Profile updated", { type: "success" });
                     setEditMode(false);
-                  } catch (err: any) {
-                    const msg = err?.message || err?.error || "Failed to update profile.";
+                  } catch (err: unknown) {
+                    const e = err as { message?: string; error?: string };
+                    const msg = e?.message || e?.error || "Failed to update profile.";
                     setProfileError(typeof msg === "string" ? msg : "Failed to update profile.");
                   } finally {
                     setProfileSaving(false);
@@ -288,13 +304,12 @@ export default function ProfilePage() {
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-accent-secondary/60">
                   <path d="M21 8L17.4392 9.97822C15.454 11.0811 14.4614 11.6326 13.4102 11.8488C12.4798 12.0401 11.5202 12.0401 10.5898 11.8488C9.53864 11.6326 8.54603 11.0811 6.5608 9.97822L3 8M6.2 19H17.8C18.9201 19 19.4802 19 19.908 18.782C20.2843 18.5903 20.5903 18.2843 20.782 17.908C21 17.4802 21 16.9201 21 15.8V8.2C21 7.0799 21 6.51984 20.782 6.09202C20.5903 5.71569 20.2843 5.40973 19.908 5.21799C19.4802 5 18.9201 5 17.8 5H6.2C5.0799 5 4.51984 5 4.09202 5.21799C3.71569 5.40973 3.40973 5.71569 3.21799 6.09202C3 6.51984 3 7.07989 3 8.2V15.8C3 16.9201 3 17.4802 3.21799 17.908C3.40973 18.2843 3.71569 18.5903 4.09202 18.782C4.51984 19 5.07989 19 6.2 19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <Text variant="muted">{user?.email || "No email set"}</Text>
+                <Text variant="muted">{email || "No email set"}</Text>
               </div>
             </div>
           )}
         </div>
 
-        {/* Stats */}
         {loading ? (
           <div className="grid grid-cols-3 gap-3 mb-6">
             <StatCardSkeleton />
@@ -324,7 +339,6 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Settings section */}
         <div className="bg-surface-base border border-border-subtle rounded-xl overflow-hidden mb-6">
           <div className="px-6 py-4 border-b border-border-subtle">
             <Heading level={3} className="text-sm font-semibold text-accent-secondary">
@@ -344,24 +358,13 @@ export default function ProfilePage() {
                 </svg>
                 <span className="text-sm text-accent-secondary">Change password</span>
               </div>
-              <svg
-                className="w-5 h-5 text-accent-secondary/40"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5l7 7-7 7"
-                />
+              <svg className="w-5 h-5 text-accent-secondary/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
           </div>
         </div>
 
-        {/* Logout button */}
         <Button
           variant="danger"
           onClick={handleLogout}
@@ -377,7 +380,6 @@ export default function ProfilePage() {
         </Button>
       </div>
 
-      {/* Change password modal */}
       {showPasswordModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-surface-base rounded-xl p-6 max-w-sm w-full">
@@ -482,7 +484,6 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Bottom Navigation */}
       <BottomNav />
     </div>
   );
