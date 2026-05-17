@@ -1,12 +1,11 @@
-// @ts-nocheck
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { DateTime } from "luxon";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { OFFICE_TIMEZONE } from "../utils/bookingUtils";
 import { useAlert } from "../context/AlertContext";
 import BottomNav from "../components/BottomNav";
 import { Heading, Text } from "../components/ui/Typography";
-import { useCalendarBookings } from "../components/calendar/useCalendarBookings";
+import { useCalendarBookings, DayInfo } from "../components/calendar/useCalendarBookings";
 import BookingCardInline from "../components/calendar/BookingCardInline";
 
 export default function CalendarPage() {
@@ -25,20 +24,19 @@ export default function CalendarPage() {
     currentBooking, nextBooking,
     handleCloseExpanded, handleEditBooking, handleCancelEdit,
     handleSaveEdit, handleDeleteClick, handleConfirmDelete,
-    refreshBookings,
   } = useCalendarBookings(currentMonth);
 
   const handlePreviousMonth = () => setCurrentMonth(currentMonth.minus({ months: 1 }));
   const handleNextMonth = () => setCurrentMonth(currentMonth.plus({ months: 1 }));
   const handleToday = () => setCurrentMonth(DateTime.now());
 
-  const handleDayClick = (dayInfo) => {
+  const handleDayClick = (dayInfo: DayInfo) => {
     if (dayInfo.dayBookings.length > 0) setExpandedDay(dayInfo);
   };
 
   // Unsaved changes warning
   useEffect(() => {
-    const handleBeforeUnload = (e) => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (editingBooking || deleteConfirmBooking) { e.preventDefault(); e.returnValue = ''; }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -189,7 +187,7 @@ export default function CalendarPage() {
                   <div className="bg-surface-base rounded-xl p-6 max-w-sm w-full">
                     <Heading level={3} className="text-lg font-semibold text-accent-secondary mb-2">Delete booking?</Heading>
                     <Text variant="muted" className="mb-4">
-                      Are you sure you want to delete your booking for <span className="font-medium text-accent-secondary">{deleteConfirmBooking.room_name || deleteConfirmBooking.room}</span>{" "}
+                      Are you sure you want to delete your booking for <span className="font-medium text-accent-secondary">{deleteConfirmBooking.room_name || (typeof deleteConfirmBooking.room === "number" ? String(deleteConfirmBooking.room) : "Room")}</span>{" "}
                       on {DateTime.fromISO(deleteConfirmBooking.start_time).toFormat("MMM d")}? This action cannot be undone.
                     </Text>
                     <div className="flex gap-2">
@@ -240,7 +238,7 @@ export default function CalendarPage() {
                               title={`${booking.room_name || booking.room}: ${booking.start_time ? DateTime.fromISO(booking.start_time).toFormat("HH:mm") : "??"} - ${booking.end_time ? DateTime.fromISO(booking.end_time).toFormat("HH:mm") : "??"}`}>
                               {bookingIsCurrent && <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 flex-shrink-0"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/><path d="M8.5 12.5L10.5 14.5L15.5 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                               {bookingIsNext && <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 flex-shrink-0"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/><path d="M12 8V12L14.5 14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                              <span className={`truncate ${bookingPast ? 'line-through' : ''}`}>{booking.start_time ? DateTime.fromISO(booking.start_time).toFormat("HH:mm") : "??:??"} {booking.room_name || booking.room}</span>
+                              <span className={`truncate ${bookingPast ? 'line-through' : ''}`}>{booking.start_time ? DateTime.fromISO(booking.start_time).toFormat("HH:mm") : "??:??"} {booking.room_name || (typeof booking.room === "number" ? String(booking.room) : "Room")}</span>
                             </div>
                           );
                         })}
