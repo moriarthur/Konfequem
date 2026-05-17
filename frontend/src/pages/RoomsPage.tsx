@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import Button from "../components/ui/Button";
@@ -8,20 +7,22 @@ import RoomList from "../components/RoomList";
 import RoomFilters from "../components/RoomFilters";
 import BookingForm from "../components/BookingForm";
 import { Heading, Text } from "../components/ui/Typography";
-import { Skeleton, RoomCardSkeleton } from "../components/ui/Skeleton";
+import { RoomCardSkeleton } from "../components/ui/Skeleton";
 import EmptyState from "../components/ui/EmptyState";
+import { Room, Feature, ActiveFilters, PaginatedResponse } from "../types";
+import { BookingData } from "../utils/bookingUtils";
 
 export default function RoomsPage() {
   const { authFetch, authFetchRef, isAuthenticated } = useAuth();
-  const [rooms, setRooms] = useState([]);
-  const [features, setFeatures] = useState([]);
-  const [bookings, setBookings] = useState([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [features, setFeatures] = useState<Feature[]>([]);
+  const [bookings, setBookings] = useState<BookingData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRoomId, setSelectedRoomId] = useState(null);
+  const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [isFormValid, setIsFormValid] = useState(false);
-  const bookingFormRef = useRef(null);
-  const [activeFilters, setActiveFilters] = useState({
+  const bookingFormRef = useRef<HTMLFormElement>(null);
+  const [activeFilters, setActiveFilters] = useState<ActiveFilters>({
     capacity: null,
     features: [],
   });
@@ -35,9 +36,7 @@ export default function RoomsPage() {
       return;
     }
 
-    // Only fetch if the authFetchRef is available (i.e., authContext is fully initialized)
     if (!authFetchRef?.current) {
-      // Auth context not fully initialized yet, skip this render
       setLoading(false);
       return;
     }
@@ -45,17 +44,15 @@ export default function RoomsPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Use the ref to get the latest authFetch function
-        const fetch = authFetchRef.current;
+        const fetch = authFetchRef.current!;
         const [roomsData, featuresData, bookingsData] = await Promise.all([
           fetch("/api/rooms/"),
           fetch("/api/room-features/"),
           fetch("/api/bookings/"),
         ]);
-        // Handle pagination - extract results array from paginated response
-        setRooms(roomsData.results || roomsData);
-        setFeatures(featuresData.results || featuresData);
-        setBookings(bookingsData.results || bookingsData);
+        setRooms((roomsData as PaginatedResponse<Room>).results || (roomsData as Room[]));
+        setFeatures((featuresData as PaginatedResponse<Feature>).results || (featuresData as Feature[]));
+        setBookings((bookingsData as PaginatedResponse<BookingData>).results || (bookingsData as BookingData[]));
       } catch (err) {
         logError("Error fetching data:", err);
       } finally {
@@ -66,7 +63,6 @@ export default function RoomsPage() {
     fetchData();
   }, [isAuthenticated]);
 
-  // Prevent body scroll when modal is open
   useEffect(() => {
     if (showBookingForm) {
       document.body.style.overflow = 'hidden';
@@ -79,14 +75,10 @@ export default function RoomsPage() {
     };
   }, [showBookingForm]);
 
-  /**
-   * Handle booking creation - refresh bookings and close form
-   */
   const handleBookingCreated = async () => {
     try {
       const bookingsData = await authFetch("/api/bookings/");
-      // Handle pagination - extract results array from paginated response
-      setBookings(bookingsData.results || bookingsData);
+      setBookings((bookingsData as PaginatedResponse<BookingData>).results || (bookingsData as BookingData[]));
       setShowBookingForm(false);
       setSelectedRoomId(null);
       setIsFormValid(false);
@@ -95,24 +87,17 @@ export default function RoomsPage() {
     }
   };
 
-  /**
-   * Handle filter changes
-   */
-  const handleFilterChange = (type, value) => {
+  const handleFilterChange = (type: string | ActiveFilters, value?: number | number[] | null) => {
     if (type === "capacity") {
-      setActiveFilters(prev => ({ ...prev, capacity: value }));
+      setActiveFilters(prev => ({ ...prev, capacity: (value as number) ?? null }));
     } else if (type === "features") {
-      setActiveFilters(prev => ({ ...prev, features: value }));
+      setActiveFilters(prev => ({ ...prev, features: value as number[] }));
     } else if (typeof type === "object") {
-      // Handle full object update (for clear filters)
       setActiveFilters(type);
     }
   };
 
-  /**
-   * Toggle booking form for a room
-   */
-  const handleToggleBookingForm = (roomId) => {
+  const handleToggleBookingForm = (roomId: number) => {
     if (selectedRoomId === roomId) {
       setShowBookingForm(false);
       setSelectedRoomId(null);
@@ -123,17 +108,12 @@ export default function RoomsPage() {
     }
   };
 
-  /**
-   * Filter rooms based on active filters
-   */
   const filteredRooms = useMemo(() => {
     return rooms.filter((room) => {
-      // Capacity filter
       if (activeFilters.capacity !== null && room.capacity < activeFilters.capacity) {
         return false;
       }
 
-      // Features filter - room must have ALL selected features
       if (activeFilters.features.length > 0) {
         const roomFeatureIds = room.features?.map((f) => f.id) || [];
         const hasAllFeatures = activeFilters.features.every((featureId) =>
@@ -158,7 +138,6 @@ export default function RoomsPage() {
 
   return (
     <div className="min-h-screen bg-surface-muted pb-20">
-      {/* Header */}
       <div className="px-4 py-6 max-w-4xl mx-auto">
         <Heading level={1} className="text-2xl font-semibold text-accent-secondary mb-2">
           Rooms
@@ -167,7 +146,6 @@ export default function RoomsPage() {
           Browse and book available rooms
         </Text>
 
-        {/* Loading state */}
         {loading && (
           <div className="space-y-3">
             <RoomCardSkeleton />
@@ -176,7 +154,6 @@ export default function RoomsPage() {
           </div>
         )}
 
-        {/* Filters */}
         {!loading && features.length > 0 && (
           <div className="mb-6">
             <RoomFilters
@@ -187,7 +164,6 @@ export default function RoomsPage() {
           </div>
         )}
 
-        {/* Room list */}
         {!loading && (
           <>
             {filteredRooms.length === 0 ? (
@@ -222,7 +198,6 @@ export default function RoomsPage() {
         )}
       </div>
 
-      {/* Booking form modal */}
       {showBookingForm && selectedRoomId && (
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center">
           <div className="bg-surface-base w-full sm:max-w-lg sm:rounded-xl rounded-t-xl max-h-[calc(100vh-4rem)] sm:max-h-[85vh] overflow-y-auto">
@@ -244,20 +219,19 @@ export default function RoomsPage() {
               </button>
             </div>
             <div className="p-4 sm:p-6">
-              <BookingForm
-                roomId={selectedRoomId}
-                rooms={rooms}
-                formRef={bookingFormRef}
-                showSubmitButton={false}
-                onValidityChange={setIsFormValid}
-                onBookingCreated={handleBookingCreated}
-                onCancel={() => {
+              {React.createElement(BookingForm as React.ComponentType<any>, {
+                roomId: selectedRoomId,
+                rooms,
+                formRef: bookingFormRef,
+                showSubmitButton: false,
+                onValidityChange: setIsFormValid,
+                onBookingCreated: handleBookingCreated,
+                onCancel: () => {
                   setShowBookingForm(false);
                   setSelectedRoomId(null);
-                }}
-              />
-              
-              {/* Submit Button */}
+                },
+              })}
+
               <Button
                 variant="primary"
                 size="lg"
@@ -276,7 +250,6 @@ export default function RoomsPage() {
         </div>
       )}
 
-      {/* Bottom Navigation */}
       <BottomNav />
     </div>
   );
