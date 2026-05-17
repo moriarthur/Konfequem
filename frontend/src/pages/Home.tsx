@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { error as logError } from "../utils/logger";
@@ -468,26 +468,26 @@ export default function Home() {
                         Back to rooms
                       </button>
                       <div className="p-4">
-                        {React.createElement(BookingForm as React.ComponentType<any>, {
-                          roomId: selectedRoomId,
-                          rooms,
-                          formRef: bookingFormRef,
-                          showSubmitButton: false,
-                          onValidityChange: setIsFormValid,
-                          onConflictChange: setHasBookingConflict,
-                          bookingToEdit,
-                          onBookingCreated: () => {
+                        <BookingForm
+                          roomId={selectedRoomId}
+                          rooms={rooms}
+                          formRef={bookingFormRef}
+                          showSubmitButton={false}
+                          onValidityChange={setIsFormValid}
+                          onConflictChange={setHasBookingConflict}
+                          bookingToEdit={bookingToEdit}
+                          onBookingCreated={() => {
                             refreshBookings();
                             closeQuickBook();
-                          },
-                          onBookingUpdated: () => {
+                          }}
+                          onBookingUpdated={() => {
                             refreshBookings();
                             closeQuickBook();
-                          },
-                          onCancel: () => {
+                          }}
+                          onCancel={() => {
                             closeQuickBook();
-                          },
-                        })}
+                          }}
+                        />
                       </div>
                     </>
                   )}

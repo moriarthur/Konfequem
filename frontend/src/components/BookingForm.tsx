@@ -1,5 +1,4 @@
-// @ts-nocheck
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useAlert } from "../context/AlertContext";
 import { error as logError } from "../utils/logger";
@@ -10,6 +9,8 @@ import "./DayPickerStyles.css";
 import {
   OFFICE_HOURS,
   OFFICE_TIMEZONE,
+  BookingData,
+  DurationOption,
 } from "../utils/bookingUtils";
 import { TimeSlot } from "../utils/timeSlots";
 import {
@@ -26,30 +27,49 @@ import {
   isDayFullyBooked,
   findNextAvailableDay,
 } from "../utils/timeSlots";
-import { checkBookingConflict, getConflictMessage } from "../utils/bookingConflict";
+import { checkBookingConflict, getConflictMessage, ConflictResult } from "../utils/bookingConflict";
 import Button from "./ui/Button";
 import { Text, Label } from "./ui/Typography";
 import Card from "./ui/Card";
+import { Room } from "../types";
 
-export default function BookingForm({ roomId, onBookingCreated, onClose, onValidityChange, onConflictChange, formRef, showSubmitButton = true, bookingToEdit, onBookingUpdated }) {
+interface ConflictInfo {
+  hasConflict: boolean;
+  message: string;
+  conflictData: ConflictResult | null;
+}
+
+interface BookingFormProps {
+  roomId: number;
+  rooms?: Room[];
+  onBookingCreated?: (booking: unknown) => void;
+  onBookingUpdated?: (booking: unknown) => void;
+  onClose?: () => void;
+  onValidityChange?: (isValid: boolean) => void;
+  onConflictChange?: (hasConflict: boolean) => void;
+  formRef?: React.Ref<HTMLFormElement>;
+  showSubmitButton?: boolean;
+  bookingToEdit?: BookingData | null;
+  onCancel?: () => void;
+}
+
+export default function BookingForm({ roomId, onBookingCreated, onClose, onValidityChange, onConflictChange, formRef, showSubmitButton = true, bookingToEdit, onBookingUpdated }: BookingFormProps) {
   const { authFetch } = useAuth();
   const { showAlert } = useAlert();
   const [isBookingSuccessful, setIsBookingSuccessful] = useState(false);
 
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [bookings, setBookings] = useState([]);
-  const [selectedDuration, setSelectedDuration] = useState(null);
-  const [groupedSlots, setGroupedSlots] = useState({});
-  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [bookings, setBookings] = useState<BookingData[]>([]);
+  const [selectedDuration, setSelectedDuration] = useState<DurationOption | null>(null);
+  const [groupedSlots, setGroupedSlots] = useState<Record<string, TimeSlot[]>>({});
+  const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [nextAvailableDay, setNextAvailableDay] = useState(null);
-  const [filteredDates, setFilteredDates] = useState(new Map());
-  const [expandedPeriod, setExpandedPeriod] = useState(null);
-  const [conflictInfo, setConflictInfo] = useState(null); // { hasConflict: boolean, message: string, conflictData: object }
+  const [error, setError] = useState<string | null>(null);
+  const [nextAvailableDay, setNextAvailableDay] = useState<Date | null>(null);
+  const [filteredDates, setFilteredDates] = useState<Map<string, boolean>>(new Map());
+  const [expandedPeriod, setExpandedPeriod] = useState<string | null>(null);
+  const [conflictInfo, setConflictInfo] = useState<ConflictInfo | null>(null);
 
-
-  // Initialize form from bookingToEdit (edit mode)
   useEffect(() => {
     if (!bookingToEdit) return;
 
@@ -61,7 +81,6 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
     setSelectedSlot(new TimeSlot(start, end));
     setSelectedDuration({ minutes: durationMinutes, label: `${durationMinutes} min` });
 
-    // Determine period to expand
     const slotHour = start.hour;
     for (const [key, period] of Object.entries(TIME_PERIODS)) {
       if (slotHour >= period.start && slotHour < period.end) {
@@ -71,7 +90,6 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
     }
   }, [bookingToEdit]);
 
-  // Calculate date limits (persist for session)
   const [minDate] = useState(() =>
     DateTime.now().setZone(OFFICE_TIMEZONE).startOf("day").toJSDate()
   );
@@ -79,7 +97,6 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
     DateTime.now().setZone(OFFICE_TIMEZONE).plus({ months: 6 }).endOf("day").toJSDate()
   );
 
-  // Optimize date filtering for DayPicker
   useEffect(() => {
     const now = DateTime.now().setZone(OFFICE_TIMEZONE);
     const startDate = DateTime.fromJSDate(minDate)
@@ -88,7 +105,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
     const endDate = DateTime.fromJSDate(maxDate)
       .setZone(OFFICE_TIMEZONE)
       .endOf("month");
-    const newFilteredDates = new Map();
+    const newFilteredDates = new Map<string, boolean>();
 
     let current = startDate;
     while (current <= endDate) {
@@ -96,10 +113,8 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
       const jsDate = current.toJSDate();
       const cachedBookings = getCachedBookings(jsDate);
 
-      // Basic validation
       let isValid = current >= now.startOf("day");
 
-      // Check office hours for today
       if (isValid && current.hasSame(now, "day")) {
         const currentHour = now.hour;
         if (currentHour >= 22) isValid = false;
@@ -109,31 +124,29 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
         }
       }
 
-      // Check bookings if available
       if (isValid && cachedBookings) {
         isValid = !isDayFullyBooked(current, cachedBookings);
       }
 
-      newFilteredDates.set(dateStr, isValid);
+      newFilteredDates.set(dateStr!, isValid);
       current = current.plus({ days: 1 });
     }
 
     setFilteredDates(newFilteredDates);
   }, [bookings, minDate, maxDate]);
 
-  // Filter function for DayPicker
   const isDateDisabledInternal = useCallback(
-    (date) => {
+    (date: Date): boolean => {
       const dateKey = DateTime.fromJSDate(date)
         .setZone(OFFICE_TIMEZONE)
         .toISODate();
-      return !(filteredDates.get(dateKey) ?? true);
+      return !(filteredDates.get(dateKey!) ?? true);
     },
     [filteredDates]
   );
 
   const isDateDisabled = useCallback(
-    (date) => {
+    (date: Date): boolean => {
       if (date < minDate || date > maxDate) {
         return true;
       }
@@ -142,7 +155,6 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
     [minDate, maxDate, isDateDisabledInternal]
   );
 
-  // Pre-fetch data for visible month
   useEffect(() => {
     const date = selectedDate || new Date();
     if (shouldFetchMonth(date)) {
@@ -150,7 +162,6 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
     }
   }, [selectedDate, roomId, authFetch]);
 
-  // Update available slots when date changes
   useEffect(() => {
     if (!selectedDate) return;
 
@@ -203,31 +214,26 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
         unsubscribe();
       };
     }
-
-    // No cleanup needed for cached data path
-    return undefined;
   }, [selectedDate, roomId]);
 
-  // Real-time conflict detection when date, slot, or duration changes
   useEffect(() => {
     if (!selectedDate || !selectedSlot || !bookings.length) {
       setConflictInfo(null);
       return;
     }
 
-    // Check for booking conflicts (exclude current booking when editing)
     const conflict = checkBookingConflict(
       selectedSlot.start,
       selectedSlot.end,
       bookings,
       roomId,
-      bookingToEdit?.id
+      bookingToEdit?.id as number | undefined
     );
 
     if (conflict) {
       setConflictInfo({
         hasConflict: true,
-        message: getConflictMessage(conflict),
+        message: getConflictMessage(conflict) || "Conflict detected",
         conflictData: conflict,
       });
     } else {
@@ -235,8 +241,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
     }
   }, [selectedDate, selectedSlot, bookings, roomId, bookingToEdit?.id]);
 
-  // Get available durations based on selected slot
-  const getAvailableDurationsForSlot = useCallback(() => {
+  const getAvailableDurationsForSlot = useCallback((): DurationOption[] => {
     if (!selectedSlot || !selectedDate) return [];
 
     const selectedDateTime = DateTime.fromJSDate(selectedDate).setZone(
@@ -244,9 +249,8 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
     );
     const allDurations = getAvailableDurations(selectedDateTime);
 
-    // Find which period the selected slot belongs to
     const slotHour = selectedSlot.start.hour;
-    let periodKey = null;
+    let periodKey: string | null = null;
     for (const [key, period] of Object.entries(TIME_PERIODS)) {
       if (slotHour >= period.start && slotHour < period.end) {
         periodKey = key;
@@ -256,7 +260,6 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
 
     if (!periodKey) return allDurations;
 
-    // Get max duration available in this period from this slot's start time
     const periodSlots = groupedSlots[periodKey] || [];
     const slotAtTime = periodSlots.find((s) =>
       s.start.equals(selectedSlot.start)
@@ -264,18 +267,16 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
 
     if (!slotAtTime) return allDurations;
 
-    // Filter durations that fit in this slot
     return allDurations.filter((d) => slotAtTime.duration >= d.minutes);
   }, [selectedSlot, selectedDate, groupedSlots]);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!roomId || !selectedDate || !selectedSlot || !selectedDuration) {
       setError("Please fill in all required fields");
       return;
     }
 
-    // Final validation before submission
     const selectedDateTime = DateTime.fromJSDate(selectedDate).setZone(
       OFFICE_TIMEZONE
     );
@@ -283,8 +284,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
       const bookingStart = DateTime.fromISO(booking.start_time).setZone(
         OFFICE_TIMEZONE
       );
-      const bookingRoomId = booking.room?.id || booking.room;
-      // Exclude current booking from conflict check when editing
+      const bookingRoomId = typeof booking.room === "object" ? booking.room?.id : booking.room;
       if (bookingToEdit && booking.id === bookingToEdit.id) return false;
       return (
         bookingRoomId === roomId &&
@@ -292,7 +292,6 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
       );
     });
 
-    // Double-check for overlaps before submission
     for (const booking of relevantBookings) {
       const bookingStart = DateTime.fromISO(booking.start_time).setZone(
         OFFICE_TIMEZONE
@@ -305,18 +304,17 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
         selectedSlot.start < bookingEnd &&
         selectedSlot.end > bookingStart
       ) {
-        // Use the conflict detection system for nice warning
         const conflict = checkBookingConflict(
           selectedSlot.start,
           selectedSlot.end,
           bookings,
           roomId,
-          bookingToEdit?.id
+          bookingToEdit?.id as number | undefined
         );
         if (conflict) {
           setConflictInfo({
             hasConflict: true,
-            message: getConflictMessage(conflict),
+            message: getConflictMessage(conflict) || "Conflict detected",
             conflictData: conflict,
           });
         }
@@ -331,7 +329,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
 
     try {
       const url = isEditing
-        ? `/api/bookings/${bookingToEdit.id}/`
+        ? `/api/bookings/${bookingToEdit!.id}/`
         : "/api/bookings/";
       const method = isEditing ? "PATCH" : "POST";
 
@@ -347,39 +345,34 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
 
       const booking = response;
 
-      // Trigger success animation
       setIsBookingSuccessful(true);
 
-      // Show success message after a brief delay
       setTimeout(
         () => showAlert(isEditing ? "Booking updated successfully" : "Your booking was created successfully"),
         300
       );
 
-      // Reset form state
       setSelectedDate(null);
       setSelectedSlot(null);
       setSelectedDuration(null);
       setError(null);
 
-      // Notify parent component
       if (isEditing) {
         if (onBookingUpdated) onBookingUpdated(booking);
         if (onClose) onClose();
       } else {
         if (onBookingCreated) onBookingCreated(booking);
       }
-    } catch (error) {
-      logError(`Error ${isEditing ? "updating" : "creating"} booking:`, error);
+    } catch (err: unknown) {
+      const error = err as { status?: number; message?: string; general?: string[] };
+      logError(`Error ${isEditing ? "updating" : "creating"} booking:`, err);
       if (error.status === 401) {
         setError(
           "Your session has expired. Please refresh the page and try again."
         );
       } else if (error.status === 400) {
-        // Validation errors - check if it's a booking conflict
         const errorMsg = error.message || error.general?.join(". ") || "";
         if (errorMsg.toLowerCase().includes("booked") || errorMsg.toLowerCase().includes("overlap") || errorMsg.toLowerCase().includes("conflict")) {
-          // Show as warning for conflicts
           setConflictInfo({
             hasConflict: true,
             message: errorMsg,
@@ -398,43 +391,33 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
     }
   };
 
-  const isValid = () => {
-    return selectedDate && selectedDuration && selectedSlot;
-  };
-
-  // Format button label with booking info
-  const getButtonLabel = () => {
+  const getButtonLabel = (): string => {
     if (loading) return "Loading...";
-    if (isBookingSuccessful) return bookingToEdit ? "✓ Booking Updated" : "✓ Booking Confirmed";
+    if (isBookingSuccessful) return bookingToEdit ? "Booking Updated" : "Booking Confirmed";
     if (conflictInfo?.hasConflict) return "Time Slot Unavailable";
 
-    // Check edit mode - look at the prop directly
     if (bookingToEdit) {
-      // We're editing, even if form isn't fully initialized yet
       if (!selectedDate || !selectedSlot || !selectedDuration) return "Update Booking";
       const timeStr = selectedSlot.format().start;
       return `Update for ${timeStr}`;
     }
 
-    // Creating new booking
     if (!selectedDate || !selectedSlot || !selectedDuration) return "Book Room";
     const timeStr = selectedSlot.format().start;
     return `Book for ${timeStr}`;
   };
 
-  // Notify parent when form validity changes
   useEffect(() => {
     const isFormValid = !!(selectedDate && selectedSlot && selectedDuration);
     onValidityChange?.(isFormValid);
   }, [selectedDate, selectedSlot, selectedDuration, onValidityChange]);
 
-  // Notify parent when conflict status changes
   useEffect(() => {
     onConflictChange?.(conflictInfo?.hasConflict || false);
   }, [conflictInfo, onConflictChange]);
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+    <form ref={formRef as React.Ref<HTMLFormElement>} onSubmit={handleSubmit} className="space-y-4">
       {error && (
         <Card className="p-4 border-status-danger/20 bg-status-danger/10">
           <Text className="font-medium text-status-danger-text">{error}</Text>
@@ -473,15 +456,14 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
         </Card>
       )}
 
-      {/* Step 1: Select Date */}
       <div>
         <Label>Select Date</Label>
         <div className="flex justify-center mt-2">
           <DayPicker
             mode="single"
-            selected={selectedDate}
-            onSelect={(date) => {
-              setSelectedDate(date);
+            selected={selectedDate ?? undefined}
+            onSelect={(date: Date | undefined) => {
+              setSelectedDate(date !== undefined ? date : null);
               setSelectedSlot(null);
               setSelectedDuration(null);
             }}
@@ -493,7 +475,6 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
               caption: { color: "#3f3f46" },
               head_cell: { color: "#71717a" },
               nav_button: { color: "#3f3f46" },
-              nav_button_disabled: { color: "#d4d4d8" },
               day: { color: "#3f3f46" },
               day_disabled: { color: "#d4d4d8" },
               day_selected: {
@@ -506,7 +487,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
                 color: "#3f3f46",
                 fontWeight: "bold",
               },
-            }}
+            } as Record<string, React.CSSProperties>}
           />
         </div>
         {selectedDate && (
@@ -518,10 +499,8 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
         )}
       </div>
 
-      {/* Step 2: Available Times (three buttons in a row) */}
       {selectedDate && !loading && Object.keys(groupedSlots).length > 0 && (
         <div>
-          {/* Period buttons row */}
           <div className="grid grid-cols-3 gap-2 mb-3">
             {Object.entries(TIME_PERIODS).map(([periodKey, period]) => {
               const slots = groupedSlots[periodKey] || [];
@@ -549,7 +528,6 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
             })}
           </div>
 
-          {/* Time slots for selected period */}
           {expandedPeriod && groupedSlots[expandedPeriod] && (
             <div className="grid grid-cols-4 gap-2">
               {groupedSlots[expandedPeriod].map((slot) => {
@@ -559,7 +537,6 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
                   selectedSlot?.start &&
                   selectedSlot.start.equals(slot.start);
 
-                // Check if this slot is available
                 const selectedDateTime = DateTime.fromJSDate(
                   selectedDate
                 ).setZone(OFFICE_TIMEZONE);
@@ -567,14 +544,13 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
                   const bookingStart = DateTime.fromISO(
                     booking.start_time
                   ).setZone(OFFICE_TIMEZONE);
-                  const bookingRoomId = booking.room?.id || booking.room;
+                  const bookingRoomId = typeof booking.room === "object" ? booking.room?.id : booking.room;
                   return (
                     bookingRoomId === roomId &&
                     bookingStart.hasSame(selectedDateTime, "day")
                   );
                 });
 
-                // Check for overlaps
                 let isAvailable = true;
                 for (const booking of relevantBookings) {
                   const bookingStart = DateTime.fromISO(
@@ -584,7 +560,6 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
                     booking.end_time
                   ).setZone(OFFICE_TIMEZONE);
 
-                  // Check 15-minute slot availability
                   const slotEnd = slot.start.plus({ minutes: 15 });
                   if (
                     slot.start < bookingEnd &&
@@ -609,7 +584,6 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
                     }
                     onClick={() => {
                       if (isAvailable) {
-                        // Create a 15-minute slot by default
                         const defaultSlot = new TimeSlot(
                           slot.start,
                           slot.start.plus({ minutes: 15 })
@@ -628,7 +602,6 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
         </div>
       )}
 
-      {/* Step 3: Duration (shown after slot selection) */}
       {selectedDate && selectedSlot && (
         <div>
           <Label>Duration</Label>
@@ -636,13 +609,12 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
             {(() => {
               const availableDurations = getAvailableDurationsForSlot();
 
-              // Show durations in order
               const commonDurations = [15, 30, 45, 60, 90, 120];
               const displayDurations = commonDurations
                 .map((mins) =>
                   availableDurations.find((d) => d.minutes === mins)
                 )
-                .filter(Boolean);
+                .filter(Boolean) as DurationOption[];
 
               return displayDurations.map((duration) => (
                 <Button
@@ -656,7 +628,6 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
                   size="sm"
                   onClick={() => {
                     setSelectedDuration(duration);
-                    // Update the selected slot with new duration
                     const updatedSlot = new TimeSlot(
                       selectedSlot.start,
                       selectedSlot.start.plus({ minutes: duration.minutes })
@@ -672,7 +643,6 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
         </div>
       )}
 
-      {/* Submit Button */}
       {showSubmitButton && selectedDate && selectedSlot && selectedDuration && (
         <Button
           type="submit"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import Button from "../components/ui/Button";
 import { error as logError } from "../utils/logger";
@@ -219,18 +219,18 @@ export default function RoomsPage() {
               </button>
             </div>
             <div className="p-4 sm:p-6">
-              {React.createElement(BookingForm as React.ComponentType<any>, {
-                roomId: selectedRoomId,
-                rooms,
-                formRef: bookingFormRef,
-                showSubmitButton: false,
-                onValidityChange: setIsFormValid,
-                onBookingCreated: handleBookingCreated,
-                onCancel: () => {
+              <BookingForm
+                roomId={selectedRoomId}
+                rooms={rooms}
+                formRef={bookingFormRef}
+                showSubmitButton={false}
+                onValidityChange={setIsFormValid}
+                onBookingCreated={handleBookingCreated}
+                onCancel={() => {
                   setShowBookingForm(false);
                   setSelectedRoomId(null);
-                },
-              })}
+                }}
+              />
 
               <Button
                 variant="primary"
