@@ -17,6 +17,7 @@ frontend/node_modules/
 
 # Virtual environment
 backend/venv/
+backend/staticfiles/
 
 # Claude/Serena
 .claude/
