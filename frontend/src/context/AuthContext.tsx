@@ -356,10 +356,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userFetchedRef.current = false;
         setLoading(false);
       } else if (hasRefresh) {
-        const newAccess = await refreshAccessToken();
-        if (newAccess) {
-          setIsAuthenticated(true);
-        } else {
+        // refreshAccessToken reads `refresh` from state, but state hasn't
+        // been set yet (only the `isValidAccess` branch calls setRefresh).
+        // Call the refresh endpoint directly with the stored token.
+        try {
+          const res = await fetch(`${API_URL}/api/token/refresh/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refresh: storedRefresh }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            setAccess(data.access);
+            setRefresh(data.refresh || storedRefresh);
+            TOKEN_STORAGE.set(data.access, data.refresh || storedRefresh);
+            setIsAuthenticated(true);
+          } else {
+            logout();
+          }
+        } catch {
           logout();
         }
         setLoading(false);
