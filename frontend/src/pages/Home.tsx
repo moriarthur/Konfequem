@@ -1,9 +1,8 @@
-// @ts-nocheck
-import { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { error as logError } from "../utils/logger";
-import { OFFICE_TIMEZONE } from "../utils/bookingUtils";
+import { OFFICE_TIMEZONE, BookingData } from "../utils/bookingUtils";
 import { useAlert } from "../context/AlertContext";
 import BottomNav from "../components/BottomNav";
 import Button from "../components/ui/Button";
@@ -14,32 +13,37 @@ import { Skeleton, StatCardSkeleton, BookingListSkeleton } from "../components/u
 import EmptyState from "../components/ui/EmptyState";
 import BookingDetailsModal from "../components/booking/BookingDetailsModal";
 import { DateTime } from "luxon";
+import { Room, PaginatedResponse } from "../types";
+
+function roomDisplayName(room: number | { id: number } | undefined): string {
+  if (!room) return "Room";
+  if (typeof room === "number") return String(room);
+  return String(room.id);
+}
 
 export default function Home() {
   const { authFetch, authFetchRef, isAuthenticated, loading, user } = useAuth();
   const { success, error: showError } = useAlert();
   const navigate = useNavigate();
-  const [rooms, setRooms] = useState([]);
-  const [bookings, setBookings] = useState([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [bookings, setBookings] = useState<BookingData[]>([]);
   const [showQuickBook, setShowQuickBook] = useState(false);
-  const [selectedRoomId, setSelectedRoomId] = useState(null);
+  const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
   const [isFormValid, setIsFormValid] = useState(false);
-  const [bookingToEdit, setBookingToEdit] = useState(null);
+  const [bookingToEdit, setBookingToEdit] = useState<BookingData | null>(null);
   const [hasBookingConflict, setHasBookingConflict] = useState(false);
-  const bookingFormRef = useRef(null);
-  const quickBookSectionRef = useRef(null);
-  const [detailsBooking, setDetailsBooking] = useState(null);
-  const [confirmCancel, setConfirmCancel] = useState(null);
+  const bookingFormRef = useRef<HTMLFormElement>(null);
+  const quickBookSectionRef = useRef<HTMLDivElement>(null);
+  const [detailsBooking, setDetailsBooking] = useState<BookingData | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState<BookingData | null>(null);
 
-  // Handle edit booking
-  const handleEditBooking = (booking) => {
-    const roomId = booking.room?.id || booking.room || booking.room_id;
+  const handleEditBooking = (booking: BookingData) => {
+    const roomId = typeof booking.room === "object" ? booking.room?.id : booking.room;
     setBookingToEdit(booking);
-    setSelectedRoomId(roomId);
+    setSelectedRoomId(roomId ?? null);
     setShowQuickBook(true);
   };
 
-  // Close quick book modal and reset state
   const closeQuickBook = () => {
     setShowQuickBook(false);
     setSelectedRoomId(null);
@@ -47,8 +51,7 @@ export default function Home() {
     setHasBookingConflict(false);
   };
 
-  // Cancel a booking
-  const handleCancelBooking = async (booking) => {
+  const handleCancelBooking = async (booking: BookingData) => {
     try {
       await authFetch(`/api/bookings/${booking.id}/`, { method: "DELETE" });
       success("Booking cancelled successfully");
@@ -56,7 +59,7 @@ export default function Home() {
       setDetailsBooking(null);
       refreshBookings();
     } catch (err) {
-      const msg = err?.message || "";
+      const msg = (err as { message?: string })?.message || "";
       if (msg.includes("JSON.parse") || msg.includes("unexpected end of data")) {
         success("Booking cancelled successfully");
         setConfirmCancel(null);
@@ -68,23 +71,23 @@ export default function Home() {
     }
   };
 
-  // Refresh bookings
   const refreshBookings = () => {
     authFetch("/api/bookings/")
-      .then(data => setBookings(data.results || data))
+      .then(data => {
+        const resp = data as PaginatedResponse<BookingData>;
+        setBookings(resp.results || []);
+      })
       .catch(logError);
   };
 
-  // Get time-based greeting
-  const getTimeBasedGreeting = () => {
+  const getTimeBasedGreeting = (): string => {
     const hour = DateTime.now().hour;
     if (hour < 12) return "Good morning";
     if (hour < 17) return "Good afternoon";
     return "Good evening";
   };
 
-  // Get today's date in German format
-  const getTodayDate = () => {
+  const getTodayDate = (): string => {
     return DateTime.now().setZone("Europe/Berlin").toFormat("EEEE, dd. MMMM yyyy");
   };
 
@@ -95,23 +98,16 @@ export default function Home() {
       return;
     }
 
-    // Only fetch if the authFetchRef is available (i.e., authContext is fully initialized)
-    if (!authFetchRef?.current) {
-      // Auth context not fully initialized yet, skip this render
-      return;
-    }
+    if (!authFetchRef?.current) return;
 
     const fetchData = async () => {
       try {
-        // Use the ref to get the latest authFetch function
-        const fetch = authFetchRef.current;
-        const roomsResponse = await fetch("/api/rooms/");
-        // Handle pagination - extract results array from paginated response
-        setRooms(roomsResponse.results || roomsResponse);
+        const fetch = authFetchRef.current!;
+        const roomsResponse = await fetch("/api/rooms/") as PaginatedResponse<Room>;
+        setRooms(roomsResponse.results || []);
 
-        const bookingsResponse = await fetch("/api/bookings/");
-        // Handle pagination - extract results array from paginated response
-        setBookings(bookingsResponse.results || bookingsResponse);
+        const bookingsResponse = await fetch("/api/bookings/") as PaginatedResponse<BookingData>;
+        setBookings(bookingsResponse.results || []);
       } catch (err) {
         logError("Error fetching data:", err);
       }
@@ -120,38 +116,32 @@ export default function Home() {
     fetchData();
   }, [isAuthenticated]);
 
-  // Get upcoming bookings (nearest future bookings)
   const upcomingBookings = useMemo(() => {
-    // Ensure bookings is an array before processing
     if (!bookings || !Array.isArray(bookings) || bookings.length === 0) {
-      return { current: null, upcoming: [] };
+      return { current: null as BookingData | null, upcoming: [] as BookingData[] };
     }
 
     const now = DateTime.now().setZone("Europe/Berlin");
 
-    // Filter and sort all future bookings
     const futureBookings = bookings
       .filter((booking) => {
         if (!booking?.start_time) return false;
         const start = DateTime.fromISO(booking.start_time).setZone("Europe/Berlin");
         return start > now;
       })
-      .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
-    // Find current booking (happening now)
     const current = bookings.find((booking) => {
       const start = DateTime.fromISO(booking.start_time).setZone("Europe/Berlin");
       const end = DateTime.fromISO(booking.end_time).setZone("Europe/Berlin");
       return now >= start && now < end;
     });
 
-    // Get next 5 upcoming bookings
     const upcoming = futureBookings.slice(0, 5);
 
     return { current, upcoming };
   }, [bookings]);
 
-  // Get rooms available right now
   const availableNow = useMemo(() => {
     if (!rooms.length || !Array.isArray(bookings) || !bookings.length) return rooms.length;
 
@@ -162,12 +152,11 @@ export default function Home() {
         const end = DateTime.fromISO(booking.end_time).setZone("Europe/Berlin");
         return now >= start && now < end;
       })
-      .map((b) => b.room);
+      .map((b) => typeof b.room === "object" ? b.room?.id : b.room);
 
     return rooms.filter((room) => !bookedRoomIds.includes(room.id)).length;
   }, [rooms, bookings]);
 
-  // Get today's bookings count for the status card
   const todayBookingsCount = useMemo(() => {
     if (!bookings || !Array.isArray(bookings) || bookings.length === 0) return 0;
 
@@ -182,18 +171,17 @@ export default function Home() {
     }).length;
   }, [bookings]);
 
-  // Reset form validity when room selection changes or quick book closes
   useEffect(() => {
     if (!showQuickBook || !selectedRoomId) {
       setIsFormValid(false);
     }
   }, [showQuickBook, selectedRoomId]);
 
-  // Scroll to quick book section when it opens
   useEffect(() => {
     if (showQuickBook && quickBookSectionRef.current) {
       setTimeout(() => {
         const rect = quickBookSectionRef.current?.getBoundingClientRect();
+        if (!rect) return;
         const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
         const targetY = scrollTop + rect.top - (window.innerHeight / 2) + (rect.height / 2);
         window.scrollTo({
@@ -204,11 +192,13 @@ export default function Home() {
     }
   }, [showQuickBook]);
 
+  const firstName = user?.first_name as string | undefined;
+  const username = user?.username as string | undefined;
+
   return (
     <div className="min-h-screen bg-surface-muted pb-20">
       {loading && (
         <div className="px-4 py-6 max-w-4xl mx-auto">
-          {/* Header skeleton */}
           <div className="mb-6">
             <div className="flex items-center justify-center gap-1 mb-4">
               <Skeleton className="h-5 w-28" />
@@ -218,26 +208,22 @@ export default function Home() {
             <Skeleton className="h-4 w-48 mx-auto" />
           </div>
 
-          {/* Status card skeleton */}
           <div className="grid grid-cols-2 gap-3 mb-6">
             <StatCardSkeleton />
             <StatCardSkeleton />
           </div>
 
-          {/* Booking list skeleton */}
           <div className="bg-surface-base border border-border-subtle rounded-xl p-4">
             <Skeleton className="h-5 w-32 mb-4" />
             <BookingListSkeleton />
           </div>
 
-          {/* Quick Book button skeleton */}
           <div className="bg-surface-base border border-border-subtle rounded-xl h-14" />
         </div>
       )}
 
       {!loading && isAuthenticated ? (
         <div className="px-4 py-6 max-w-4xl mx-auto">
-          {/* Header with logo and greeting */}
           <section className="mb-6">
             <div className="flex items-center justify-center gap-1 mb-4">
               <span className="text-xl font-bold tracking-wide" style={{ color: "#61b390" }}>KONFEQUEM</span>
@@ -246,7 +232,7 @@ export default function Home() {
             </div>
             <div className="text-center">
               <p className="text-sm text-accent-secondary/60">
-                {getTimeBasedGreeting()}, {user?.first_name || user?.username || "there"}
+                {getTimeBasedGreeting()}, {firstName || username || "there"}
               </p>
             </div>
             <Text variant="muted" className="text-sm text-center mt-1">
@@ -254,7 +240,6 @@ export default function Home() {
             </Text>
           </section>
 
-          {/* Current status card */}
           <section className="mb-6">
             <div className="bg-surface-base border border-border-subtle rounded-xl p-4">
               <div className="grid grid-cols-2 gap-4">
@@ -274,7 +259,6 @@ export default function Home() {
             </div>
           </section>
 
-          {/* Current/Next meeting highlight */}
           {upcomingBookings.current && (
             <section className="mb-6">
               <div className="bg-status-success/10 border border-status-success/20 rounded-xl p-4">
@@ -286,7 +270,7 @@ export default function Home() {
                   <p className="text-sm font-medium text-status-success">Happening now</p>
                 </div>
                 <p className="font-semibold text-accent-secondary">
-                  {upcomingBookings.current.room_name || upcomingBookings.current.room}
+                  {(upcomingBookings.current.room_name as string) || roomDisplayName(upcomingBookings.current.room)}
                 </p>
                 <p className="text-sm text-accent-secondary/70 mt-1">
                   Until {DateTime.fromISO(upcomingBookings.current.end_time).setZone("Europe/Berlin").toFormat("HH:mm")}
@@ -306,7 +290,7 @@ export default function Home() {
                   <p className="text-sm font-medium text-status-warning">Upcoming next</p>
                 </div>
                 <p className="font-semibold text-accent-secondary">
-                  {upcomingBookings.upcoming[0].room_name || upcomingBookings.upcoming[0].room}
+                  {(upcomingBookings.upcoming[0].room_name as string) || roomDisplayName(upcomingBookings.upcoming[0].room)}
                 </p>
                 <p className="text-sm text-accent-secondary/70 mt-1">
                   {DateTime.fromISO(upcomingBookings.upcoming[0].start_time).setZone("Europe/Berlin").toFormat("HH:mm")} –{" "}
@@ -316,7 +300,6 @@ export default function Home() {
             </section>
           )}
 
-          {/* Upcoming Bookings */}
           <section className="mb-6">
             <div className="bg-surface-base border border-border-subtle rounded-xl p-4">
               <Heading level={2} className="text-lg font-semibold text-accent-secondary mb-4">
@@ -350,10 +333,10 @@ export default function Home() {
                 <>
                   <div className="space-y-2">
                     {upcomingBookings.current && (
-                      <div className={`w-full bg-surface-base border rounded-xl p-3 flex items-center justify-between gap-3 border-status-success/30 bg-status-success/5`}>
+                      <div className="w-full bg-surface-base border rounded-xl p-3 flex items-center justify-between gap-3 border-status-success/30 bg-status-success/5">
                         <div className="flex-1 min-w-0 text-left">
                           <p className="font-medium text-accent-secondary truncate">
-                            {upcomingBookings.current.room_name || upcomingBookings.current.room}
+                            {(upcomingBookings.current.room_name as string) || roomDisplayName(upcomingBookings.current.room)}
                           </p>
                           <p className="text-xs text-accent-secondary/60">
                             {DateTime.fromISO(upcomingBookings.current.start_time).setZone("Europe/Berlin").toFormat("HH:mm")} –{" "}
@@ -378,13 +361,13 @@ export default function Home() {
 
                       return (
                         <button
-                          key={booking.id}
+                          key={String(booking.id)}
                           onClick={() => setDetailsBooking(booking)}
                           className="w-full bg-surface-muted border border-border-subtle rounded-xl p-3 flex items-center justify-between gap-3 hover:ring-2 hover:ring-accent-primary/30 hover:bg-surface-base transition-all group"
                         >
                           <div className="flex-1 min-w-0 text-left">
                             <p className="font-medium text-accent-secondary truncate">
-                              {booking.room_name || booking.room}
+                              {(booking.room_name as string) || roomDisplayName(booking.room)}
                             </p>
                             <p className="text-xs text-accent-secondary/60">
                               {dateLabel} • {start.toFormat("HH:mm")} –{" "}
@@ -398,8 +381,7 @@ export default function Home() {
                       );
                     })}
                   </div>
-                  
-                  {/* View all bookings button */}
+
                   <button
                     onClick={() => navigate("/calendar")}
                     className="w-full text-center text-sm text-accent-primary hover:underline mt-4"
@@ -411,9 +393,7 @@ export default function Home() {
             </div>
           </section>
 
-          {/* Quick Book CTA */}
           <section className="mb-4">
-            {/* Expandable Quick Book Section */}
             <div
               ref={quickBookSectionRef}
               className={`overflow-hidden transition-all duration-300 ease-in-out ${
@@ -421,7 +401,6 @@ export default function Home() {
               }`}
             >
               <div className="bg-surface-base border border-border-subtle rounded-xl overflow-hidden">
-                {/* Section Header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
                   <Heading level={3} className="text-base font-semibold">
                     Quick Book
@@ -437,22 +416,20 @@ export default function Home() {
                   </button>
                 </div>
 
-                {/* Booking Form */}
                 <div>
                   {!selectedRoomId ? (
-                    // Step 1: Select Room
                     <div className="p-4">
                       <Text variant="muted" className="mb-3 text-sm">
                         Select a room to book
                       </Text>
                       <div className="space-y-2">
                         {rooms.map((room) => {
-                          // Check if room is available now
                           const now = DateTime.now().setZone("Europe/Berlin");
                           const isBooked = bookings.some((b) => {
                             const start = DateTime.fromISO(b.start_time).setZone("Europe/Berlin");
                             const end = DateTime.fromISO(b.end_time).setZone("Europe/Berlin");
-                            return b.room === room.id && now >= start && now < end;
+                            const bRoomId = typeof b.room === "object" ? b.room?.id : b.room;
+                            return bRoomId === room.id && now >= start && now < end;
                           });
 
                           return (
@@ -480,7 +457,6 @@ export default function Home() {
                       </div>
                     </div>
                   ) : (
-                    // Step 2: Booking Form
                     <>
                       <button
                         onClick={() => setSelectedRoomId(null)}
@@ -492,26 +468,26 @@ export default function Home() {
                         Back to rooms
                       </button>
                       <div className="p-4">
-                        <BookingForm
-                          roomId={selectedRoomId}
-                          rooms={rooms}
-                          formRef={bookingFormRef}
-                          showSubmitButton={false}
-                          onValidityChange={setIsFormValid}
-                          onConflictChange={setHasBookingConflict}
-                          bookingToEdit={bookingToEdit}
-                          onBookingCreated={() => {
+                        {React.createElement(BookingForm as React.ComponentType<any>, {
+                          roomId: selectedRoomId,
+                          rooms,
+                          formRef: bookingFormRef,
+                          showSubmitButton: false,
+                          onValidityChange: setIsFormValid,
+                          onConflictChange: setHasBookingConflict,
+                          bookingToEdit,
+                          onBookingCreated: () => {
                             refreshBookings();
                             closeQuickBook();
-                          }}
-                          onBookingUpdated={() => {
+                          },
+                          onBookingUpdated: () => {
                             refreshBookings();
                             closeQuickBook();
-                          }}
-                          onCancel={() => {
+                          },
+                          onCancel: () => {
                             closeQuickBook();
-                          }}
-                        />
+                          },
+                        })}
                       </div>
                     </>
                   )}
@@ -525,10 +501,8 @@ export default function Home() {
               disabled={showQuickBook && (!isFormValid || hasBookingConflict)}
               onClick={() => {
                 if (showQuickBook && isFormValid && !hasBookingConflict) {
-                  // Trigger form submission
                   bookingFormRef.current?.requestSubmit();
                 } else {
-                  // Opening for new booking - reset edit state
                   setBookingToEdit(null);
                   setHasBookingConflict(false);
                   setShowQuickBook(true);
@@ -557,7 +531,6 @@ export default function Home() {
             </Button>
           </section>
 
-          {/* Helpful office info */}
           <section className="mb-4">
             <div className="bg-surface-base border border-border-subtle rounded-xl p-4">
               <p className="text-xs font-medium text-accent-secondary/60 uppercase tracking-wide mb-3">
@@ -601,25 +574,22 @@ export default function Home() {
         )
       )}
 
-      {/* Bottom Navigation */}
       {isAuthenticated && <BottomNav />}
 
-      {/* Booking details modal */}
       {detailsBooking && (
         <BookingDetailsModal
-          booking={detailsBooking}
+          booking={detailsBooking as any}
           onClose={() => setDetailsBooking(null)}
           onEdit={(booking) => {
             setDetailsBooking(null);
-            handleEditBooking(booking);
+            handleEditBooking(booking as any);
           }}
           onCancel={(booking) => {
-            setConfirmCancel(booking);
+            setConfirmCancel(booking as any);
           }}
         />
       )}
 
-      {/* Cancel confirmation modal */}
       {confirmCancel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmCancel(null)} aria-hidden="true" />
@@ -628,7 +598,7 @@ export default function Home() {
             <p className="text-accent-secondary/70 mb-6">Are you sure you want to cancel this booking?</p>
             <div className="bg-surface-muted rounded-xl p-4 mb-6">
               <div className="space-y-2 text-sm">
-                <div className="font-medium">Room: {confirmCancel.room_name || confirmCancel.room}</div>
+                <div className="font-medium">Room: {(confirmCancel.room_name as string) || roomDisplayName(confirmCancel.room)}</div>
                 <div>Date: {DateTime.fromISO(confirmCancel.start_time).setZone(OFFICE_TIMEZONE).toFormat("dd.MM.yyyy")}</div>
                 <div>Time: {DateTime.fromISO(confirmCancel.start_time).setZone(OFFICE_TIMEZONE).toFormat("HH:mm")} — {DateTime.fromISO(confirmCancel.end_time).setZone(OFFICE_TIMEZONE).toFormat("HH:mm")}</div>
               </div>
