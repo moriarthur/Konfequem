@@ -1,25 +1,36 @@
-// @ts-nocheck
 import React, { useState, useMemo } from "react";
 import { DateTime } from "luxon";
-import { OFFICE_TIMEZONE, OFFICE_HOURS } from "../utils/bookingUtils";
+import { OFFICE_TIMEZONE, OFFICE_HOURS, BookingData } from "../utils/bookingUtils";
 import { Text, Heading } from "./ui/Typography";
 import Card from "./ui/Card";
 
-export default function AvailabilityCalendar({ bookings = [], selectedRoom = null, onDaySelect = null }) {
-  const [tooltipDay, setTooltipDay] = useState(null);
-  const [selectedDay, setSelectedDay] = useState(null);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+interface DayAvailabilityDetail {
+  status: "available" | "busy" | "full";
+  occupancyPercent: number;
+  freeSlots: number;
+  date: DateTime;
+  bookings: BookingData[];
+}
 
-  // Calculate availability for each day
-  const dayAvailability = useMemo(() => {
-    const availability = {};
+interface AvailabilityCalendarProps {
+  bookings?: BookingData[];
+  selectedRoom?: number | null;
+  onDaySelect?: ((dateKey: string, dayData: DayAvailabilityDetail) => void) | null;
+}
+
+export default function AvailabilityCalendar({ bookings = [], selectedRoom = null, onDaySelect = null }: AvailabilityCalendarProps) {
+  const [tooltipDay, setTooltipDay] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [_tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+
+  const dayAvailability = useMemo<Record<string, DayAvailabilityDetail>>(() => {
+    const availability: Record<string, DayAvailabilityDetail> = {};
     const today = DateTime.now().setZone(OFFICE_TIMEZONE);
     const maxDate = today.plus({ days: 90 });
 
     for (let d = today; d <= maxDate; d = d.plus({ days: 1 })) {
       const dateKey = d.toFormat("yyyy-MM-dd");
-      
-      // Get bookings for this day and room
+
       const dayBookings = bookings.filter((booking) => {
         const bookingDate = DateTime.fromISO(booking.start_time)
           .setZone(OFFICE_TIMEZONE)
@@ -27,22 +38,17 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
         return bookingDate === dateKey && (!selectedRoom || booking.room === selectedRoom);
       });
 
-      // Calculate total booked minutes
       const totalBookedMinutes = dayBookings.reduce((sum, booking) => {
         const start = DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE);
         const end = DateTime.fromISO(booking.end_time).setZone(OFFICE_TIMEZONE);
         return sum + end.diff(start, "minutes").minutes;
       }, 0);
 
-      // Calculate total available minutes (office hours)
       const officeHoursMinutes = (OFFICE_HOURS.end - OFFICE_HOURS.start) * 60;
-
-      // Calculate free slots (approximate)
       const freeMinutes = Math.max(0, officeHoursMinutes - totalBookedMinutes);
       const occupancyPercent = (totalBookedMinutes / officeHoursMinutes) * 100;
 
-      // Determine status: green (0-50%), yellow (50-80%), red (80-100%)
-      let status = "available";
+      let status: DayAvailabilityDetail["status"] = "available";
       if (occupancyPercent >= 80) {
         status = "full";
       } else if (occupancyPercent >= 50) {
@@ -54,14 +60,14 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
         occupancyPercent: Math.round(occupancyPercent),
         freeSlots: Math.floor(freeMinutes / OFFICE_HOURS.minDuration),
         date: d,
-        bookings: dayBookings, // Store the actual bookings for the selected day
+        bookings: dayBookings,
       };
     }
 
     return availability;
   }, [bookings, selectedRoom]);
 
-  const handleMouseEnter = (dateKey, e) => {
+  const handleMouseEnter = (dateKey: string, e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     setTooltipPos({
       x: rect.left + rect.width / 2,
@@ -74,8 +80,7 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
     setTooltipDay(null);
   };
 
-  const handleDayClick = (dateKey) => {
-    // Toggle: если день уже выбран, десelectить его
+  const handleDayClick = (dateKey: string) => {
     if (selectedDay === dateKey) {
       setSelectedDay(null);
     } else {
@@ -86,15 +91,14 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
     }
   };
 
-  // Get current week
   const today = DateTime.now().setZone(OFFICE_TIMEZONE);
-  const weekStart = today.startOf("week").plus({ days: 1 }); // Monday
-  const weekDays = [];
+  const weekStart = today.startOf("week").plus({ days: 1 });
+  const weekDays: DateTime[] = [];
   for (let i = 0; i < 7; i++) {
     weekDays.push(weekStart.plus({ days: i }));
   }
 
-  const getStatusStyles = (status) => {
+  const getStatusStyles = (status: string): Record<string, string> => {
     switch (status) {
       case "available":
         return {
@@ -134,7 +138,7 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
     }
   };
 
-  const getStatusLabel = (status) => {
+  const getStatusLabel = (status: string): string => {
     switch (status) {
       case "available":
         return "Available";
@@ -188,17 +192,14 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
                 onMouseEnter={(e) => handleMouseEnter(dateKey, e)}
                 onMouseLeave={handleMouseLeave}
               >
-                {/* Day label */}
                 <Text variant="small" className="font-medium text-accent-secondary/70 mb-1">
                   {day.toFormat("EEE")}
                 </Text>
 
-                {/* Date number */}
                 <Heading level={3} className="text-2xl text-accent-secondary mb-3">
                   {day.toFormat("d")}
                 </Heading>
 
-                {/* Availability progress bar */}
                 <div className="w-full h-1.5 bg-surface-muted rounded-full overflow-hidden mb-3">
                   <div
                     className={`h-full transition-all duration-500 ${statusStyles.fill}`}
@@ -206,7 +207,6 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
                   />
                 </div>
 
-                {/* Occupancy percentage */}
                 <Text
                   variant="small"
                   className={`font-semibold ${statusStyles.text}`}
@@ -214,23 +214,19 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
                   {dayData.occupancyPercent}%
                 </Text>
 
-                {/* Month indicator */}
                 <Text variant="muted" className="text-xs mt-1">
                   {day.toFormat("MMM")}
                 </Text>
 
-                {/* Selected indicator */}
                 {isSelected && (
                   <div className="absolute -top-1 -right-1 w-3 h-3 bg-accent-primary rounded-full border-2 border-surface-base shadow-soft" />
                 )}
 
-                {/* Today indicator */}
                 {isToday && !isSelected && (
                   <div className="absolute -top-1 -right-1 w-2 h-2 bg-accent-secondary/40 rounded-full" />
                 )}
               </div>
 
-              {/* Simplified tooltip - only show quick status */}
               {tooltipDay === dateKey && dayData && !isSelected && (
                 <div
                   className="absolute bottom-full left-1/2 transform -translate-x-1/2 z-50 mb-2 pointer-events-none animate-fadeIn"
@@ -255,7 +251,6 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
         })}
       </div>
 
-      {/* Selected day details */}
       {selectedDay && dayAvailability[selectedDay] && (
         <Card className={`border-2 ${getStatusStyles(dayAvailability[selectedDay].status).border} ${getStatusStyles(dayAvailability[selectedDay].status).bg} p-6 animate-fadeIn`}>
           <div className="mb-6">
@@ -267,7 +262,6 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
             </h3>
           </div>
 
-          {/* Time-based visualization */}
           <div className="mb-6">
             <Text variant="small" className="font-semibold text-accent-secondary mb-3">Hourly Availability</Text>
             <div className="grid grid-cols-8 gap-1 mb-2">
@@ -295,7 +289,6 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
             </div>
           </div>
 
-          {/* Stats overview */}
           <div className="grid grid-cols-3 gap-6 mb-6">
             <div className="text-center">
               <div className={`inline-flex items-center justify-center w-12 h-12 rounded-full ${getStatusStyles(dayAvailability[selectedDay].status).bg} mb-2`}>
@@ -323,7 +316,6 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
             </div>
           </div>
 
-          {/* Existing bookings */}
           {dayAvailability[selectedDay].bookings && dayAvailability[selectedDay].bookings.length > 0 && (
             <div className="mb-6">
               <Text variant="small" className="font-semibold text-accent-secondary mb-3">Existing Bookings</Text>
@@ -337,7 +329,7 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
                       </Text>
                     </div>
                     <Text variant="small" className="text-accent-secondary/70">
-                      {booking.room_name || booking.room || 'Room'}
+                      {(booking.room_name as string) || (typeof booking.room === "number" ? String(booking.room) : booking.room?.id ? String(booking.room.id) : 'Room')}
                     </Text>
                   </div>
                 ))}
@@ -351,7 +343,6 @@ export default function AvailabilityCalendar({ bookings = [], selectedRoom = nul
               : "All time slots are booked for this day. Please select another date."}
           </Text>
 
-          {/* Legend moved inside the selected card */}
           <div className="grid grid-cols-3 gap-4 p-4 bg-surface-muted/30 rounded-xl">
             <div className="flex items-center gap-3 p-3 rounded-lg bg-status-success/5 border border-status-success/10">
               <div className="w-3 h-3 rounded-full bg-status-success" />
