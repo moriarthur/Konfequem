@@ -12,7 +12,6 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from decouple import config
-import dj_database_url
 
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -38,19 +37,29 @@ if not ALLOWED_HOSTS:
         ALLOWED_HOSTS = ["*"]
 
 # ==== Database configuration ====
-# DATABASE_URL must be defined in .env; fallback handled safely
-db_url = config("DATABASE_URL", default=None)
-if not db_url:
-    raise ValueError("DATABASE_URL is not set in .env!")
+from urllib.parse import urlparse
 
-# Configure database with connection management
+db_url = os.environ.get("DATABASE_URL") or config("DATABASE_URL", default=None)
+if not db_url:
+    raise ValueError("DATABASE_URL is not set!")
+
+parsed = urlparse(db_url)
+
 DATABASES = {
-    "default": dj_database_url.config(
-        default=db_url,
-        conn_max_age=600,  # Close connections after 10 minutes
-        conn_health_checks=True,  # Check connection health before use
-    )
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": parsed.path.lstrip("/"),
+        "USER": parsed.username,
+        "PASSWORD": parsed.password,
+        "HOST": parsed.hostname,
+        "PORT": parsed.port or 5432,
+        "CONN_MAX_AGE": 600,
+        "CONN_HEALTH_CHECKS": True,
+    }
 }
+
+if "supabase" in (parsed.hostname or ""):
+    DATABASES["default"]["OPTIONS"] = {"sslmode": "require"}
 
 # ==== Timezone settings ====
 TIME_ZONE = "Europe/Berlin"
