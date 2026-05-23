@@ -1,7 +1,11 @@
 from rest_framework import serializers
 from django.utils import timezone
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework_simplejwt.tokens import RefreshToken
 from datetime import timedelta
 from .models import Booking, Room, RoomFeature
+from .models_users import Organization, User
 from django.db.models import Q
 
 
@@ -114,3 +118,116 @@ class RoomSerializer(serializers.ModelSerializer):
     class Meta:
         model = Room
         fields = ["id", "name", "location", "capacity", "features"]
+
+
+# ---------------------------------------------------------------------------
+# Auth serializers
+# ---------------------------------------------------------------------------
+
+
+def _user_response(user, organization):
+    refresh = RefreshToken.for_user(user)
+    return {
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "role": user.role,
+            "organization": organization.id,
+        },
+        "organization": {
+            "id": organization.id,
+            "name": organization.name,
+            "slug": organization.slug,
+            "invite_key": str(organization.invite_key),
+        },
+        "tokens": {
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+        },
+    }
+
+
+class RegisterSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+    first_name = serializers.CharField(required=False, default="")
+    last_name = serializers.CharField(required=False, default="")
+    org_name = serializers.CharField()
+    org_slug = serializers.SlugField()
+
+    def validate_password(self, value):
+        try:
+            validate_password(value)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.messages)
+        return value
+
+    def validate_org_slug(self, value):
+        if Organization.objects.filter(slug=value).exists():
+            raise serializers.ValidationError("This organization slug is already taken.")
+        return value
+
+    def validate_username(self, value):
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("A user with this username already exists.")
+        return value
+
+    def create(self, validated_data):
+        org = Organization.objects.create(
+            name=validated_data["org_name"],
+            slug=validated_data["org_slug"],
+        )
+        user = User.objects.create_user(
+            username=validated_data["username"],
+            email=validated_data["email"],
+            password=validated_data["password"],
+            first_name=validated_data.get("first_name", ""),
+            last_name=validated_data.get("last_name", ""),
+            role="org_admin",
+            organization=org,
+        )
+        return _user_response(user, org)
+
+
+class JoinSerializer(serializers.Serializer):
+    invite_key = serializers.UUIDField()
+    username = serializers.CharField()
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+    first_name = serializers.CharField(required=False, default="")
+    last_name = serializers.CharField(required=False, default="")
+
+    def validate_invite_key(self, value):
+        try:
+            self._org = Organization.objects.get(invite_key=value)
+        except Organization.DoesNotExist:
+            raise serializers.ValidationError("Invalid or expired invite key.")
+        return value
+
+    def validate_password(self, value):
+        try:
+            validate_password(value)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.messages)
+        return value
+
+    def validate_username(self, value):
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("A user with this username already exists.")
+        return value
+
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            username=validated_data["username"],
+            email=validated_data["email"],
+            password=validated_data["password"],
+            first_name=validated_data.get("first_name", ""),
+            last_name=validated_data.get("last_name", ""),
+            role="member",
+            organization=self._org,
+        )
+        return _user_response(user, self._org)

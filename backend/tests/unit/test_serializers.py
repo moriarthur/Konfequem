@@ -479,7 +479,7 @@ class TestBookingSerializerOutput:
         assert "user" in data
         assert data["user"] == booking.user.id
 
-    def test_booking_serializer_allows_user_create(self, db, room, user):
+    def test_booking_serializer_allows_user_create(self, db, room, user, organization):
         """Test that user is automatically assigned on create."""
         from rest_framework.test import APIRequestFactory
 
@@ -499,5 +499,5 @@ class TestBookingSerializerOutput:
         serializer = BookingSerializer(data=data, context={"request": request})
         assert serializer.is_valid(), serializer.errors
 
-        booking = serializer.save(user=user)
+        booking = serializer.save(user=user, organization=organization)
         assert booking.user == user

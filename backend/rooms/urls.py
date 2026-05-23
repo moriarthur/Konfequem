@@ -6,6 +6,9 @@ from .views import (
     CurrentUserView,
     RoomFeatureViewSet,
     ChangePasswordView,
+    RegisterView,
+    InvitePreviewView,
+    JoinView,
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.views import TokenBlacklistView
@@ -24,4 +27,7 @@ urlpatterns = [
     path(
         "users/change-password/", ChangePasswordView.as_view(), name="change_password"
     ),
+    path("register/", RegisterView.as_view(), name="register"),
+    path("join/", JoinView.as_view(), name="join"),
+    path("invites/<uuid:key>/", InvitePreviewView.as_view(), name="invite_preview"),
 ]

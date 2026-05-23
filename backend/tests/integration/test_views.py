@@ -47,10 +47,10 @@ class TestRoomViewSet:
         assert response.status_code == 200
         assert len(response.data["results"]) == 0
 
-    def test_list_rooms_ordered(self, db, api_client):
+    def test_list_rooms_ordered(self, db, api_client, organization):
         """Test that rooms are ordered consistently."""
-        Room.objects.create(name="Z Room", location="Floor 1", capacity=5)
-        Room.objects.create(name="A Room", location="Floor 2", capacity=10)
+        Room.objects.create(name="Z Room", location="Floor 1", capacity=5, organization=organization)
+        Room.objects.create(name="A Room", location="Floor 2", capacity=10, organization=organization)
 
         response = api_client.get("/api/rooms/")
 
@@ -86,7 +86,7 @@ class TestRoomViewSet:
     # HTTP Method Tests
     # ========================================================================
 
-    def test_rooms_read_only(self, db, api_client):
+    def test_rooms_read_only(self, db, api_client, organization):
         """Test that rooms cannot be created/updated/deleted via API."""
         # Try to create a room
         create_response = api_client.post(
@@ -95,7 +95,7 @@ class TestRoomViewSet:
         assert create_response.status_code == 405  # Method Not Allowed
 
         # Create a room for update/delete tests
-        room = Room.objects.create(name="Test Room", capacity=5)
+        room = Room.objects.create(name="Test Room", capacity=5, organization=organization)
 
         # Try to update
         update_response = api_client.put(
@@ -154,7 +154,7 @@ class TestBookingViewSet:
         assert len(response.data["results"]) >= 1
 
     def test_list_bookings_filters_by_user(
-        self, db, api_client, user, staff_user, room
+        self, db, api_client, user, staff_user, room, organization
     ):
         """Test that users only see their own bookings."""
         # Create bookings for different users
@@ -165,6 +165,7 @@ class TestBookingViewSet:
         user_booking = Booking.objects.create(
             room=room,
             user=user,
+            organization=organization,
             start_time=now + timedelta(days=1, hours=10),
             date=(now + timedelta(days=1, hours=10)).date(),
             end_time=now + timedelta(days=1, hours=12),
@@ -173,6 +174,7 @@ class TestBookingViewSet:
         staff_booking = Booking.objects.create(
             room=room,
             user=staff_user,
+            organization=organization,
             start_time=now + timedelta(days=2, hours=10),
             date=(now + timedelta(days=2, hours=10)).date(),
             end_time=now + timedelta(days=2, hours=12),
@@ -194,7 +196,7 @@ class TestBookingViewSet:
     # ========================================================================
 
     def test_filter_bookings_by_room(
-        self, db, authenticated_api_client, user, room, rooms
+        self, db, authenticated_api_client, user, room, rooms, organization
     ):
         """Test filtering bookings by room ID."""
         # Create bookings for different rooms
@@ -205,6 +207,7 @@ class TestBookingViewSet:
         Booking.objects.create(
             room=room,
             user=user,
+            organization=organization,
             start_time=now + timedelta(days=1, hours=10),
             date=(now + timedelta(days=1, hours=10)).date(),
             end_time=now + timedelta(days=1, hours=12),
@@ -214,6 +217,7 @@ class TestBookingViewSet:
         Booking.objects.create(
             room=other_room,
             user=user,
+            organization=organization,
             start_time=now + timedelta(days=2, hours=10),
             date=(now + timedelta(days=2, hours=10)).date(),
             end_time=now + timedelta(days=2, hours=12),
@@ -231,7 +235,7 @@ class TestBookingViewSet:
     # ========================================================================
 
     def test_filter_bookings_by_date(
-        self, db, authenticated_api_client, user, room, booking
+        self, db, authenticated_api_client, user, room, booking, organization
     ):
         """Test filtering bookings by date."""
         # Create a booking for tomorrow
@@ -239,6 +243,7 @@ class TestBookingViewSet:
         Booking.objects.create(
             room=room,
             user=user,
+            organization=organization,
             start_time=tomorrow,
             end_time=tomorrow + timedelta(hours=2),
         )
@@ -364,13 +369,14 @@ class TestBookingViewSet:
         assert response.data["id"] == booking.id
 
     def test_cannot_retrieve_others_booking(
-        self, db, api_client, user, staff_user, room
+        self, db, api_client, user, staff_user, room, organization
     ):
         """Test that you cannot retrieve other users' bookings."""
         # Create a booking for another user
         other_booking = Booking.objects.create(
             room=room,
             user=staff_user,
+            organization=organization,
             start_time=timezone.now() + timedelta(days=1),
             end_time=timezone.now() + timedelta(days=1, hours=2),
         )
@@ -471,7 +477,7 @@ class TestBookingViewSet:
     # ========================================================================
 
     def test_cannot_modify_booking_in_progress(
-        self, db, authenticated_api_client, user, room
+        self, db, authenticated_api_client, user, room, organization
     ):
         """Test that a booking currently in progress cannot be modified."""
         from django.utils import timezone
@@ -482,6 +488,7 @@ class TestBookingViewSet:
         booking = Booking.objects.create(
             room=room,
             user=user,
+            organization=organization,
             start_time=now - timedelta(minutes=30),
             end_time=now + timedelta(minutes=30),
             date=(now - timedelta(minutes=30)).date(),
@@ -503,7 +510,7 @@ class TestBookingViewSet:
         assert "currently in progress" in str(response.data).lower()
 
     def test_cannot_modify_ended_booking(
-        self, db, authenticated_api_client, user, room
+        self, db, authenticated_api_client, user, room, organization
     ):
         """Test that a booking that has ended cannot be modified."""
         from django.utils import timezone
@@ -514,6 +521,7 @@ class TestBookingViewSet:
         booking = Booking.objects.create(
             room=room,
             user=user,
+            organization=organization,
             start_time=now - timedelta(hours=2),
             end_time=now - timedelta(hours=1),
             date=(now - timedelta(hours=2)).date(),
@@ -535,7 +543,7 @@ class TestBookingViewSet:
         assert "already ended" in str(response.data).lower()
 
     def test_cannot_delete_booking_in_progress(
-        self, db, authenticated_api_client, user, room
+        self, db, authenticated_api_client, user, room, organization
     ):
         """Test that a booking currently in progress cannot be deleted."""
         from django.utils import timezone
@@ -546,6 +554,7 @@ class TestBookingViewSet:
         booking = Booking.objects.create(
             room=room,
             user=user,
+            organization=organization,
             start_time=now - timedelta(minutes=30),
             end_time=now + timedelta(minutes=30),
             date=(now - timedelta(minutes=30)).date(),
@@ -559,7 +568,7 @@ class TestBookingViewSet:
         assert "currently in progress" in str(response.data).lower()
 
     def test_cannot_delete_ended_booking(
-        self, db, authenticated_api_client, user, room
+        self, db, authenticated_api_client, user, room, organization
     ):
         """Test that a booking that has ended cannot be deleted."""
         from django.utils import timezone
@@ -570,6 +579,7 @@ class TestBookingViewSet:
         booking = Booking.objects.create(
             room=room,
             user=user,
+            organization=organization,
             start_time=now - timedelta(hours=2),
             end_time=now - timedelta(hours=1),
             date=(now - timedelta(hours=2)).date(),
@@ -583,7 +593,7 @@ class TestBookingViewSet:
         assert "already ended" in str(response.data).lower()
 
     def test_can_modify_upcoming_booking(
-        self, db, authenticated_api_client, user, room
+        self, db, authenticated_api_client, user, room, organization
     ):
         """Test that an upcoming (not started) booking can still be modified."""
         from django.utils import timezone as tz
@@ -594,6 +604,7 @@ class TestBookingViewSet:
         booking = Booking.objects.create(
             room=room,
             user=user,
+            organization=organization,
             start_time=now + timedelta(hours=1),
             end_time=now + timedelta(hours=3),
             date=(now + timedelta(hours=1)).date(),

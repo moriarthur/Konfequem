@@ -27,3 +27,7 @@ backend/staticfiles/
 coverage.xml
 htmlcov/
 .pytest_cache/
+
+# CodeGraph
+.codegraph/
+.mcp.json

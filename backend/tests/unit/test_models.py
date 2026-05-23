@@ -20,33 +20,33 @@ class TestRoomModel:
     # Capacity Validation Tests
     # ========================================================================
 
-    def test_room_with_valid_minimum_capacity(self, db):
+    def test_room_with_valid_minimum_capacity(self, db, organization):
         """Test that room can be created with minimum capacity of 1."""
-        room = Room.objects.create(name="Single Office", location="Floor 1", capacity=1)
+        room = Room.objects.create(name="Single Office", location="Floor 1", capacity=1, organization=organization)
         assert room.capacity == 1
         assert room.pk is not None
 
-    def test_room_with_valid_maximum_capacity(self, db):
+    def test_room_with_valid_maximum_capacity(self, db, organization):
         """Test that room can be created with maximum capacity of 50."""
         room = Room.objects.create(
-            name="Main Hall", location="Ground Floor", capacity=50
+            name="Main Hall", location="Ground Floor", capacity=50, organization=organization
         )
         assert room.capacity == 50
         assert room.pk is not None
 
-    def test_room_with_average_capacity(self, db):
+    def test_room_with_average_capacity(self, db, organization):
         """Test that room can be created with average capacity."""
         room = Room.objects.create(
-            name="Conference Room", location="Floor 2", capacity=15
+            name="Conference Room", location="Floor 2", capacity=15, organization=organization
         )
         assert room.capacity == 15
 
     @pytest.mark.parametrize("invalid_capacity", [0, -1, 51, 100, -10])
-    def test_room_rejects_invalid_capacity(self, db, invalid_capacity):
+    def test_room_rejects_invalid_capacity(self, db, organization, invalid_capacity):
         """Test that room creation fails with invalid capacity values."""
         with pytest.raises(ValidationError):
             room = Room(
-                name="Invalid Room", location="Floor 1", capacity=invalid_capacity
+                name="Invalid Room", location="Floor 1", capacity=invalid_capacity, organization=organization
             )
             room.full_clean()  # Triggers validators
 
@@ -54,33 +54,33 @@ class TestRoomModel:
     # Field Validation Tests
     # ========================================================================
 
-    def test_room_name_is_required(self, db):
+    def test_room_name_is_required(self, db, organization):
         """Test that room name is a required field."""
         from django.core.exceptions import ValidationError
 
-        room = Room(location="Floor 1", capacity=10)
+        room = Room(location="Floor 1", capacity=10, organization=organization)
         with pytest.raises(ValidationError):  # Model validation
             room.full_clean()
 
-    def test_room_location_is_optional(self, db):
+    def test_room_location_is_optional(self, db, organization):
         """Test that room location can be blank."""
-        room = Room.objects.create(name="Room without location", capacity=5)
+        room = Room.objects.create(name="Room without location", capacity=5, organization=organization)
         assert room.location == ""
         assert room.name == "Room without location"
 
-    def test_room_name_max_length(self, db):
+    def test_room_name_max_length(self, db, organization):
         """Test that room name respects max_length constraint."""
         # Create a name exactly at the limit (100 characters)
         long_name = "A" * 100
-        room = Room.objects.create(name=long_name, capacity=10)
+        room = Room.objects.create(name=long_name, capacity=10, organization=organization)
         assert room.name == long_name
         assert len(room.name) == 100
 
-    def test_room_location_max_length(self, db):
+    def test_room_location_max_length(self, db, organization):
         """Test that room location respects max_length constraint."""
         long_location = "B" * 100
         room = Room.objects.create(
-            name="Test Room", location=long_location, capacity=10
+            name="Test Room", location=long_location, capacity=10, organization=organization
         )
         assert room.location == long_location
         assert len(room.location) == 100
@@ -89,17 +89,17 @@ class TestRoomModel:
     # String Representation Tests
     # ========================================================================
 
-    def test_room_str_representation(self, db):
+    def test_room_str_representation(self, db, organization):
         """Test that room's string representation returns its name."""
         room = Room.objects.create(
-            name="Conference Room A", location="Floor 1", capacity=10
+            name="Conference Room A", location="Floor 1", capacity=10, organization=organization
         )
         assert str(room) == "Conference Room A"
 
-    def test_room_str_with_special_characters(self, db):
+    def test_room_str_with_special_characters(self, db, organization):
         """Test string representation with special characters in name."""
         room = Room.objects.create(
-            name="Room 123 - Ümläut", location="Étage 2", capacity=8
+            name="Room 123 - Ümläut", location="Étage 2", capacity=8, organization=organization
         )
         assert "Ümläut" in str(room)
 
@@ -107,9 +107,9 @@ class TestRoomModel:
     # Model Methods Tests
     # ========================================================================
 
-    def test_room_absolute_url(self, db):
+    def test_room_absolute_url(self, db, organization):
         """Test that room has a URL (if implemented)."""
-        room = Room.objects.create(name="Test Room", capacity=5)
+        room = Room.objects.create(name="Test Room", capacity=5, organization=organization)
         # This test would pass if you implement get_absolute_url
         # For now, just verify the room exists
         assert room.pk is not None
@@ -118,26 +118,26 @@ class TestRoomModel:
     # QuerySet Tests
     # ========================================================================
 
-    def test_rooms_ordered_by_name(self, db):
+    def test_rooms_ordered_by_name(self, db, organization):
         """Test that rooms are returned in predictable order."""
         Room.objects.bulk_create(
             [
-                Room(name="Z Room", capacity=5),
-                Room(name="A Room", capacity=5),
-                Room(name="M Room", capacity=5),
+                Room(name="Z Room", capacity=5, organization=organization),
+                Room(name="A Room", capacity=5, organization=organization),
+                Room(name="M Room", capacity=5, organization=organization),
             ]
         )
         rooms = list(Room.objects.all())
         # Django orders by PK by default unless ordering is specified
         assert len(rooms) == 3
 
-    def test_filter_rooms_by_capacity(self, db):
+    def test_filter_rooms_by_capacity(self, db, organization):
         """Test filtering rooms by capacity."""
         Room.objects.bulk_create(
             [
-                Room(name="Small", capacity=5),
-                Room(name="Medium", capacity=15),
-                Room(name="Large", capacity=30),
+                Room(name="Small", capacity=5, organization=organization),
+                Room(name="Medium", capacity=15, organization=organization),
+                Room(name="Large", capacity=30, organization=organization),
             ]
         )
 
@@ -153,21 +153,22 @@ class TestRoomModel:
     # Edge Cases
     # ========================================================================
 
-    def test_room_with_unicode_name(self, db):
+    def test_room_with_unicode_name(self, db, organization):
         """Test that rooms can have unicode names."""
         room = Room.objects.create(
             name="会議室",  # Chinese for "Meeting Room"
             location="第1階",  # Chinese for "Floor 1"
             capacity=10,
+            organization=organization,
         )
         assert room.name == "会議室"
 
-    def test_room_duplicate_names_allowed(self, db):
+    def test_room_duplicate_names_allowed(self, db, organization):
         """Test that multiple rooms can have the same name (by default)."""
         Room.objects.bulk_create(
             [
-                Room(name="Conference Room", location="Floor 1", capacity=10),
-                Room(name="Conference Room", location="Floor 2", capacity=10),
+                Room(name="Conference Room", location="Floor 1", capacity=10, organization=organization),
+                Room(name="Conference Room", location="Floor 2", capacity=10, organization=organization),
             ]
         )
         rooms = Room.objects.filter(name="Conference Room")

@@ -64,6 +64,7 @@ if "supabase" in (parsed.hostname or ""):
 # ==== Timezone settings ====
 TIME_ZONE = "Europe/Berlin"
 USE_TZ = True
+AUTH_USER_MODEL = "rooms.User"
 
 # ==== Application definition ====
 INSTALLED_APPS = [

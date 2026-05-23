@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.core.validators import (
     MinValueValidator,
     MaxValueValidator,
@@ -10,7 +10,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Q
 
-User = get_user_model()
+from .models_users import Organization, User  # noqa: F401 — register models with Django
 
 
 class RoomFeature(models.Model):
@@ -39,6 +39,11 @@ class RoomFeature(models.Model):
 class Room(models.Model):
     """Room model."""
 
+    organization = models.ForeignKey(
+        "Organization",
+        on_delete=models.CASCADE,
+        related_name="rooms",
+    )
     name = models.CharField(
         max_length=100,
         validators=[
@@ -69,8 +74,17 @@ class Room(models.Model):
 class Booking(models.Model):
     """Booking model with minimal backend validation."""
 
+    organization = models.ForeignKey(
+        "Organization",
+        on_delete=models.CASCADE,
+        related_name="bookings",
+    )
     room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="bookings")
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="bookings")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="bookings",
+    )
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -107,7 +121,9 @@ class Booking(models.Model):
                 }
             )
 
-        overlapping = Booking.objects.filter(room=self.room).filter(
+        overlapping = Booking.objects.filter(
+            room=self.room, organization=self.organization
+        ).filter(
             Q(start_time__lt=self.end_time) & Q(end_time__gt=self.start_time)
         )
         if self.pk:

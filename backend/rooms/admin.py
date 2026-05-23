@@ -1,5 +1,27 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
+
 from .models import Room, Booking, RoomFeature
+from .models_users import Organization, User
+
+
+@admin.register(Organization)
+class OrganizationAdmin(admin.ModelAdmin):
+    list_display = ("name", "slug", "invite_key", "created_at")
+    search_fields = ("name", "slug")
+    readonly_fields = ("invite_key", "created_at")
+
+
+@admin.register(User)
+class CustomUserAdmin(UserAdmin):
+    list_display = ("username", "email", "role", "organization", "is_active")
+    list_filter = ("role", "organization", "is_active")
+    fieldsets = UserAdmin.fieldsets + (
+        (
+            "Organization",
+            {"fields": ("role", "organization")},
+        ),
+    )
 
 
 @admin.register(RoomFeature)
@@ -8,13 +30,12 @@ class RoomFeatureAdmin(admin.ModelAdmin):
     search_fields = ("name",)
 
 
-# Register model Room in admin panel
 @admin.register(Room)
 class RoomAdmin(admin.ModelAdmin):
-    list_display = ("name", "capacity", "location")  # what to display in the table
-    search_fields = ("name", "location")  # search fields
-    list_filter = ("capacity", "features")  # filters on the right
-    filter_horizontal = ("features",)  # many-to-many filter widget
+    list_display = ("name", "organization", "capacity", "location")
+    search_fields = ("name", "location")
+    list_filter = ("organization", "capacity", "features")
+    filter_horizontal = ("features",)
 
 
 @admin.register(Booking)
@@ -22,12 +43,14 @@ class BookingAdmin(admin.ModelAdmin):
     list_display = (
         "room",
         "user",
+        "organization",
         "start_time_display",
         "end_time_display",
         "created_at",
     )
     search_fields = ("room__name", "user__username")
     list_filter = (
+        "organization",
         "room",
         ("start_time", admin.DateFieldListFilter),
         ("end_time", admin.DateFieldListFilter),

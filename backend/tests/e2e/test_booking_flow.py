@@ -27,13 +27,14 @@ class TestBookingFlowE2E:
     # Complete Booking Flow Tests
     # ========================================================================
 
-    def test_complete_booking_flow(self):
+    def test_complete_booking_flow(self, organization):
         """Test the complete flow: login → create booking → retrieve."""
         # Step 1: Create user and room
         User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
+            username="testuser", email="test@example.com", password="testpass123",
+            organization=organization,
         )
-        Room.objects.create(name="Test Room", capacity=10)
+        Room.objects.create(name="Test Room", capacity=10, organization=organization)
 
         # Step 2: Login (obtain tokens)
         client = APIClient()
@@ -98,11 +99,11 @@ class TestBookingFlowE2E:
     # Double Booking Prevention Tests
     # ========================================================================
 
-    def test_double_booking_prevention_in_same_room(self):
+    def test_double_booking_prevention_in_same_room(self, organization):
         """Test that double booking in the same room is prevented."""
         # Setup
-        User.objects.create_user(username="testuser", password="testpass123")
-        room = Room.objects.create(name="Test Room", capacity=10)
+        User.objects.create_user(username="testuser", password="testpass123", organization=organization)
+        room = Room.objects.create(name="Test Room", capacity=10, organization=organization)
 
         # Login
         client = APIClient()
@@ -143,12 +144,12 @@ class TestBookingFlowE2E:
         assert response.status_code == 400
         assert "already booked" in str(response.data).lower()
 
-    def test_booking_allowed_in_different_room_same_time(self):
+    def test_booking_allowed_in_different_room_same_time(self, organization):
         """Test that booking is allowed in different room at same time."""
         # Setup
-        User.objects.create_user(username="testuser", password="testpass123")
-        room1 = Room.objects.create(name="Room 1", capacity=10)
-        room2 = Room.objects.create(name="Room 2", capacity=10)
+        User.objects.create_user(username="testuser", password="testpass123", organization=organization)
+        room1 = Room.objects.create(name="Room 1", capacity=10, organization=organization)
+        room2 = Room.objects.create(name="Room 2", capacity=10, organization=organization)
 
         # Login
         client = APIClient()
@@ -192,12 +193,12 @@ class TestBookingFlowE2E:
     # User Isolation Tests
     # ========================================================================
 
-    def test_users_only_see_own_bookings(self):
+    def test_users_only_see_own_bookings(self, organization):
         """Test that users can only see their own bookings."""
         # Create two users
-        user1 = User.objects.create_user(username="user1", password="pass123")
-        user2 = User.objects.create_user(username="user2", password="pass123")
-        room = Room.objects.create(name="Test Room", capacity=10)
+        user1 = User.objects.create_user(username="user1", password="pass123", organization=organization)
+        user2 = User.objects.create_user(username="user2", password="pass123", organization=organization)
+        room = Room.objects.create(name="Test Room", capacity=10, organization=organization)
 
         # Create booking for user1
         start_time = timezone.now() + timedelta(days=1)
@@ -207,6 +208,7 @@ class TestBookingFlowE2E:
             user=user1,
             start_time=start_time,
             end_time=start_time + timedelta(hours=2),
+            organization=organization,
         )
 
         # Create booking for user2
@@ -215,6 +217,7 @@ class TestBookingFlowE2E:
             user=user2,
             start_time=start_time + timedelta(hours=3),
             end_time=start_time + timedelta(hours=5),
+            organization=organization,
         )
 
         # Login as user1
@@ -234,11 +237,11 @@ class TestBookingFlowE2E:
     # Token Lifecycle Tests
     # ========================================================================
 
-    def test_token_refresh_during_booking_flow(self):
+    def test_token_refresh_during_booking_flow(self, organization):
         """Test that token refresh works during booking operations."""
         # Setup
-        User.objects.create_user(username="testuser", password="testpass123")
-        room = Room.objects.create(name="Test Room", capacity=10)
+        User.objects.create_user(username="testuser", password="testpass123", organization=organization)
+        room = Room.objects.create(name="Test Room", capacity=10, organization=organization)
 
         # Login
         client = APIClient()
@@ -284,11 +287,11 @@ class TestBookingFlowE2E:
     # ========================================================================
 
     @pytest.mark.timezone
-    def test_booking_across_dst_boundary(self):
+    def test_booking_across_dst_boundary(self, organization):
         """Test booking creation around DST transition."""
         # Setup
-        User.objects.create_user(username="testuser", password="testpass123")
-        room = Room.objects.create(name="Test Room", capacity=10)
+        User.objects.create_user(username="testuser", password="testpass123", organization=organization)
+        room = Room.objects.create(name="Test Room", capacity=10, organization=organization)
 
         # Login
         client = APIClient()
@@ -320,11 +323,11 @@ class TestBookingFlowE2E:
         assert response.status_code in [201, 400]  # Either success or validation error
 
     @pytest.mark.timezone
-    def test_booking_in_berlin_timezone(self):
+    def test_booking_in_berlin_timezone(self, organization):
         """Test that bookings are correctly handled in Berlin timezone."""
         # Setup
-        User.objects.create_user(username="testuser", password="testpass123")
-        room = Room.objects.create(name="Test Room", capacity=10)
+        User.objects.create_user(username="testuser", password="testpass123", organization=organization)
+        room = Room.objects.create(name="Test Room", capacity=10, organization=organization)
 
         # Login
         client = APIClient()
@@ -363,11 +366,11 @@ class TestBookingFlowE2E:
     # Validation Flow Tests
     # ========================================================================
 
-    def test_booking_validation_in_flow(self):
+    def test_booking_validation_in_flow(self, organization):
         """Test that validation is properly enforced in the booking flow."""
         # Setup
-        User.objects.create_user(username="testuser", password="testpass123")
-        room = Room.objects.create(name="Test Room", capacity=10)
+        User.objects.create_user(username="testuser", password="testpass123", organization=organization)
+        room = Room.objects.create(name="Test Room", capacity=10, organization=organization)
 
         # Login
         client = APIClient()
@@ -423,11 +426,11 @@ class TestBookingFlowE2E:
     # Cleanup Flow Tests
     # ========================================================================
 
-    def test_booking_deletion_flow(self):
+    def test_booking_deletion_flow(self, organization):
         """Test the complete deletion flow."""
         # Setup
-        User.objects.create_user(username="testuser", password="testpass123")
-        room = Room.objects.create(name="Test Room", capacity=10)
+        User.objects.create_user(username="testuser", password="testpass123", organization=organization)
+        room = Room.objects.create(name="Test Room", capacity=10, organization=organization)
 
         # Login and create booking
         client = APIClient()

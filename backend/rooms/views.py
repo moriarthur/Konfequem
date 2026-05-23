@@ -6,10 +6,13 @@ from rest_framework.response import Response
 from django.utils import timezone
 
 from .models import Room, Booking, RoomFeature
+from .models_users import Organization
 from .serializers import (
     RoomSerializer,
     BookingSerializer,
     RoomFeatureSerializer,
+    RegisterSerializer,
+    JoinSerializer,
 )
 
 
@@ -83,8 +86,10 @@ class BookingViewSet(viewsets.ModelViewSet):
         return queryset.select_related("room")
 
     def perform_create(self, serializer):
-        # Attach current user to booking
-        serializer.save(user=self.request.user)
+        serializer.save(
+            user=self.request.user,
+            organization=self.request.user.organization,
+        )
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -195,3 +200,34 @@ class ChangePasswordView(APIView):
         user.set_password(new_password)
         user.save()
         return Response({"message": "Password changed successfully."})
+
+
+class RegisterView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.save()
+        return Response(data, status=201)
+
+
+class InvitePreviewView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, key):
+        try:
+            org = Organization.objects.get(invite_key=key)
+        except Organization.DoesNotExist:
+            return Response({"error": "Invite not found."}, status=404)
+        return Response({"name": org.name, "slug": org.slug})
+
+
+class JoinView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = JoinSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.save()
+        return Response(data, status=201)

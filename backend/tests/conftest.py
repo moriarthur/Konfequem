@@ -14,6 +14,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from freezegun import freeze_time
 
 from rooms.models import Room, Booking
+from rooms.models_users import Organization
 
 User = get_user_model()
 
@@ -54,12 +55,26 @@ def office_hours_end():
 
 
 # ============================================================================
+# Organization Fixtures
+# ============================================================================
+
+
+@pytest.fixture(autouse=True)
+def organization(db):
+    """Create a test organization (autouse — available in all tests)."""
+    return Organization.objects.create(
+        name="Test Organization",
+        slug="test-org",
+    )
+
+
+# ============================================================================
 # Authentication Fixtures
 # ============================================================================
 
 
 @pytest.fixture
-def user(db):
+def user(db, organization):
     """Create a standard test user."""
     return User.objects.create_user(
         username="testuser",
@@ -67,11 +82,12 @@ def user(db):
         password="testpass123",
         first_name="Test",
         last_name="User",
+        organization=organization,
     )
 
 
 @pytest.fixture
-def staff_user(db):
+def staff_user(db, organization):
     """Create a staff user for admin tests."""
     return User.objects.create_user(
         username="staffuser",
@@ -80,6 +96,7 @@ def staff_user(db):
         first_name="Staff",
         last_name="User",
         is_staff=True,
+        organization=organization,
     )
 
 
@@ -111,30 +128,31 @@ def authenticated_api_client(api_client, user):
 
 
 @pytest.fixture
-def room(db):
+def room(db, organization):
     """Create a standard test room."""
     return Room.objects.create(
-        name="Conference Room A", location="Floor 1", capacity=10
+        name="Conference Room A", location="Floor 1", capacity=10,
+        organization=organization,
     )
 
 
 @pytest.fixture
-def small_room(db):
+def small_room(db, organization):
     """Create a small room (capacity 2)."""
-    return Room.objects.create(name="Huddle Room", location="Floor 2", capacity=2)
+    return Room.objects.create(name="Huddle Room", location="Floor 2", capacity=2, organization=organization)
 
 
 @pytest.fixture
-def large_room(db):
+def large_room(db, organization):
     """Create a large room (capacity 50)."""
-    return Room.objects.create(name="Main Hall", location="Ground Floor", capacity=50)
+    return Room.objects.create(name="Main Hall", location="Ground Floor", capacity=50, organization=organization)
 
 
 @pytest.fixture
-def rooms(db):
+def rooms(db, organization):
     """Create multiple test rooms."""
     rooms = [
-        Room(name=f"Room {i}", location=f"Floor {i % 3}", capacity=5 + i * 5)
+        Room(name=f"Room {i}", location=f"Floor {i % 3}", capacity=5 + i * 5, organization=organization)
         for i in range(1, 6)
     ]
     return Room.objects.bulk_create(rooms)
@@ -170,30 +188,32 @@ def future_start_time(utc_now):
 
 
 @pytest.fixture
-def booking(db, user, room, future_start_time):
+def booking(db, user, room, organization, future_start_time):
     """Create a valid test booking (2 hours duration)."""
     return Booking.objects.create(
         room=room,
         user=user,
+        organization=organization,
         start_time=future_start_time,
         end_time=future_start_time + timedelta(hours=2),
     )
 
 
 @pytest.fixture
-def past_booking(db, user, room):
+def past_booking(db, user, room, organization):
     """Create a booking in the past (for testing retrieval)."""
     past_time = timezone.now() - timedelta(days=1)
     return Booking.objects.create(
         room=room,
         user=user,
+        organization=organization,
         start_time=past_time,
         end_time=past_time + timedelta(hours=1),
     )
 
 
 @pytest.fixture
-def today_bookings(db, user, room, future_start_time):
+def today_bookings(db, user, room, organization, future_start_time):
     """Create multiple bookings starting from future_start_time."""
     bookings = []
     base_time = future_start_time
@@ -205,6 +225,7 @@ def today_bookings(db, user, room, future_start_time):
             Booking(
                 room=room,
                 user=user,
+                organization=organization,
                 start_time=start,
                 end_time=start + timedelta(hours=2),
             )
