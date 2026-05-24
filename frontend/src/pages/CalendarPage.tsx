@@ -143,7 +143,13 @@ export default function CalendarPage() {
           )}
 
           {loading ? (
-            <div className="p-12 text-center"><Text variant="muted">Loading calendar...</Text></div>
+            <div className="grid grid-cols-7">
+              {Array.from({ length: 35 }).map((_, i) => (
+                <div key={i} className="min-h-[70px] sm:min-h-[100px] border-r border-b border-border-subtle p-1 sm:p-2">
+                  <div className="animate-pulse rounded-md bg-surface-muted h-4 w-4 mb-2" />
+                </div>
+              ))}
+            </div>
           ) : expandedDay ? (
             <div className="p-4 sm:p-6 animate-expand-in">
               <div className="flex items-center gap-3 mb-6">

@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { API_URL } from "../context/authConfig";
 import { FiEye, FiEyeOff } from "react-icons/fi";
+import PasswordHints from "./PasswordHints";
 
 const USERNAME_REGEX = /^[a-zA-ZäöüÄÖÜß0-9._-]+$/;
 
@@ -189,6 +190,7 @@ export default function JoinForm() {
               </button>
             </div>
             {showFieldError("password") && <p className="text-status-danger-text text-sm mt-1">{validationErrors.password}</p>}
+            <PasswordHints password={password} username={username} />
           </div>
 
           <button

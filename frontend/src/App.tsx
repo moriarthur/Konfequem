@@ -9,7 +9,7 @@ import NotFound from "./pages/NotFound";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { AlertProvider } from "./context/AlertContext";
 import ErrorBoundary from "./components/ErrorBoundary";
-import { PageHeaderSkeleton } from "./components/ui/Skeleton";
+import { CalendarSkeleton, ProfileSkeleton } from "./components/ui/Skeleton";
 import LoadingSpinner from "./components/ui/LoadingSpinner";
 import "./index.css";
 
@@ -65,7 +65,7 @@ export default function App() {
                 path="/calendar"
                 element={
                   <PrivateRoute>
-                    <LazyRoute fallback={<PageHeaderSkeleton />}>
+                    <LazyRoute fallback={<CalendarSkeleton />}>
                       <CalendarPage />
                     </LazyRoute>
                   </PrivateRoute>
@@ -75,7 +75,7 @@ export default function App() {
                 path="/profile"
                 element={
                   <PrivateRoute>
-                    <LazyRoute fallback={<PageHeaderSkeleton />}>
+                    <LazyRoute fallback={<ProfileSkeleton />}>
                       <ProfilePage />
                     </LazyRoute>
                   </PrivateRoute>
