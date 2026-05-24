@@ -1,15 +1,15 @@
 services:
   db:
     image: postgres:15
-    container_name: booking_db
+    container_name: konfequem_db
     restart: always
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d booking"]
+      test: ["CMD-SHELL", "pg_isready -U admin -d konfequem"]
       interval: 10s
       timeout: 5s
       retries: 5
     environment:
-      POSTGRES_DB: booking
+      POSTGRES_DB: konfequem
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: secret
     volumes:
@@ -19,7 +19,7 @@ services:
 
   backend:
     build: ./backend
-    container_name: booking_backend
+    container_name: konfequem_backend
     restart: always
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/')"]
@@ -36,17 +36,14 @@ services:
       - "8000:8000"
     env_file:
       - .env
-    # DATABASE_URL and DOCKER are loaded from .env file
-    # Use .env.docker.example as template for Docker setup
-
 
   frontend:
     build: ./frontend
-    container_name: booking_frontend
+    container_name: konfequem_frontend
     restart: always
     volumes:
       - ./frontend:/app
-      - /app/node_modules  
+      - /app/node_modules
     ports:
       - "5173:5173"
     depends_on:

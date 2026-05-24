@@ -1,9 +1,13 @@
+import uuid as uuid_mod
+
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.utils import timezone
 from rest_framework import viewsets
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from django.utils import timezone
 
 from .models import Room, Booking, RoomFeature
 from .models_users import Organization, User
@@ -14,6 +18,26 @@ from .serializers import (
     RegisterSerializer,
     JoinSerializer,
 )
+
+
+def _user_response_data(user):
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "role": user.role,
+        "organization": (
+            {
+                "id": user.organization.id,
+                "name": user.organization.name,
+                "slug": user.organization.slug,
+            }
+            if user.organization
+            else None
+        ),
+    }
 
 
 def _check_booking_modifiable(booking, action="modify"):
@@ -62,13 +86,12 @@ class BookingViewSet(viewsets.ModelViewSet):
 
         room_id = self.request.query_params.get("room")
         date_str = self.request.query_params.get("date")
-        month_str = self.request.query_params.get("month")  # YYYY-MM format
+        month_str = self.request.query_params.get("month")
 
         if room_id:
             queryset = queryset.filter(room_id=room_id)
 
         if month_str:
-            # Parse YYYY-MM format
             try:
                 parts = month_str.split("-")
                 if len(parts) != 2:
@@ -76,14 +99,10 @@ class BookingViewSet(viewsets.ModelViewSet):
                 year, month = map(int, parts)
                 if not (1 <= month <= 12) or year < 2020 or year > 2100:
                     raise ValueError("Invalid year or month values")
-                # Get all bookings for the month
                 queryset = queryset.filter(
                     start_time__year=year, start_time__month=month
                 )
             except (ValueError, TypeError) as e:
-                # Return proper error response instead of silent failure
-                from rest_framework.exceptions import ValidationError
-
                 raise ValidationError(
                     f"Invalid month parameter '{month_str}': {str(e)}"
                 )
@@ -99,8 +118,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         )
 
     def update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        _check_booking_modifiable(instance, "modify")
+        _check_booking_modifiable(self.get_object(), "modify")
         return super().update(request, *args, **kwargs)
 
     def perform_update(self, serializer):
@@ -110,8 +128,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         return super().perform_update(serializer)
 
     def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        _check_booking_modifiable(instance, "delete")
+        _check_booking_modifiable(self.get_object(), "delete")
         return super().destroy(request, *args, **kwargs)
 
     def perform_destroy(self, instance):
@@ -125,24 +142,7 @@ class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = request.user
-        return Response(
-            {
-                "id": user.id,
-                "username": user.username,
-                "email": user.email,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "role": user.role,
-                "organization": {
-                    "id": user.organization.id,
-                    "name": user.organization.name,
-                    "slug": user.organization.slug,
-                }
-                if user.organization
-                else None,
-            }
-        )
+        return Response(_user_response_data(request.user))
 
     def put(self, request):
         user = request.user
@@ -157,23 +157,7 @@ class CurrentUserView(APIView):
         user.last_name = last_name
         user.email = email
         user.save()
-        return Response(
-            {
-                "id": user.id,
-                "username": user.username,
-                "email": user.email,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "role": user.role,
-                "organization": {
-                    "id": user.organization.id,
-                    "name": user.organization.name,
-                    "slug": user.organization.slug,
-                }
-                if user.organization
-                else None,
-            }
-        )
+        return Response(_user_response_data(user))
 
 
 class ChangePasswordView(APIView):
@@ -208,9 +192,6 @@ class ChangePasswordView(APIView):
                 {"error": "New password must be different from current password."},
                 status=400,
             )
-
-        from django.contrib.auth.password_validation import validate_password
-        from django.core.exceptions import ValidationError as DjangoValidationError
 
         try:
             validate_password(new_password, user=user)
@@ -273,8 +254,6 @@ class RegenerateInviteView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        import uuid as uuid_mod
-
         user = request.user
         if user.role != "org_admin":
             return Response({"error": "Only org admins can regenerate invite keys."}, status=403)

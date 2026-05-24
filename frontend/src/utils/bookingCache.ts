@@ -1,5 +1,6 @@
 import { DateTime } from "luxon";
 import { OFFICE_TIMEZONE, OFFICE_HOURS } from "./bookingUtils";
+import { warn } from "./logger";
 import type { BookingData } from "./bookingUtils";
 
 const MAX_CACHE_SIZE = 6;
@@ -113,7 +114,7 @@ export function subscribeToMonth(
   const listeners = bookingCache.listeners.get(monthKey)!;
 
   if (listeners.size >= MAX_LISTENERS_PER_MONTH) {
-    console.warn(
+    warn(
       `Max listeners (${MAX_LISTENERS_PER_MONTH}) reached for month ${monthKey}. Cleanup may be needed.`
     );
     return () => {};

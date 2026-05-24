@@ -9,36 +9,30 @@ Docs:
 """
 
 import os
+from datetime import timedelta
 from pathlib import Path
-from dotenv import load_dotenv
+from urllib.parse import urlparse
+
 from decouple import config
 
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load environment variables from .env file
-load_dotenv(BASE_DIR / ".env")
-
 # ==== Django core settings ====
 SECRET_KEY = config("DJANGO_SECRET_KEY")
 DEBUG = config("DJANGO_DEBUG", default=False, cast=bool)
 
-# Check if running in Docker (used for conditional logic below)
 IS_DOCKER = config("DOCKER", default=False, cast=bool)
 
-# Allowed hosts from comma-separated .env variable
 ALLOWED_HOSTS = [
     host.strip() for host in os.getenv("ALLOWED_HOSTS", "").split(",") if host.strip()
 ]
 
-# If ALLOWED_HOSTS is empty and we're in DEBUG or running inside Docker, allow all hosts
 if not ALLOWED_HOSTS:
     if DEBUG or IS_DOCKER:
         ALLOWED_HOSTS = ["*"]
 
 # ==== Database configuration ====
-from urllib.parse import urlparse
-
 db_url = os.environ.get("DATABASE_URL") or config("DATABASE_URL", default=None)
 if not db_url:
     raise ValueError("DATABASE_URL is not set!")
@@ -128,11 +122,6 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# Internationalization
-LANGUAGE_CODE = "en-us"
-TIME_ZONE = "Europe/Berlin"
-USE_TZ = True
-
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
@@ -167,8 +156,6 @@ REST_FRAMEWORK = {
 }
 
 # JWT settings for rest_framework_simplejwt
-from datetime import timedelta  # noqa: E402
-
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
@@ -205,6 +192,7 @@ if not DEBUG:
     SESSION_COOKIE_SAMESITE = "Lax"
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     X_FRAME_OPTIONS = "DENY"
 
 # Logging
