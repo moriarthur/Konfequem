@@ -9,12 +9,14 @@ from .views import (
     RegisterView,
     InvitePreviewView,
     JoinView,
+    OrgMembersView,
+    RegenerateInviteView,
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.views import TokenBlacklistView
 
 router = DefaultRouter()
-router.register(r"rooms", RoomViewSet)
+router.register(r"rooms", RoomViewSet, basename="room")
 router.register(r"room-features", RoomFeatureViewSet, basename="room-feature")
 router.register(r"bookings", BookingViewSet, basename="booking")
 
@@ -30,4 +32,10 @@ urlpatterns = [
     path("register/", RegisterView.as_view(), name="register"),
     path("join/", JoinView.as_view(), name="join"),
     path("invites/<uuid:key>/", InvitePreviewView.as_view(), name="invite_preview"),
+    path("org/members/", OrgMembersView.as_view(), name="org_members"),
+    path(
+        "org/invite/regenerate/",
+        RegenerateInviteView.as_view(),
+        name="regenerate_invite",
+    ),
 ]

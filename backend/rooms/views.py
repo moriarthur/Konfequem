@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from django.utils import timezone
 
 from .models import Room, Booking, RoomFeature
-from .models_users import Organization
+from .models_users import Organization, User
 from .serializers import (
     RoomSerializer,
     BookingSerializer,
@@ -28,11 +28,16 @@ def _check_booking_modifiable(booking, action="modify"):
 
 
 class RoomViewSet(viewsets.ReadOnlyModelViewSet):
-    """Read-only view for rooms."""
+    """Read-only view for rooms, scoped to the user's organization."""
 
-    queryset = Room.objects.all()
     serializer_class = RoomSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff:
+            return Room.objects.all()
+        return Room.objects.filter(organization=user.organization)
 
 
 class RoomFeatureViewSet(viewsets.ReadOnlyModelViewSet):
@@ -51,7 +56,9 @@ class BookingViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = Booking.objects.filter(user=user)
+        queryset = Booking.objects.filter(
+            user=user, organization=user.organization
+        )
 
         room_id = self.request.query_params.get("room")
         date_str = self.request.query_params.get("date")
@@ -126,6 +133,14 @@ class CurrentUserView(APIView):
                 "email": user.email,
                 "first_name": user.first_name,
                 "last_name": user.last_name,
+                "role": user.role,
+                "organization": {
+                    "id": user.organization.id,
+                    "name": user.organization.name,
+                    "slug": user.organization.slug,
+                }
+                if user.organization
+                else None,
             }
         )
 
@@ -149,6 +164,14 @@ class CurrentUserView(APIView):
                 "email": user.email,
                 "first_name": user.first_name,
                 "last_name": user.last_name,
+                "role": user.role,
+                "organization": {
+                    "id": user.organization.id,
+                    "name": user.organization.name,
+                    "slug": user.organization.slug,
+                }
+                if user.organization
+                else None,
             }
         )
 
@@ -231,3 +254,31 @@ class JoinView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.save()
         return Response(data, status=201)
+
+
+class OrgMembersView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if user.role != "org_admin":
+            return Response({"error": "Only org admins can view members."}, status=403)
+        members = User.objects.filter(organization=user.organization).values(
+            "id", "username", "email", "role", "first_name", "last_name"
+        )
+        return Response(list(members))
+
+
+class RegenerateInviteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        import uuid as uuid_mod
+
+        user = request.user
+        if user.role != "org_admin":
+            return Response({"error": "Only org admins can regenerate invite keys."}, status=403)
+        org = user.organization
+        org.invite_key = uuid_mod.uuid4()
+        org.save()
+        return Response({"invite_key": str(org.invite_key)})

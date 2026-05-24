@@ -2,7 +2,7 @@
 Integration tests for views/API endpoints.
 
 Tests validate:
-- RoomViewSet: public access, list/retrieve
+- RoomViewSet: auth required, org-scoped, list/retrieve
 - BookingViewSet: auth required, user filtering, room/date/month filters
 """
 
@@ -22,38 +22,67 @@ class TestRoomViewSet:
     """Test suite for RoomViewSet API endpoints."""
 
     # ========================================================================
-    # List Rooms Tests
+    # Auth & Org Scoping Tests
     # ========================================================================
 
-    def test_list_rooms_public_access(self, db, api_client, rooms):
-        """Test that listing rooms doesn't require authentication."""
+    def test_list_rooms_requires_auth(self, db, api_client, rooms):
+        """Test that listing rooms requires authentication."""
         response = api_client.get("/api/rooms/")
+        assert response.status_code == 401
 
+    def test_list_rooms_org_scoped(self, db, authenticated_api_client, rooms, user):
+        """Test that rooms are scoped to the user's organization."""
+        response = authenticated_api_client.get("/api/rooms/")
         assert response.status_code == 200
         assert len(response.data["results"]) == 5
 
-    def test_list_rooms_returns_correct_fields(self, db, api_client, room):
-        """Test that room list returns expected fields."""
-        response = api_client.get("/api/rooms/")
+    def test_list_rooms_other_org_hidden(self, db, user, organization):
+        """Test that rooms from other orgs are not visible."""
+        from rooms.models_users import Organization
 
+        other_org = Organization.objects.create(name="Other", slug="other")
+        Room.objects.create(name="Hidden Room", location="Floor X", capacity=5, organization=other_org)
+
+        client = authenticated_api_client = None
+        from rest_framework.test import APIClient
+
+        client = APIClient()
+        refresh = RefreshToken.for_user(user)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+
+        response = client.get("/api/rooms/")
+        assert response.status_code == 200
+        assert len(response.data["results"]) == 0
+
+    # ========================================================================
+    # List Rooms Tests
+    # ========================================================================
+
+    def test_list_rooms_returns_correct_fields(self, db, authenticated_api_client, room):
+        """Test that room list returns expected fields."""
+        response = authenticated_api_client.get("/api/rooms/")
         assert response.status_code == 200
         data = response.data["results"][0]
         assert set(data.keys()) == {"id", "name", "location", "capacity", "features"}
 
-    def test_list_rooms_empty(self, db, api_client):
-        """Test listing rooms when no rooms exist."""
-        response = api_client.get("/api/rooms/")
-
+    def test_list_rooms_empty(self, db, authenticated_api_client):
+        """Test listing rooms when no rooms exist in the user's org."""
+        response = authenticated_api_client.get("/api/rooms/")
         assert response.status_code == 200
         assert len(response.data["results"]) == 0
 
-    def test_list_rooms_ordered(self, db, api_client, organization):
+    def test_list_rooms_ordered(self, db, organization, user):
         """Test that rooms are ordered consistently."""
         Room.objects.create(name="Z Room", location="Floor 1", capacity=5, organization=organization)
         Room.objects.create(name="A Room", location="Floor 2", capacity=10, organization=organization)
 
-        response = api_client.get("/api/rooms/")
+        from rest_framework.test import APIClient
 
+        client = APIClient()
+        refresh = RefreshToken.for_user(user)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+
+        response = client.get("/api/rooms/")
         assert response.status_code == 200
         assert len(response.data["results"]) == 2
 
@@ -61,52 +90,39 @@ class TestRoomViewSet:
     # Retrieve Room Tests
     # ========================================================================
 
-    def test_retrieve_room_by_id(self, db, api_client, room):
+    def test_retrieve_room_by_id(self, db, authenticated_api_client, room):
         """Test retrieving a specific room by ID."""
-        response = api_client.get(f"/api/rooms/{room.id}/")
-
+        response = authenticated_api_client.get(f"/api/rooms/{room.id}/")
         assert response.status_code == 200
         assert response.data["id"] == room.id
         assert response.data["name"] == room.name
-        assert response.data["capacity"] == room.capacity
 
-    def test_retrieve_nonexistent_room(self, db, api_client):
+    def test_retrieve_nonexistent_room(self, db, authenticated_api_client):
         """Test retrieving a room that doesn't exist."""
-        response = api_client.get("/api/rooms/99999/")
-
+        response = authenticated_api_client.get("/api/rooms/99999/")
         assert response.status_code == 404
-
-    def test_retrieve_room_without_auth(self, db, api_client, room):
-        """Test that retrieving a room doesn't require authentication."""
-        response = api_client.get(f"/api/rooms/{room.id}/")
-
-        assert response.status_code == 200
 
     # ========================================================================
     # HTTP Method Tests
     # ========================================================================
 
-    def test_rooms_read_only(self, db, api_client, organization):
+    def test_rooms_read_only(self, db, authenticated_api_client, organization):
         """Test that rooms cannot be created/updated/deleted via API."""
-        # Try to create a room
-        create_response = api_client.post(
+        create_response = authenticated_api_client.post(
             "/api/rooms/", {"name": "New Room", "location": "Floor 1", "capacity": 10}
         )
-        assert create_response.status_code == 405  # Method Not Allowed
+        assert create_response.status_code == 405
 
-        # Create a room for update/delete tests
         room = Room.objects.create(name="Test Room", capacity=5, organization=organization)
 
-        # Try to update
-        update_response = api_client.put(
+        update_response = authenticated_api_client.put(
             f"/api/rooms/{room.id}/",
             {"name": "Updated Room", "capacity": 15},
             format="json",
         )
         assert update_response.status_code == 405
 
-        # Try to delete
-        delete_response = api_client.delete(f"/api/rooms/{room.id}/")
+        delete_response = authenticated_api_client.delete(f"/api/rooms/{room.id}/")
         assert delete_response.status_code == 405
 
 

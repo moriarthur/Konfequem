@@ -1,6 +1,8 @@
 import { Suspense, lazy, type ReactNode } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import LoginForm from "./components/LoginForm";
+import RegisterForm from "./components/RegisterForm";
+import JoinForm from "./components/JoinForm";
 import Home from "./pages/Home";
 import RoomsPage from "./pages/RoomsPage";
 import NotFound from "./pages/NotFound";
@@ -41,6 +43,8 @@ export default function App() {
           <Router future={{ v7_startTransition: true }}>
             <Routes>
               <Route path="/login" element={<LoginForm />} />
+              <Route path="/register" element={<RegisterForm />} />
+              <Route path="/join/:key" element={<JoinForm />} />
               <Route
                 path="/"
                 element={

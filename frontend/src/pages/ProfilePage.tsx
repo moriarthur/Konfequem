@@ -55,6 +55,10 @@ export default function ProfilePage() {
   const [profileForm, setProfileForm] = useState<ProfileForm>({ first_name: "", last_name: "", email: "" });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState("");
+  const [members, setMembers] = useState<Array<{ id: number; username: string; email: string; role: string; first_name: string; last_name: string }>>([]);
+  const [inviteKey, setInviteKey] = useState<string | null>(null);
+  const [copiedInvite, setCopiedInvite] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
 
   const pw = passwordForm.new_password;
   const pwChecks: { met: boolean; label: string }[] = [
@@ -179,6 +183,37 @@ export default function ProfilePage() {
   const lastName = user?.last_name as string | undefined;
   const username = user?.username as string | undefined;
   const email = user?.email as string | undefined;
+  const role = user?.role as string | undefined;
+  const org = user?.organization as { id: number; name: string; slug: string } | null | undefined;
+
+  useEffect(() => {
+    if (role !== "org_admin") return;
+    authFetch("/api/org/members/")
+      .then((data) => setMembers(data as typeof members))
+      .catch(() => {});
+  }, [role, authFetch]);
+
+  const handleRegenerate = async () => {
+    setRegenerating(true);
+    try {
+      const data = await authFetch("/api/org/invite/regenerate/", { method: "POST" }) as { invite_key: string };
+      setInviteKey(data.invite_key);
+      showAlert("Invite link regenerated", { type: "success" });
+    } catch {
+      showAlert("Failed to regenerate invite", { type: "error" });
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
+  const handleCopyInvite = () => {
+    const key = inviteKey || "";
+    const url = `${window.location.origin}/join/${key}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedInvite(true);
+      setTimeout(() => setCopiedInvite(false), 2000);
+    });
+  };
 
   if (!isAuthenticated) {
     return (
@@ -309,6 +344,54 @@ export default function ProfilePage() {
             </div>
           )}
         </div>
+
+        {org && (
+          <div className="bg-surface-base border border-border-subtle rounded-xl p-6 mb-6">
+            <Heading level={3} className="text-sm font-semibold text-accent-secondary mb-3">
+              Organization
+            </Heading>
+            <div className="flex items-center gap-2 mb-2">
+              <Text className="text-base font-medium text-accent-secondary">{org.name}</Text>
+              <Text variant="muted" className="text-sm">/{org.slug}</Text>
+            </div>
+
+            {role === "org_admin" && (
+              <div className="mt-4 space-y-4">
+                <div>
+                  <Text variant="muted" className="text-xs mb-1">Invite link</Text>
+                  <div className="flex gap-2">
+                    <code className="flex-1 px-3 py-2 bg-surface-muted border border-border-subtle rounded-lg text-sm text-accent-secondary truncate">
+                      {window.location.origin}/join/{inviteKey || "••••••••"}
+                    </code>
+                    <button onClick={handleCopyInvite} className="px-3 py-2 border border-border-subtle rounded-lg text-sm text-accent-secondary hover:bg-surface-muted transition">
+                      {copiedInvite ? "Copied!" : "Copy"}
+                    </button>
+                    <button onClick={handleRegenerate} disabled={regenerating} className="px-3 py-2 border border-border-subtle rounded-lg text-sm text-accent-secondary hover:bg-surface-muted transition disabled:opacity-50">
+                      {regenerating ? "..." : "Regenerate"}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <Text variant="muted" className="text-xs mb-2">Members ({members.length})</Text>
+                  <div className="divide-y divide-border-subtle border border-border-subtle rounded-lg overflow-hidden">
+                    {members.map((m) => (
+                      <div key={m.id} className="px-3 py-2 flex items-center justify-between bg-surface-base">
+                        <div>
+                          <Text className="text-sm font-medium text-accent-secondary">{m.username}</Text>
+                          {m.first_name && <Text variant="muted" className="text-xs ml-2">{m.first_name} {m.last_name}</Text>}
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${m.role === "org_admin" ? "bg-accent-primary/10 text-accent-primary" : "bg-surface-muted text-accent-secondary/60"}`}>
+                          {m.role === "org_admin" ? "Admin" : "Member"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {loading ? (
           <div className="grid grid-cols-3 gap-3 mb-6">

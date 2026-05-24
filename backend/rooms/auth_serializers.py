@@ -2,11 +2,22 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """
-    Custom JWT token serializer with UTF-8 support.
-    """
-
     def validate(self, attrs):
-        # Let parent class handle authentication
-        # The parent class properly handles UTF-8
-        return super().validate(attrs)
+        data = super().validate(attrs)
+        user = self.user
+        data["user"] = {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "role": user.role,
+            "organization": {
+                "id": user.organization.id,
+                "name": user.organization.name,
+                "slug": user.organization.slug,
+            }
+            if user.organization
+            else None,
+        }
+        return data

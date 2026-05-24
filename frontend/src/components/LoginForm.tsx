@@ -46,7 +46,6 @@ export default function LoginForm() {
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [capsLockOn, setCapsLockOn] = useState(false);
-  const [toast, setToast] = useState("");
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [lockoutRemaining, setLockoutRemaining] = useState(0);
@@ -159,26 +158,8 @@ export default function LoginForm() {
     }
   };
 
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(""), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
-
-  const handleSignUpClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setToast("This feature will be available soon. 🙂");
-  };
-
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-surface-muted p-4">
-      {toast && (
-        <div key={toast} className="fixed top-6 left-1/2 -translate-x-1/2 bg-status-info-soft text-status-info-text border border-status-info-border px-6 py-3 rounded-2xl shadow-soft text-sm font-medium backdrop-blur-sm z-50 opacity-0 animate-fadeInOut">
-          {toast}
-        </div>
-      )}
-
       <div className="w-full max-w-sm p-8 rounded-2xl bg-surface-base shadow-soft border border-border-subtle">
         <div className="flex justify-center mb-6">
           <img src="/konfequem.svg" alt="Konfequem" width="160" height="160" />
@@ -276,7 +257,7 @@ export default function LoginForm() {
 
         <p className="text-center text-sm text-accent-secondary/60 mt-6">
           Don&apos;t have an account?{" "}
-          <a href="#" onClick={handleSignUpClick} className="text-accent-primary hover:underline">Sign up</a>
+          <a href="/register" className="text-accent-primary hover:underline">Sign up</a>
         </p>
 
         <p className="text-center text-sm text-accent-secondary/40 mt-2">

@@ -29,6 +29,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   loading: boolean;
   login: (username: string, password: string) => Promise<Record<string, unknown>>;
+  register: (tokens: { access: string; refresh: string }) => Promise<void>;
   logout: () => Promise<void>;
   authFetch: <T = unknown>(url: string, options?: RequestInit) => Promise<T>;
   authFetchRef: React.RefObject<((url: string, options?: RequestInit) => Promise<unknown>) | null>;
@@ -340,6 +341,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [fetchUser, logout]
   );
 
+  const register = useCallback(
+    async (tokens: { access: string; refresh: string }) => {
+      if (!tokens.access || isTokenExpired(tokens.access)) {
+        throw new Error("Received invalid or expired token");
+      }
+      setAccess(tokens.access);
+      setRefresh(tokens.refresh);
+      setIsAuthenticated(true);
+      TOKEN_STORAGE.set(tokens.access, tokens.refresh);
+      userFetchedRef.current = true;
+      await fetchUser(tokens.access);
+    },
+    [fetchUser]
+  );
+
   useEffect(() => {
     const initializeAuth = async () => {
       const storedTokens = TOKEN_STORAGE.get();
@@ -400,7 +416,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ access, refresh, isAuthenticated, loading, login, logout, authFetch, authFetchRef, user }}
+      value={{ access, refresh, isAuthenticated, loading, login, register, logout, authFetch, authFetchRef, user }}
     >
       {children}
     </AuthContext.Provider>

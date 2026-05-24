@@ -1,6 +1,7 @@
 import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import RefreshToken
 from rooms.models_users import Organization
 
 User = get_user_model()
@@ -178,3 +179,81 @@ class TestJoin:
         client = APIClient()
         resp = client.post("/api/join/", {}, format="json")
         assert resp.status_code == 400
+
+
+# ============================================================================
+# Org Admin
+# ============================================================================
+
+
+@pytest.fixture
+def org_admin(organization):
+    return User.objects.create_user(
+        username="admin",
+        email="admin@example.com",
+        password="testpass123",
+        role="org_admin",
+        organization=organization,
+    )
+
+
+@pytest.fixture
+def member(organization):
+    return User.objects.create_user(
+        username="memberuser",
+        email="member@example.com",
+        password="testpass123",
+        role="member",
+        organization=organization,
+    )
+
+
+@pytest.mark.django_db
+class TestOrgMembers:
+    def test_admin_sees_members(self, org_admin, member, organization):
+        client = APIClient()
+        refresh = RefreshToken.for_user(org_admin)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+        resp = client.get("/api/org/members/")
+        assert resp.status_code == 200
+        data = resp.json()
+        usernames = [m["username"] for m in data]
+        assert "admin" in usernames
+        assert "memberuser" in usernames
+
+    def test_member_forbidden(self, member):
+        client = APIClient()
+        refresh = RefreshToken.for_user(member)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+        resp = client.get("/api/org/members/")
+        assert resp.status_code == 403
+
+    def test_unauthenticated(self):
+        client = APIClient()
+        resp = client.get("/api/org/members/")
+        assert resp.status_code == 401
+
+
+@pytest.mark.django_db
+class TestRegenerateInvite:
+    def test_admin_regenerates(self, org_admin, organization):
+        old_key = organization.invite_key
+        client = APIClient()
+        refresh = RefreshToken.for_user(org_admin)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+        resp = client.post("/api/org/invite/regenerate/")
+        assert resp.status_code == 200
+        new_key = resp.json()["invite_key"]
+        assert new_key != str(old_key)
+
+    def test_member_forbidden(self, member):
+        client = APIClient()
+        refresh = RefreshToken.for_user(member)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+        resp = client.post("/api/org/invite/regenerate/")
+        assert resp.status_code == 403
+
+    def test_unauthenticated(self):
+        client = APIClient()
+        resp = client.post("/api/org/invite/regenerate/")
+        assert resp.status_code == 401
