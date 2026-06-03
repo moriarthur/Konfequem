@@ -1,114 +1,110 @@
-# Konfequem - Room Booking System
+<div align="center">
 
-A modern room booking system built with Django 4.2 (backend) and React 19 (frontend), featuring JWT authentication and office-hours-based booking validation.
+# Konfequem
 
-## Quick Start
+### Multi-Tenant Room Booking Platform
 
-### Option 1: Docker Setup (Windows/WSL with Docker)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://typescriptlang.org)
+[![React](https://img.shields.io/badge/React_19-61DAFB?style=flat&logo=react&logoColor=black)](https://react.dev)
+[![Django](https://img.shields.io/badge/Django_4.2-092E20?style=flat&logo=django&logoColor=white)](https://djangoproject.com)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat&logo=postgresql&logoColor=white)](https://postgresql.org)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white)](https://docker.com)
 
-**Prerequisites:** Docker and Docker Compose installed
+*Book rooms by the hour with real-time calendar views, JWT-secured API, and office-hours validation.*
+
+</div>
+
+---
+
+## What it does
+
+Konfequem is a room booking system for organizations that need to manage shared spaces — conference rooms, coworking desks, studios. Users browse available rooms, pick a time slot on a visual calendar, and book instantly. The backend enforces business rules: no double-bookings, office hours only (08:00–22:00), min 15 min / max 8 hours per booking.
+
+## Key Features
+
+- **Visual Calendar** — Interactive calendar view for room availability at a glance
+- **Room Management** — Browse rooms, view details, filter by capacity and equipment
+- **JWT Authentication** — Secure signup/login with access + refresh tokens (SimpleJWT)
+- **Booking Validation** — Office hours enforcement, overlap detection, advance booking limits
+- **User Profiles** — Account management and booking history
+- **Timezone-Aware** — Stores UTC, displays Europe/Berlin; correct DST handling
+- **Docker-Ready** — Full Docker Compose stack (Django + React + PostgreSQL)
+- **Test Suite** — pytest on backend, testing infrastructure on frontend
+
+## Architecture
+
+```
+konfequem/
+├── backend/                  # Django 4.2 REST API
+│   ├── config/               # Project settings, URLs, ASGI/WSGI
+│   ├── rooms/                # Core app: models, views, serializers
+│   │   ├── models.py         # Room & Booking models
+│   │   ├── models_users.py   # Custom user model
+│   │   ├── auth_serializers.py
+│   │   └── management/       # Custom management commands
+│   ├── admin-interface/      # Django admin customizations
+│   ├── tests/                # pytest test suite
+│   └── Dockerfile
+├── frontend/                 # React 19 + Vite + TypeScript
+│   └── src/
+│       ├── pages/            # Calendar, Rooms, Home, Profile
+│       ├── components/       # Reusable UI components
+│       ├── context/          # React context providers
+│       └── utils/            # Helpers and API clients
+├── docker-compose.yml
+└── .github/                  # CI/CD workflows
+```
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 19, TypeScript, Vite |
+| Backend | Django 4.2, Django REST Framework |
+| Auth | SimpleJWT (access + refresh tokens) |
+| Database | PostgreSQL (Docker) / SQLite (local) |
+| Infra | Docker, Docker Compose |
+| Testing | pytest, Django test runner |
+
+## Getting Started
 
 ```bash
-# 1. Clone the repository
-git clone <repository-url>
+# Prerequisites: Docker & Docker Compose
+
+# Clone
+git clone https://github.com/moriarthur/Konfequem.git
 cd Konfequem
 
-# 2. Copy Docker environment file
+# Configure
 cp .env.docker.example .env
 
-# 3. Start services
+# Start all services
 docker compose up -d
 
-# 4. Run migrations
+# Run migrations & create admin
 docker compose exec backend python manage.py migrate
-
-# 5. Create superuser (optional)
 docker compose exec backend python manage.py createsuperuser
 
-# 6. Access the application
-# Frontend: http://localhost:5173
-# Backend API: http://localhost:8000/api
-# Admin: http://localhost:8000/admin
+# Access
+# Frontend:  http://localhost:5173
+# API:       http://localhost:8000/api
+# Admin:     http://localhost:8000/admin
 ```
 
-### Option 2: Local Setup (macOS/Windows without Docker)
+## Booking Rules
 
-**Prerequisites:** Python 3.11+, Node.js 18+
+| Rule | Value |
+|------|-------|
+| Operating hours | 08:00 – 22:00 (Berlin time) |
+| Minimum booking | 15 minutes |
+| Maximum booking | 8 hours |
+| Advance booking | Up to 90 days |
+| Overlap detection | Server-side validation |
 
-```bash
-# 1. Clone the repository
-git clone <repository-url>
-cd Konfequem
+---
 
-# 2. Copy Local environment file
-cp .env.local.example .env
+<div align="center">
 
-# 3. Backend Setup
-cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\\Scripts\\activate
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py createsuperuser  # Optional
-python manage.py runserver
+*Built with [Claude Code](https://claude.ai/code) — AI-native development workflow*
 
-# 4. Frontend Setup (new terminal)
-cd frontend
-npm install
-npm run dev
-
-# 5. Access the application
-# Same URLs as Docker mode
-```
-
-## Environment Configuration
-
-The system supports two environments:
-
-### Docker Mode (.env.docker.example)
-- **Database:** PostgreSQL (containerized)
-- **Connection:** `postgresql://admin:secret@db:5432/konfequem`
-- **Services:** All containerized
-
-### Local Mode (.env.local.example)
-- **Database:** SQLite (file-based)
-- **Connection:** `sqlite:///backend/db.sqlite3`
-- **Services:** Run manually
-
-## Standard Ports
-
-- **Backend:** 8000
-- **Frontend:** 5173
-- **Database (Docker):** 5433 (mapped from container 5432)
-
-## Timezone Handling
-
-- **Storage:** UTC (backend database)
-- **Display:** Europe/Berlin (frontend)
-- **Office Hours:** 08:00-22:00 (Berlin time)
-- **Booking Rules:** 15min minimum, 8 hours maximum, 90 days advance
-
-## Development Notes
-
-1. **Environment Files:**
-   - Never commit `.env` files
-   - Use `.env.docker.example` or `.env.local.example` as templates
-   - Update example files when adding new variables
-
-2. **Database:**
-   - Docker: PostgreSQL in container
-   - Local: SQLite file at `backend/db.sqlite3`
-
-3. **Code Style:**
-   - Backend: Black formatter (`make format`)
-   - Frontend: ESLint + Prettier
-
-4. **Testing:**
-   - Backend: `cd backend && make test`
-   - Frontend: `cd frontend && npm test`
-
-## Windows/WSL Notes
-
-- Docker Desktop must be running
-- WSL2 backend recommended for better performance
-- Use `cp .env.docker.example .env` for Docker setup
+</div>
