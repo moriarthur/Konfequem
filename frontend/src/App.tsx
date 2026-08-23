@@ -38,8 +38,8 @@ function LazyRoute({ children, fallback }: { children: ReactNode; fallback: Reac
 export default function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <AlertProvider>
+      <AlertProvider>
+        <AuthProvider>
           <Router future={{ v7_startTransition: true }}>
             <Routes>
               <Route path="/login" element={<LoginForm />} />
@@ -84,8 +84,8 @@ export default function App() {
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Router>
-        </AlertProvider>
-      </AuthProvider>
+        </AuthProvider>
+      </AlertProvider>
     </ErrorBoundary>
   );
 }

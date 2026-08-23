@@ -98,12 +98,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<Record<string, unknown> | null>(null);
-  const refreshPromise = useRef<Promise<Response> | null>(null);
+  const refreshPromise = useRef<Promise<string | null> | null>(null);
   const userFetchedRef = useRef(false);
   const authFetchRef = useRef<((url: string, options?: RequestInit) => Promise<unknown>) | null>(null);
 
   const logout = useCallback(async () => {
-    const currentRefresh = refresh;
+    // Read from storage — the state value may be stale after a rotation
+    // in another part of the app, and this keeps the callback stable.
+    const currentRefresh = TOKEN_STORAGE.get().refresh;
     setAccess(null);
     setRefresh(null);
     setIsAuthenticated(false);
@@ -122,60 +124,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Best-effort — don't block logout if blacklist fails
       }
     }
-  }, [refresh]);
+  }, []);
 
   const refreshAccessToken = useCallback(async (): Promise<string | null> => {
-    if (!refresh) {
+    // Read from storage — a closure over `refresh` can hold a token that
+    // was already rotated and blacklisted by a concurrent refresh.
+    const currentRefresh = TOKEN_STORAGE.get().refresh;
+    if (!currentRefresh) {
       logout();
       return null;
     }
 
-    // If a refresh is already in progress, wait for it
-    if (refreshPromise.current) {
+    // A refresh is already in flight: share its (parsed) result instead of
+    // issuing another request. Two parallel refreshes would race under
+    // ROTATE_REFRESH_TOKENS and get the second one blacklisted.
+    if (refreshPromise.current) return refreshPromise.current;
+
+    const promise = (async (): Promise<string | null> => {
       try {
-        const res = await refreshPromise.current;
-        if (res.ok) {
-          const data = await res.json();
-          return data.access;
+        const res = await fetch(`${API_URL}/api/token/refresh/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh: currentRefresh }),
+        });
+
+        if (!res.ok) {
+          // Only an invalid/blacklisted token ends the session.
+          // 429/5xx are transient — keep the user logged in.
+          if (res.status === 401 || res.status === 403) {
+            logout();
+          }
+          return null;
         }
+
+        const data = await res.json();
+        const newRefresh = data.refresh || currentRefresh;
+        setAccess(data.access);
+        setRefresh(newRefresh);
+        TOKEN_STORAGE.set(data.access, newRefresh);
+        return data.access;
       } catch {
-        // Pending refresh failed, fall through to start a new one
-      }
-      return null;
-    }
-
-    try {
-      refreshPromise.current = fetch(`${API_URL}/api/token/refresh/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh }),
-      });
-
-      const res = await refreshPromise.current;
-      refreshPromise.current = null;
-
-      if (!res.ok) {
-        if (res.status === 401 || res.status === 403) {
-          logout();
-        }
         return null;
+      } finally {
+        refreshPromise.current = null;
       }
+    })();
 
-      const data = await res.json();
-      setAccess(data.access);
-      const newRefresh = data.refresh || refresh;
-      setRefresh(newRefresh);
-      TOKEN_STORAGE.set(data.access, newRefresh);
-      return data.access;
-    } catch (error) {
-      refreshPromise.current = null;
-      const status = (error as { status?: number })?.status;
-      if (status === 401 || status === 403) {
-        logout();
-      }
-      return null;
-    }
-  }, [refresh, logout]);
+    refreshPromise.current = promise;
+    return promise;
+  }, [logout]);
 
   const authFetch = useCallback(
     async <T = unknown>(url: string, options: RequestInit = {} as RequestInit): Promise<T> => {
