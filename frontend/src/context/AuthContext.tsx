@@ -10,6 +10,7 @@ import {
 } from "react";
 /* eslint-disable react-refresh/only-export-components */
 import { API_URL } from "./authConfig";
+import { useAlert } from "./AlertContext";
 
 // --- Types ---
 
@@ -101,6 +102,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshPromise = useRef<Promise<string | null> | null>(null);
   const userFetchedRef = useRef(false);
   const authFetchRef = useRef<((url: string, options?: RequestInit) => Promise<unknown>) | null>(null);
+  const lastThrottleToastRef = useRef(0);
+  const alert = useAlert();
 
   const logout = useCallback(async () => {
     // Read from storage — the state value may be stale after a rotation
@@ -197,6 +200,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           throw new Error("Network error. Please try again.");
         }
+      }
+
+      if (res.status === 429) {
+        const raw = res.headers.get("Retry-After");
+        const seconds = raw && /^\d+$/.test(raw) ? Number(raw) : null;
+        // Pages fire several parallel requests — show one toast per burst
+        if (Date.now() - lastThrottleToastRef.current > 5000) {
+          lastThrottleToastRef.current = Date.now();
+          alert.warning(
+            seconds
+              ? `Too many requests. Please try again in ${seconds}s.`
+              : "Too many requests. Please try again shortly."
+          );
+        }
+        throw {
+          status: 429,
+          retryAfter: seconds ?? undefined,
+          message: "Request was throttled.",
+        };
       }
 
       if (!res.ok) {

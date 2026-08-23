@@ -120,6 +120,10 @@ export default function ProfilePage() {
         });
       } catch (err) {
         logError("Error fetching profile data:", err);
+        // 429 already surfaces a toast from authFetch; keep loaded data
+        if ((err as { status?: number }).status !== 429) {
+          showAlert("Could not load profile data. Please try again.", { type: "error" });
+        }
       } finally {
         setLoading(false);
       }

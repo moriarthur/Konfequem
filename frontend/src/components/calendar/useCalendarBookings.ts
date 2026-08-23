@@ -72,7 +72,13 @@ export function useCalendarBookings(currentMonth: DateTime) {
         const allBookingsData = await authFetch("/api/bookings/");
         if (isMountedRef.current) setAllBookings(extractResults(allBookingsData));
       } catch (err) {
-        if (isMountedRef.current) logError("Error fetching bookings:", err);
+        if (isMountedRef.current) {
+          logError("Error fetching bookings:", err);
+          // 429 already surfaces a toast from authFetch; keep loaded data
+          if ((err as { status?: number }).status !== 429) {
+            showAlert("Could not load bookings. Please try again.", { type: "error" });
+          }
+        }
       } finally {
         if (isMountedRef.current) setLoading(false);
       }

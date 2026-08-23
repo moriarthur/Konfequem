@@ -12,6 +12,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { AuthProvider, useAuth } from '@/context/AuthContext'
+import { AlertProvider } from '@/context/AlertContext'
 import { server } from '../../mocks/handlers'
 import { http, HttpResponse } from 'msw'
 
@@ -59,7 +60,11 @@ const createExpiredJwt = () => {
 // Wrapper component for testing hooks
 function createWrapper() {
   return function AuthWrapper({ children }: { children: React.ReactNode }) {
-    return <AuthProvider>{children}</AuthProvider>
+    return (
+      <AlertProvider>
+        <AuthProvider>{children}</AuthProvider>
+      </AlertProvider>
+    )
   }
 }
 

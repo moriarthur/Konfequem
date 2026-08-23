@@ -110,6 +110,10 @@ export default function Home() {
         setBookings(bookingsResponse.results || []);
       } catch (err) {
         logError("Error fetching data:", err);
+        // 429 already surfaces a toast from authFetch; keep loaded data
+        if ((err as { status?: number }).status !== 429) {
+          showError("Could not load data. Please try again.");
+        }
       }
     };
 

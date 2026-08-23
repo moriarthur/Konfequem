@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useAlert } from "../context/AlertContext";
 import Button from "../components/ui/Button";
 import { error as logError } from "../utils/logger";
 import BottomNav from "../components/BottomNav";
@@ -14,6 +15,7 @@ import { BookingData } from "../utils/bookingUtils";
 
 export default function RoomsPage() {
   const { authFetch, authFetchRef, isAuthenticated, access } = useAuth();
+  const { showAlert } = useAlert();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [features, setFeatures] = useState<Feature[]>([]);
   const [bookings, setBookings] = useState<BookingData[]>([]);
@@ -55,6 +57,10 @@ export default function RoomsPage() {
         setBookings((bookingsData as PaginatedResponse<BookingData>).results || (bookingsData as BookingData[]));
       } catch (err) {
         logError("Error fetching data:", err);
+        // 429 already surfaces a toast from authFetch; keep loaded data
+        if ((err as { status?: number }).status !== 429) {
+          showAlert("Could not load data. Please try again.", { type: "error" });
+        }
       } finally {
         setLoading(false);
       }
