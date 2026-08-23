@@ -6,8 +6,14 @@ from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+    TokenBlacklistView,
+)
 
 from .models import Room, Booking, RoomFeature
 from .models_users import Organization, User
@@ -49,6 +55,27 @@ def _check_booking_modifiable(booking, action="modify"):
         raise PermissionDenied(
             f"Cannot {action} a booking that is currently in progress."
         )
+
+
+class ThrottledTokenObtainPairView(TokenObtainPairView):
+    """Login endpoint with brute-force rate limiting (scope: login)."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"
+
+
+class ThrottledTokenRefreshView(TokenRefreshView):
+    """Token refresh endpoint with rate limiting (scope: token_refresh)."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "token_refresh"
+
+
+class ThrottledTokenBlacklistView(TokenBlacklistView):
+    """Token blacklist endpoint with rate limiting (scope: token_blacklist)."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "token_blacklist"
 
 
 class RoomViewSet(viewsets.ReadOnlyModelViewSet):
@@ -162,6 +189,8 @@ class CurrentUserView(APIView):
 
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "change_password"
 
     def post(self, request):
         user = request.user
@@ -208,6 +237,8 @@ class ChangePasswordView(APIView):
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "register"
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
@@ -218,6 +249,8 @@ class RegisterView(APIView):
 
 class InvitePreviewView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "invite_preview"
 
     def get(self, request, key):
         try:
@@ -229,6 +262,8 @@ class InvitePreviewView(APIView):
 
 class JoinView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "join"
 
     def post(self, request):
         serializer = JoinSerializer(data=request.data)
@@ -252,6 +287,8 @@ class OrgMembersView(APIView):
 
 class RegenerateInviteView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "regenerate_invite"
 
     def post(self, request):
         user = request.user

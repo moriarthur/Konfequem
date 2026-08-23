@@ -144,14 +144,18 @@ REST_FRAMEWORK = {
     # Pagination settings
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 100,
-    # Rate limiting
-    "DEFAULT_THROTTLE_CLASSES": [
-        "rest_framework.throttling.AnonRateThrottle",
-        "rest_framework.throttling.UserRateThrottle",
-    ],
+    # Rate limiting: per-endpoint via `throttle_scope` + ScopedRateThrottle
+    # (see rooms/views.py). No global throttle classes — authenticated CRUD
+    # endpoints are not throttled; only auth/session-sensitive endpoints are.
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "30/min",
-        "user": "60/min",
+        "login": "10/min",
+        "token_refresh": "30/min",
+        "register": "5/min",
+        "join": "10/min",
+        "invite_preview": "30/min",
+        "change_password": "10/min",
+        "regenerate_invite": "10/min",
+        "token_blacklist": "30/min",
     },
 }
 
@@ -174,6 +178,8 @@ CORS_ALLOWED_ORIGINS = config(
     cast=lambda v: [origin.strip() for origin in v.split(",")],
 )
 CORS_ALLOW_CREDENTIALS = True  # Required for cookies
+# Let the browser read DRF's Retry-After header on 429 responses
+CORS_EXPOSE_HEADERS = ["Retry-After"]
 
 # CSRF trusted origins for additional security
 CSRF_TRUSTED_ORIGINS = config(

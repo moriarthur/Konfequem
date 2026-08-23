@@ -10,6 +10,7 @@ from datetime import timedelta, time
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
+from rest_framework.throttling import SimpleRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from freezegun import freeze_time
 
@@ -329,9 +330,36 @@ def clear_cache():
 
 
 @pytest.fixture(autouse=True)
-def disable_throttling(settings):
-    """Disable rate limiting during tests."""
-    settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
-        "anon": None,
-        "user": None,
-    }
+def disable_throttling():
+    """Disable rate limiting during tests unless explicitly re-enabled.
+
+    Mutates SimpleRateThrottle.THROTTLE_RATES in place — it is a class-level
+    snapshot of settings captured at import time, so replacing the dict in
+    django settings (or reloading api_settings) is invisible to it. A rate
+    of None disables a throttle; a missing key would raise
+    ImproperlyConfigured.
+    """
+    SimpleRateThrottle.THROTTLE_RATES.update(
+        {key: None for key in SimpleRateThrottle.THROTTLE_RATES}
+    )
+
+
+@pytest.fixture
+def enable_scoped_throttling():
+    """Re-enable scoped throttling with low rates for testing.
+
+    Must run after disable_throttling (autouse fixtures are set up first),
+    and mutates THROTTLE_RATES in place for the same reason.
+    """
+    SimpleRateThrottle.THROTTLE_RATES.update(
+        {
+            "login": "3/min",
+            "token_refresh": "2/min",
+            "register": "2/min",
+            "join": "2/min",
+            "invite_preview": "2/min",
+            "change_password": "2/min",
+            "regenerate_invite": "2/min",
+            "token_blacklist": "2/min",
+        }
+    )
