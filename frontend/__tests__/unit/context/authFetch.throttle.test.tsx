@@ -171,4 +171,56 @@ describe('authFetch throttling and refresh dedupe', () => {
     expect(localStorage.getItem('access')).toBeTruthy()
     expect(localStorage.getItem('refresh')).toBeTruthy()
   })
+
+  it('discards an in-flight refresh that completes after logout', async () => {
+    seedTokens()
+    // Gate the refresh response so it is delivered strictly AFTER logout
+    let announceRefresh: () => void
+    const refreshArrived = new Promise<void>((resolve) => {
+      announceRefresh = resolve
+    })
+    let releaseResponse: () => void
+    const responseGate = new Promise<void>((resolve) => {
+      releaseResponse = resolve
+    })
+    server.use(
+      http.post('/api/token/refresh/', async () => {
+        announceRefresh!()
+        await responseGate
+        return HttpResponse.json({
+          access: mockJwt('rotated-access'),
+          refresh: mockJwt('rotated-refresh'),
+        })
+      }),
+      http.post('/api/token/blacklist/', () => HttpResponse.json({})),
+      http.get('/api/rooms/', () =>
+        HttpResponse.json({ detail: 'Unauthorized' }, { status: 401 })
+      )
+    )
+    const result = await renderAuth()
+
+    // Start a request whose 401 triggers the (gated) refresh…
+    let caught: unknown
+    const pending = result.current
+      .authFetch('/api/rooms/')
+      .catch((e) => {
+        caught = e
+      })
+    // …wait until the refresh request is actually in flight…
+    await refreshArrived
+    // …log out, and only then let the refresh response through
+    await act(async () => {
+      await result.current.logout()
+    })
+    await act(async () => {
+      releaseResponse!()
+      await pending
+    })
+
+    expect(caught).toBeInstanceOf(Error)
+    expect(result.current.isAuthenticated).toBe(false)
+    // The rotated tokens must NOT be written back after logout
+    expect(localStorage.getItem('access')).toBeNull()
+    expect(localStorage.getItem('refresh')).toBeNull()
+  })
 })

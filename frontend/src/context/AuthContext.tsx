@@ -103,9 +103,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const userFetchedRef = useRef(false);
   const authFetchRef = useRef<((url: string, options?: RequestInit) => Promise<unknown>) | null>(null);
   const lastThrottleToastRef = useRef(0);
+  // Bumped on every logout so an in-flight refresh can detect that the
+  // session it is refreshing has since ended, and discard its result.
+  const logoutEpochRef = useRef(0);
   const alert = useAlert();
 
   const logout = useCallback(async () => {
+    logoutEpochRef.current += 1;
+    refreshPromise.current = null;
     // Read from storage — the state value may be stale after a rotation
     // in another part of the app, and this keeps the callback stable.
     const currentRefresh = TOKEN_STORAGE.get().refresh;
@@ -144,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (refreshPromise.current) return refreshPromise.current;
 
     const promise = (async (): Promise<string | null> => {
+      const epochAtStart = logoutEpochRef.current;
       try {
         const res = await fetch(`${API_URL}/api/token/refresh/`, {
           method: "POST",
@@ -161,6 +167,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         const data = await res.json();
+
+        // A logout may have started while the request was in flight —
+        // writing the rotated tokens back would resurrect the session.
+        if (epochAtStart !== logoutEpochRef.current) return null;
+
         const newRefresh = data.refresh || currentRefresh;
         setAccess(data.access);
         setRefresh(newRefresh);
