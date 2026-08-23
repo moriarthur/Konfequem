@@ -45,6 +45,22 @@ cd frontend && npm run dev
 - `GET /api/org/members/` — list org members (org_admin only)
 - `POST /api/org/invite/regenerate/` — rotate invite key (org_admin only)
 
+## Rate Limiting
+Scoped via `ScopedRateThrottle` (`backend/config/settings.py` → `DEFAULT_THROTTLE_RATES`, scopes set in `backend/rooms/views.py`). Only auth/session-sensitive endpoints are throttled; data endpoints (rooms, bookings, users/me, org) are NOT — a global limit caused a bug where tab navigation exhausted the budget and pages rendered empty (429s swallowed).
+
+| Scope | Endpoint | Rate |
+|---|---|---|
+| login | POST /api/token/ | 10/min |
+| token_refresh | POST /api/token/refresh/ | 30/min |
+| register | POST /api/register/ | 5/min |
+| join | POST /api/join/ | 10/min |
+| invite_preview | GET /api/invites/<key>/ | 30/min |
+| change_password | POST /api/users/change-password/ | 10/min |
+| regenerate_invite | POST /api/org/invite/regenerate/ | 10/min |
+| token_blacklist | POST /api/token/blacklist/ | 30/min |
+
+Caveats: throttle counters live in Django's default LocMemCache (per-process). Single gunicorn worker today (`backend/entrypoint.sh`); if workers scale out, move to Redis or effective limits multiply. Behind a reverse proxy, anon buckets key on REMOTE_ADDR — review `NUM_PROXIES`/X-Forwarded-For on redeploy. In tests, mutate `SimpleRateThrottle.THROTTLE_RATES` in place (class-level snapshot — replacing the settings dict is invisible).
+
 ## Key Business Rules
 - Office hours: 08:00–22:00 Europe/Berlin (CEST/CET aware)
 - Min booking: 15 min, max: 8 hours, max advance: 90 days
@@ -60,7 +76,7 @@ cd frontend && npm run dev
 ## Testing Notes
 - Timezone fixtures: use `berlin_tz`/`berlin_now` for DST-safe tests
 - Never hardcode UTC offsets — Berlin observes CET/CEST
-- MSW handlers in `frontend/src/__tests__/mocks/handlers.ts`
+- MSW handlers in `frontend/__tests__/mocks/handlers.ts`
 
 ## TypeScript
 - Fully typed: all files, zero `@ts-nocheck`
