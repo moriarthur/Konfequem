@@ -41,9 +41,11 @@ class TestRoomViewSet:
         from rooms.models_users import Organization
 
         other_org = Organization.objects.create(name="Other", slug="other")
-        Room.objects.create(name="Hidden Room", location="Floor X", capacity=5, organization=other_org)
+        Room.objects.create(
+            name="Hidden Room", location="Floor X", capacity=5, organization=other_org
+        )
 
-        client = authenticated_api_client = None
+        client = None
         from rest_framework.test import APIClient
 
         client = APIClient()
@@ -58,7 +60,9 @@ class TestRoomViewSet:
     # List Rooms Tests
     # ========================================================================
 
-    def test_list_rooms_returns_correct_fields(self, db, authenticated_api_client, room):
+    def test_list_rooms_returns_correct_fields(
+        self, db, authenticated_api_client, room
+    ):
         """Test that room list returns expected fields."""
         response = authenticated_api_client.get("/api/rooms/")
         assert response.status_code == 200
@@ -73,8 +77,12 @@ class TestRoomViewSet:
 
     def test_list_rooms_ordered(self, db, organization, user):
         """Test that rooms are ordered consistently."""
-        Room.objects.create(name="Z Room", location="Floor 1", capacity=5, organization=organization)
-        Room.objects.create(name="A Room", location="Floor 2", capacity=10, organization=organization)
+        Room.objects.create(
+            name="Z Room", location="Floor 1", capacity=5, organization=organization
+        )
+        Room.objects.create(
+            name="A Room", location="Floor 2", capacity=10, organization=organization
+        )
 
         from rest_framework.test import APIClient
 
@@ -113,7 +121,9 @@ class TestRoomViewSet:
         )
         assert create_response.status_code == 405
 
-        room = Room.objects.create(name="Test Room", capacity=5, organization=organization)
+        room = Room.objects.create(
+            name="Test Room", capacity=5, organization=organization
+        )
 
         update_response = authenticated_api_client.put(
             f"/api/rooms/{room.id}/",

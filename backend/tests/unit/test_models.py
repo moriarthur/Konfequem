@@ -22,14 +22,22 @@ class TestRoomModel:
 
     def test_room_with_valid_minimum_capacity(self, db, organization):
         """Test that room can be created with minimum capacity of 1."""
-        room = Room.objects.create(name="Single Office", location="Floor 1", capacity=1, organization=organization)
+        room = Room.objects.create(
+            name="Single Office",
+            location="Floor 1",
+            capacity=1,
+            organization=organization,
+        )
         assert room.capacity == 1
         assert room.pk is not None
 
     def test_room_with_valid_maximum_capacity(self, db, organization):
         """Test that room can be created with maximum capacity of 50."""
         room = Room.objects.create(
-            name="Main Hall", location="Ground Floor", capacity=50, organization=organization
+            name="Main Hall",
+            location="Ground Floor",
+            capacity=50,
+            organization=organization,
         )
         assert room.capacity == 50
         assert room.pk is not None
@@ -37,7 +45,10 @@ class TestRoomModel:
     def test_room_with_average_capacity(self, db, organization):
         """Test that room can be created with average capacity."""
         room = Room.objects.create(
-            name="Conference Room", location="Floor 2", capacity=15, organization=organization
+            name="Conference Room",
+            location="Floor 2",
+            capacity=15,
+            organization=organization,
         )
         assert room.capacity == 15
 
@@ -46,7 +57,10 @@ class TestRoomModel:
         """Test that room creation fails with invalid capacity values."""
         with pytest.raises(ValidationError):
             room = Room(
-                name="Invalid Room", location="Floor 1", capacity=invalid_capacity, organization=organization
+                name="Invalid Room",
+                location="Floor 1",
+                capacity=invalid_capacity,
+                organization=organization,
             )
             room.full_clean()  # Triggers validators
 
@@ -64,7 +78,9 @@ class TestRoomModel:
 
     def test_room_location_is_optional(self, db, organization):
         """Test that room location can be blank."""
-        room = Room.objects.create(name="Room without location", capacity=5, organization=organization)
+        room = Room.objects.create(
+            name="Room without location", capacity=5, organization=organization
+        )
         assert room.location == ""
         assert room.name == "Room without location"
 
@@ -72,7 +88,9 @@ class TestRoomModel:
         """Test that room name respects max_length constraint."""
         # Create a name exactly at the limit (100 characters)
         long_name = "A" * 100
-        room = Room.objects.create(name=long_name, capacity=10, organization=organization)
+        room = Room.objects.create(
+            name=long_name, capacity=10, organization=organization
+        )
         assert room.name == long_name
         assert len(room.name) == 100
 
@@ -80,7 +98,10 @@ class TestRoomModel:
         """Test that room location respects max_length constraint."""
         long_location = "B" * 100
         room = Room.objects.create(
-            name="Test Room", location=long_location, capacity=10, organization=organization
+            name="Test Room",
+            location=long_location,
+            capacity=10,
+            organization=organization,
         )
         assert room.location == long_location
         assert len(room.location) == 100
@@ -92,14 +113,20 @@ class TestRoomModel:
     def test_room_str_representation(self, db, organization):
         """Test that room's string representation returns its name."""
         room = Room.objects.create(
-            name="Conference Room A", location="Floor 1", capacity=10, organization=organization
+            name="Conference Room A",
+            location="Floor 1",
+            capacity=10,
+            organization=organization,
         )
         assert str(room) == "Conference Room A"
 
     def test_room_str_with_special_characters(self, db, organization):
         """Test string representation with special characters in name."""
         room = Room.objects.create(
-            name="Room 123 - Ümläut", location="Étage 2", capacity=8, organization=organization
+            name="Room 123 - Ümläut",
+            location="Étage 2",
+            capacity=8,
+            organization=organization,
         )
         assert "Ümläut" in str(room)
 
@@ -109,7 +136,9 @@ class TestRoomModel:
 
     def test_room_absolute_url(self, db, organization):
         """Test that room has a URL (if implemented)."""
-        room = Room.objects.create(name="Test Room", capacity=5, organization=organization)
+        room = Room.objects.create(
+            name="Test Room", capacity=5, organization=organization
+        )
         # This test would pass if you implement get_absolute_url
         # For now, just verify the room exists
         assert room.pk is not None
@@ -167,8 +196,18 @@ class TestRoomModel:
         """Test that multiple rooms can have the same name (by default)."""
         Room.objects.bulk_create(
             [
-                Room(name="Conference Room", location="Floor 1", capacity=10, organization=organization),
-                Room(name="Conference Room", location="Floor 2", capacity=10, organization=organization),
+                Room(
+                    name="Conference Room",
+                    location="Floor 1",
+                    capacity=10,
+                    organization=organization,
+                ),
+                Room(
+                    name="Conference Room",
+                    location="Floor 2",
+                    capacity=10,
+                    organization=organization,
+                ),
             ]
         )
         rooms = Room.objects.filter(name="Conference Room")

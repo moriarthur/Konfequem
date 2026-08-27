@@ -27,9 +27,7 @@ BLACKLIST_URL = "/api/token/blacklist/"
 class TestScopedThrottling:
     """Scoped throttle behavior: sensitive endpoints limited, data endpoints not."""
 
-    def test_login_throttles_after_rate(
-        self, db, api_client, enable_scoped_throttling
-    ):
+    def test_login_throttles_after_rate(self, db, api_client, enable_scoped_throttling):
         """Login allows 3 attempts/min, then returns 429 with Retry-After."""
         payload = {"username": "nouser", "password": "wrongpass"}
 

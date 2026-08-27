@@ -31,7 +31,10 @@ class TestBookingModel:
         past_time = timezone.now() - timedelta(hours=1)
 
         booking = Booking(
-            room=room, user=user, start_time=past_time, end_time=timezone.now(),
+            room=room,
+            user=user,
+            start_time=past_time,
+            end_time=timezone.now(),
             organization=organization,
         )
 
@@ -41,7 +44,9 @@ class TestBookingModel:
         assert "start_time" in exc_info.value.message_dict
         assert "past" in str(exc_info.value).lower()
 
-    def test_booking_rejects_end_time_before_start_time(self, db, user, room, utc_now, organization):
+    def test_booking_rejects_end_time_before_start_time(
+        self, db, user, room, utc_now, organization
+    ):
         """Test that end_time must be after start_time."""
         booking = Booking(
             room=room,
@@ -56,7 +61,9 @@ class TestBookingModel:
 
         assert "end_time" in exc_info.value.message_dict
 
-    def test_booking_rejects_equal_start_and_end_time(self, db, user, room, utc_now, organization):
+    def test_booking_rejects_equal_start_and_end_time(
+        self, db, user, room, utc_now, organization
+    ):
         """Test that end_time cannot equal start_time."""
         same_time = utc_now + timedelta(hours=1)
         booking = Booking(
@@ -76,7 +83,9 @@ class TestBookingModel:
     # Duration Constraint Tests
     # ========================================================================
 
-    def test_booking_allows_valid_duration(self, db, user, room, future_start_time, organization):
+    def test_booking_allows_valid_duration(
+        self, db, user, room, future_start_time, organization
+    ):
         """Test that booking accepts valid duration (2 hours)."""
         booking = Booking(
             room=room,
@@ -93,7 +102,9 @@ class TestBookingModel:
         assert booking.pk is not None
         assert booking.end_time - booking.start_time == timedelta(hours=2)
 
-    def test_booking_allows_minimum_duration(self, db, user, room, utc_now, organization):
+    def test_booking_allows_minimum_duration(
+        self, db, user, room, utc_now, organization
+    ):
         """Test that booking can be very short (e.g., 15 minutes)."""
         start = utc_now + timedelta(hours=1)
         booking = Booking(
@@ -109,7 +120,9 @@ class TestBookingModel:
         booking.full_clean()  # Should not raise at model level
         assert booking.end_time - booking.start_time == timedelta(minutes=15)
 
-    def test_booking_allows_maximum_duration(self, db, user, room, utc_now, organization):
+    def test_booking_allows_maximum_duration(
+        self, db, user, room, utc_now, organization
+    ):
         """Test that booking can be up to 8 hours (max at serializer level)."""
         start = utc_now + timedelta(hours=1)
         booking = Booking(
@@ -128,7 +141,9 @@ class TestBookingModel:
     # Overlap Prevention Tests
     # ========================================================================
 
-    def test_booking_prevents_exact_overlap(self, db, user, room, booking, organization):
+    def test_booking_prevents_exact_overlap(
+        self, db, user, room, booking, organization
+    ):
         """Test that overlapping booking is rejected."""
         overlapping_booking = Booking(
             room=room,
@@ -144,7 +159,9 @@ class TestBookingModel:
 
         assert "already booked" in str(exc_info.value).lower()
 
-    def test_booking_prevents_partial_overlap_start(self, db, user, room, booking, organization):
+    def test_booking_prevents_partial_overlap_start(
+        self, db, user, room, booking, organization
+    ):
         """Test that booking overlapping at start is rejected."""
         overlapping_booking = Booking(
             room=room,
@@ -158,7 +175,9 @@ class TestBookingModel:
         with pytest.raises(ValidationError):
             overlapping_booking.full_clean()
 
-    def test_booking_prevents_partial_overlap_end(self, db, user, room, booking, organization):
+    def test_booking_prevents_partial_overlap_end(
+        self, db, user, room, booking, organization
+    ):
         """Test that booking overlapping at end is rejected."""
         overlapping_booking = Booking(
             room=room,
@@ -171,7 +190,9 @@ class TestBookingModel:
         with pytest.raises(ValidationError):
             overlapping_booking.full_clean()
 
-    def test_booking_prevents_contained_overlap(self, db, user, room, booking, organization):
+    def test_booking_prevents_contained_overlap(
+        self, db, user, room, booking, organization
+    ):
         """Test that booking fully contained within another is rejected."""
         overlapping_booking = Booking(
             room=room,
@@ -184,7 +205,9 @@ class TestBookingModel:
         with pytest.raises(ValidationError):
             overlapping_booking.full_clean()
 
-    def test_booking_prevents_containing_overlap(self, db, user, room, booking, organization):
+    def test_booking_prevents_containing_overlap(
+        self, db, user, room, booking, organization
+    ):
         """Test that booking fully containing another is rejected."""
         overlapping_booking = Booking(
             room=room,
@@ -197,7 +220,9 @@ class TestBookingModel:
         with pytest.raises(ValidationError):
             overlapping_booking.full_clean()
 
-    def test_booking_allows_non_overlapping_same_day(self, db, user, room, booking, organization):
+    def test_booking_allows_non_overlapping_same_day(
+        self, db, user, room, booking, organization
+    ):
         """Test that non-overlapping booking same day is allowed."""
         non_overlapping = Booking(
             room=room,
@@ -233,10 +258,14 @@ class TestBookingModel:
         non_overlapping.save()
         assert non_overlapping.pk is not None
 
-    def test_booking_allows_overlapping_different_room(self, db, user, booking, room, organization):
+    def test_booking_allows_overlapping_different_room(
+        self, db, user, booking, room, organization
+    ):
         """Test that overlapping booking for different room is allowed."""
         other_room = Room.objects.create(
-            name="Other Room", location="Floor 2", capacity=10,
+            name="Other Room",
+            location="Floor 2",
+            capacity=10,
             organization=organization,
         )
 
@@ -283,7 +312,9 @@ class TestBookingModel:
         booking.full_clean()  # Should not raise
         assert booking.start_time.date() == (utc_now + timedelta(days=90)).date()
 
-    def test_booking_beyond_90_day_limit_rejected(self, db, user, room, utc_now, organization):
+    def test_booking_beyond_90_day_limit_rejected(
+        self, db, user, room, utc_now, organization
+    ):
         """Test that booking more than 90 days ahead is rejected."""
         beyond_max = utc_now + timedelta(days=Booking.MAX_DAYS_AHEAD + 1)
         booking = Booking(
@@ -300,7 +331,9 @@ class TestBookingModel:
         assert "start_time" in exc_info.value.message_dict
         assert "90" in str(exc_info.value) or "days" in str(exc_info.value).lower()
 
-    def test_booking_slightly_beyond_90_day_limit(self, db, user, room, utc_now, organization):
+    def test_booking_slightly_beyond_90_day_limit(
+        self, db, user, room, utc_now, organization
+    ):
         """Test that booking 91 days ahead is rejected."""
         future = utc_now + timedelta(days=91)
         booking = Booking(
@@ -318,7 +351,9 @@ class TestBookingModel:
     # Date Field Tests
     # ========================================================================
 
-    def test_booking_date_field_auto_set(self, db, user, room, future_start_time, organization):
+    def test_booking_date_field_auto_set(
+        self, db, user, room, future_start_time, organization
+    ):
         """Test that date field is automatically set from start_time."""
         booking = Booking.objects.create(
             room=room,
@@ -331,7 +366,9 @@ class TestBookingModel:
 
         assert booking.date == booking.start_time.date()
 
-    def test_booking_date_persists(self, db, user, room, future_start_time, organization):
+    def test_booking_date_persists(
+        self, db, user, room, future_start_time, organization
+    ):
         """Test that date field is saved to database."""
         booking = Booking.objects.create(
             room=room,
@@ -356,7 +393,11 @@ class TestBookingModel:
         end = berlin_now.replace(hour=12, minute=0, second=0, microsecond=0)
 
         booking = Booking(
-            room=room, user=user, start_time=start, date=start.date(), end_time=end,
+            room=room,
+            user=user,
+            start_time=start,
+            date=start.date(),
+            end_time=end,
             organization=organization,
         )
 
@@ -369,7 +410,9 @@ class TestBookingModel:
     # Edge Cases
     # ========================================================================
 
-    def test_booking_with_midnight_spanning(self, db, user, room, utc_now, organization):
+    def test_booking_with_midnight_spanning(
+        self, db, user, room, utc_now, organization
+    ):
         """Test booking that spans across midnight."""
         # Set start to 23:00 and end to 01:00 next day
         start = utc_now + timedelta(days=1)
@@ -377,7 +420,11 @@ class TestBookingModel:
         end = start + timedelta(hours=2)
 
         booking = Booking(
-            room=room, user=user, start_time=start, date=start.date(), end_time=end,
+            room=room,
+            user=user,
+            start_time=start,
+            date=start.date(),
+            end_time=end,
             organization=organization,
         )
 

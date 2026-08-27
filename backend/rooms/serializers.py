@@ -168,12 +168,16 @@ class RegisterSerializer(serializers.Serializer):
 
     def validate_org_slug(self, value):
         if Organization.objects.filter(slug=value).exists():
-            raise serializers.ValidationError("This organization slug is already taken.")
+            raise serializers.ValidationError(
+                "This organization slug is already taken."
+            )
         return value
 
     def validate_username(self, value):
         if User.objects.filter(username=value).exists():
-            raise serializers.ValidationError("A user with this username already exists.")
+            raise serializers.ValidationError(
+                "A user with this username already exists."
+            )
         return value
 
     def create(self, validated_data):
@@ -217,7 +221,9 @@ class JoinSerializer(serializers.Serializer):
 
     def validate_username(self, value):
         if User.objects.filter(username=value).exists():
-            raise serializers.ValidationError("A user with this username already exists.")
+            raise serializers.ValidationError(
+                "A user with this username already exists."
+            )
         return value
 
     def create(self, validated_data):

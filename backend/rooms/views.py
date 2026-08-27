@@ -108,9 +108,7 @@ class BookingViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = Booking.objects.filter(
-            user=user, organization=user.organization
-        )
+        queryset = Booking.objects.filter(user=user, organization=user.organization)
 
         room_id = self.request.query_params.get("room")
         date_str = self.request.query_params.get("date")
@@ -174,9 +172,7 @@ class CurrentUserView(APIView):
 
     def put(self, request):
         user = request.user
-        serializer = ProfileUpdateSerializer(
-            data=request.data, context={"user": user}
-        )
+        serializer = ProfileUpdateSerializer(data=request.data, context={"user": user})
         if not serializer.is_valid():
             # Flatten to this endpoint's {"error": "..."} contract — the
             # frontend reads `error` (or `message`) off the response body.
@@ -297,7 +293,9 @@ class RegenerateInviteView(APIView):
     def post(self, request):
         user = request.user
         if user.role != "org_admin":
-            return Response({"error": "Only org admins can regenerate invite keys."}, status=403)
+            return Response(
+                {"error": "Only org admins can regenerate invite keys."}, status=403
+            )
         org = user.organization
         org.invite_key = uuid_mod.uuid4()
         org.save()

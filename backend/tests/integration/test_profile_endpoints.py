@@ -10,7 +10,6 @@ only through the success path (or not at all).
 """
 
 import pytest
-from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from rooms.models_users import User

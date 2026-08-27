@@ -132,7 +132,9 @@ def authenticated_api_client(api_client, user):
 def room(db, organization):
     """Create a standard test room."""
     return Room.objects.create(
-        name="Conference Room A", location="Floor 1", capacity=10,
+        name="Conference Room A",
+        location="Floor 1",
+        capacity=10,
         organization=organization,
     )
 
@@ -140,20 +142,32 @@ def room(db, organization):
 @pytest.fixture
 def small_room(db, organization):
     """Create a small room (capacity 2)."""
-    return Room.objects.create(name="Huddle Room", location="Floor 2", capacity=2, organization=organization)
+    return Room.objects.create(
+        name="Huddle Room", location="Floor 2", capacity=2, organization=organization
+    )
 
 
 @pytest.fixture
 def large_room(db, organization):
     """Create a large room (capacity 50)."""
-    return Room.objects.create(name="Main Hall", location="Ground Floor", capacity=50, organization=organization)
+    return Room.objects.create(
+        name="Main Hall",
+        location="Ground Floor",
+        capacity=50,
+        organization=organization,
+    )
 
 
 @pytest.fixture
 def rooms(db, organization):
     """Create multiple test rooms."""
     rooms = [
-        Room(name=f"Room {i}", location=f"Floor {i % 3}", capacity=5 + i * 5, organization=organization)
+        Room(
+            name=f"Room {i}",
+            location=f"Floor {i % 3}",
+            capacity=5 + i * 5,
+            organization=organization,
+        )
         for i in range(1, 6)
     ]
     return Room.objects.bulk_create(rooms)

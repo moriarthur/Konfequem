@@ -123,9 +123,7 @@ class Booking(models.Model):
 
         overlapping = Booking.objects.filter(
             room=self.room, organization=self.organization
-        ).filter(
-            Q(start_time__lt=self.end_time) & Q(end_time__gt=self.start_time)
-        )
+        ).filter(Q(start_time__lt=self.end_time) & Q(end_time__gt=self.start_time))
         if self.pk:
             overlapping = overlapping.exclude(pk=self.pk)
         if overlapping.exists():

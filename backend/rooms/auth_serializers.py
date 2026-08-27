@@ -12,12 +12,14 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             "first_name": user.first_name,
             "last_name": user.last_name,
             "role": user.role,
-            "organization": {
-                "id": user.organization.id,
-                "name": user.organization.name,
-                "slug": user.organization.slug,
-            }
-            if user.organization
-            else None,
+            "organization": (
+                {
+                    "id": user.organization.id,
+                    "name": user.organization.name,
+                    "slug": user.organization.slug,
+                }
+                if user.organization
+                else None
+            ),
         }
         return data
