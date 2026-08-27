@@ -157,6 +157,10 @@ REST_FRAMEWORK = {
         "regenerate_invite": "10/min",
         "token_blacklist": "30/min",
     },
+    # Anon throttle buckets key on X-Forwarded-For: take the last entry —
+    # the IP our proxy actually saw (spoof-proof). 1 = single proxy layer
+    # (Render). Raise if another proxy (e.g. Cloudflare) is added in front.
+    "NUM_PROXIES": config("NUM_PROXIES", default=1, cast=int),
 }
 
 # JWT settings for rest_framework_simplejwt
