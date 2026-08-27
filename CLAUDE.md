@@ -59,7 +59,7 @@ Scoped via `ScopedRateThrottle` (`backend/config/settings.py` → `DEFAULT_THROT
 | regenerate_invite | POST /api/org/invite/regenerate/ | 10/min |
 | token_blacklist | POST /api/token/blacklist/ | 30/min |
 
-Caveats: throttle counters live in Django's default LocMemCache (per-process). Single gunicorn worker today (`backend/entrypoint.sh`); if workers scale out, move to Redis or effective limits multiply. Behind a reverse proxy, anon buckets key on REMOTE_ADDR — review `NUM_PROXIES`/X-Forwarded-For on redeploy. In tests, mutate `SimpleRateThrottle.THROTTLE_RATES` in place (class-level snapshot — replacing the settings dict is invisible).
+Caveats: throttle counters live in Django's default LocMemCache (per-process). Single gunicorn worker in `backend/entrypoint.sh`; verified on prod 2026-08-27 that effective limits on Render (free tier) still run ~2-4x softer than nominal — buckets split across infra instances/ident variability; a shared cache (Redis) is the real fix if limits ever matter for real. `NUM_PROXIES=1` is set in settings.py (env-overridable) so anon buckets key on the proxy-supplied client IP, not the spoofable full X-Forwarded-For header. In tests, mutate `SimpleRateThrottle.THROTTLE_RATES` in place (class-level snapshot — replacing the settings dict is invisible).
 
 ## Key Business Rules
 - Office hours: 08:00–22:00 Europe/Berlin (CEST/CET aware)
@@ -86,3 +86,10 @@ Caveats: throttle counters live in Django's default LocMemCache (per-process). S
 ## Git Conventions
 - Conventional commits: feat/fix/refactor/test/chore
 - English only, no AI attribution in commit messages
+
+## Tool Usage
+
+- Use Serena for semantic code navigation, symbols, references, implementations, and safe symbol-level edits.
+- Use CodeGraph for dependency analysis, architecture, impact, callers/callees, and cross-module relationships.
+- Use Context7 when implementing or debugging third-party libraries and current APIs.
+- Prefer native Grep/Glob/Read for simple text and file searches.
