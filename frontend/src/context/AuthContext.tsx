@@ -106,6 +106,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Bumped on every logout so an in-flight refresh can detect that the
   // session it is refreshing has since ended, and discard its result.
   const logoutEpochRef = useRef(0);
+  // Mirror of the current tokens for the `storage` event handler below — a
+  // listener registered once would otherwise close over stale state.
+  const accessRef = useRef<string | null>(null);
+  const refreshRef = useRef<string | null>(null);
   const alert = useAlert();
 
   const logout = useCallback(async () => {
@@ -161,6 +165,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Only an invalid/blacklisted token ends the session.
           // 429/5xx are transient — keep the user logged in.
           if (res.status === 401 || res.status === 403) {
+            // Under ROTATE+BLACKLIST a 401 here often means another tab
+            // already refreshed with this token and got it blacklisted. If
+            // storage now holds a different, valid pair, adopt it instead of
+            // ending the session for every tab at once.
+            const latest = TOKEN_STORAGE.get();
+            if (
+              latest.access &&
+              latest.refresh &&
+              latest.refresh !== currentRefresh &&
+              !isTokenExpired(latest.access)
+            ) {
+              refreshPromise.current = null;
+              setAccess(latest.access);
+              setRefresh(latest.refresh);
+              return latest.access;
+            }
             logout();
           }
           return null;
@@ -443,6 +463,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       fetchUser(access);
     }
   }, [access, isAuthenticated, user, fetchUser]);
+
+  useEffect(() => {
+    accessRef.current = access;
+    refreshRef.current = refresh;
+  }, [access, refresh]);
+
+  // Cross-tab sync: a localStorage write in one tab fires a `storage` event
+  // in every other tab. Without this, a rotation in tab A leaves tab B holding
+  // a refresh token A already rotated+blacklisted — B's next refresh 401s and
+  // logs the user out of all tabs at once.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.storageArea && e.storageArea !== localStorage) return;
+      if (e.key !== null && e.key !== "access" && e.key !== "refresh") return;
+
+      const stored = TOKEN_STORAGE.get();
+
+      // Another tab logged out — mirror it locally. Don't call the blacklist
+      // endpoint again: the tab that wrote the removal already did that.
+      if (!stored.access && !stored.refresh) {
+        if (accessRef.current !== null || refreshRef.current !== null) {
+          logoutEpochRef.current += 1;
+          refreshPromise.current = null;
+          accessRef.current = null;
+          refreshRef.current = null;
+          setAccess(null);
+          setRefresh(null);
+          setIsAuthenticated(false);
+          setUser(null);
+          userFetchedRef.current = false;
+        }
+        return;
+      }
+
+      // Another tab logged in or rotated its tokens — adopt the full snapshot.
+      // Rotations write both keys, so the event fires twice; the first event
+      // may still see the old refresh value, and the second one converges.
+      // The tokens may also belong to a different user than the one this
+      // tab's `user` holds — drop it and let the fetch effect refetch.
+      if (
+        stored.access &&
+        (stored.access !== accessRef.current || stored.refresh !== refreshRef.current)
+      ) {
+        accessRef.current = stored.access;
+        refreshRef.current = stored.refresh;
+        refreshPromise.current = null;
+        setAccess(stored.access);
+        setRefresh(stored.refresh);
+        setIsAuthenticated(true);
+        setUser(null);
+        userFetchedRef.current = false;
+      }
+    };
+
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   return (
     <AuthContext.Provider
