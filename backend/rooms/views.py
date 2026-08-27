@@ -23,6 +23,7 @@ from .serializers import (
     RoomFeatureSerializer,
     RegisterSerializer,
     JoinSerializer,
+    ProfileUpdateSerializer,
 )
 
 
@@ -173,16 +174,19 @@ class CurrentUserView(APIView):
 
     def put(self, request):
         user = request.user
-        first_name = request.data.get("first_name", user.first_name)
-        last_name = request.data.get("last_name", user.last_name)
-        email = request.data.get("email", user.email)
+        serializer = ProfileUpdateSerializer(
+            data=request.data, context={"user": user}
+        )
+        if not serializer.is_valid():
+            # Flatten to this endpoint's {"error": "..."} contract — the
+            # frontend reads `error` (or `message`) off the response body.
+            first_error = next(iter(serializer.errors.values()))
+            return Response({"error": str(first_error[0])}, status=400)
 
-        if email and "@" not in email:
-            return Response({"error": "Enter a valid email."}, status=400)
-
-        user.first_name = first_name
-        user.last_name = last_name
-        user.email = email
+        data = serializer.validated_data
+        user.first_name = data.get("first_name", user.first_name)
+        user.last_name = data.get("last_name", user.last_name)
+        user.email = data.get("email", user.email)
         user.save()
         return Response(_user_response_data(user))
 

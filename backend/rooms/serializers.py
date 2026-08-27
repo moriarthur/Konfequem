@@ -231,3 +231,22 @@ class JoinSerializer(serializers.Serializer):
             organization=self._org,
         )
         return _user_response(user, self._org)
+
+
+class ProfileUpdateSerializer(serializers.Serializer):
+    """Validation for PUT /api/users/me/.
+
+    AbstractUser.email has no unique constraint at the database level, so
+    uniqueness is enforced here (case-insensitive, excluding the user's own
+    row) instead of trusting a bare "@" check.
+    """
+
+    first_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    last_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    email = serializers.EmailField(required=False)
+
+    def validate_email(self, value):
+        user = self.context["user"]
+        if User.objects.exclude(pk=user.pk).filter(email__iexact=value).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value
