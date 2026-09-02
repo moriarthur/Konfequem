@@ -62,7 +62,11 @@ export default function RoomsPage() {
         ]);
         setRooms((roomsData as PaginatedResponse<Room>).results || (roomsData as Room[]));
         setFeatures((featuresData as PaginatedResponse<Feature>).results || (featuresData as Feature[]));
-        setBookings((bookingsData as PaginatedResponse<BookingData>).results || (bookingsData as BookingData[]));
+        // Cancelled bookings are history — availability logic stays time-only.
+        setBookings(
+          ((bookingsData as PaginatedResponse<BookingData>).results || (bookingsData as BookingData[]))
+            .filter(b => b.status !== "cancelled")
+        );
       } catch (err) {
         logError("Error fetching data:", err);
         // 429 already surfaces a toast from authFetch; keep loaded data
@@ -107,7 +111,10 @@ export default function RoomsPage() {
       authFetch("/api/bookings/"),
     ]);
     setRooms((roomsData as PaginatedResponse<Room>).results || (roomsData as Room[]));
-    setBookings((bookingsData as PaginatedResponse<BookingData>).results || (bookingsData as BookingData[]));
+    setBookings(
+      ((bookingsData as PaginatedResponse<BookingData>).results || (bookingsData as BookingData[]))
+        .filter(b => b.status !== "cancelled")
+    );
   };
 
   const closeBookingSheet = () => {

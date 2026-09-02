@@ -15,6 +15,8 @@ export interface BookingData {
   start_time: string;
   end_time: string;
   room?: number | { id: number };
+  /** Computed server-side: upcoming | ongoing | completed | cancelled. */
+  status?: string;
   [key: string]: unknown;
 }
 

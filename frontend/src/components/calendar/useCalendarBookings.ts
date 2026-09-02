@@ -12,6 +12,8 @@ export interface CalendarBooking {
   start_time: string;
   end_time: string;
   user?: number;
+  /** Computed server-side: upcoming | ongoing | completed | cancelled. */
+  status?: string;
   [key: string]: unknown;
 }
 
@@ -119,6 +121,7 @@ export function useCalendarBookings(currentMonth: DateTime) {
 
     if (isPast) { showAlert("Cannot edit a booking that has already ended.", { type: "error" }); return; }
     if (isCurrent) { showAlert("Cannot edit a booking that is currently in progress.", { type: "error" }); return; }
+    if (booking.status === "cancelled") { showAlert("Cannot edit a cancelled booking.", { type: "error" }); return; }
 
     setEditingBooking(booking);
     setEditForm({ start_time: booking.start_time, end_time: booking.end_time });
@@ -152,7 +155,11 @@ export function useCalendarBookings(currentMonth: DateTime) {
     const editingRoomId = typeof editingBooking.room === "object" ? editingBooking.room.id : editingBooking.room;
     const roomBookings = Array.isArray(allBookings) ? allBookings.filter(b => {
       const bookingRoomId = typeof b.room === "object" ? b.room.id : b.room;
-      return bookingRoomId === editingRoomId && b.id !== editingBooking.id;
+      return (
+        bookingRoomId === editingRoomId &&
+        b.id !== editingBooking.id &&
+        b.status !== "cancelled"
+      );
     }) : [];
     const hasOverlap = roomBookings.some(b => {
       const bs = DateTime.fromISO(b.start_time).setZone(OFFICE_TIMEZONE);
@@ -210,7 +217,7 @@ export function useCalendarBookings(currentMonth: DateTime) {
     }
   };
 
-  // Delete
+  // Cancel (soft — the booking stays in history)
   const handleDeleteClick = (booking: CalendarBooking) => {
     const now = DateTime.now().setZone(OFFICE_TIMEZONE);
     const bookingEnd = DateTime.fromISO(booking.end_time).setZone(OFFICE_TIMEZONE);
@@ -218,47 +225,51 @@ export function useCalendarBookings(currentMonth: DateTime) {
     const isPast = bookingEnd < now;
     const isCurrent = now >= bookingStart && now < bookingEnd;
 
-    if (isPast) { showAlert("Cannot delete a booking that has already ended.", { type: "error" }); return; }
-    if (isCurrent) { showAlert("Cannot delete a booking that is currently in progress.", { type: "error" }); return; }
+    if (booking.status === "cancelled") { showAlert("This booking is already cancelled.", { type: "error" }); return; }
+    if (isPast) { showAlert("Cannot cancel a booking that has already ended.", { type: "error" }); return; }
+    if (isCurrent) { showAlert("Cannot cancel a booking that is currently in progress.", { type: "error" }); return; }
     setDeleteConfirmBooking(booking);
   };
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmCancel = async () => {
     if (!deleteConfirmBooking) return;
     try {
-      await authFetch(`/api/bookings/${deleteConfirmBooking.id}/`, { method: "DELETE" });
+      await authFetch(`/api/bookings/${deleteConfirmBooking.id}/cancel/`, { method: "POST" });
       await refreshBookings();
-      showAlert("Booking deleted successfully", { type: "success" });
+      showAlert("Booking cancelled successfully", { type: "success" });
       if (expandedDay) {
-        const remaining = expandedDay.dayBookings.filter(b => b.id !== deleteConfirmBooking.id);
-        if (remaining.length === 0) setExpandedDay(null);
-        else setExpandedDay({ ...expandedDay, dayBookings: remaining });
+        // The row stays visible, now marked as cancelled.
+        setExpandedDay({
+          ...expandedDay,
+          dayBookings: expandedDay.dayBookings.map(b =>
+            b.id === deleteConfirmBooking.id ? { ...b, status: "cancelled" } : b
+          ),
+        });
       }
       setDeleteConfirmBooking(null);
     } catch (err: any) {
-      logError("Error deleting booking:", err);
+      logError("Error cancelling booking:", err);
       if (err.status === 401) showAlert("Your session has expired. Please refresh the page.", { type: "error" });
-      else if (err.status === 403) showAlert(err.message || "You don't have permission to delete this booking.", { type: "error" });
+      else if (err.status === 403) showAlert(err.message || "You don't have permission to cancel this booking.", { type: "error" });
       else if (err.status === 404) {
         showAlert("This booking no longer exists.", { type: "error" });
         setDeleteConfirmBooking(null);
         await refreshBookings();
-      } else showAlert("Failed to delete booking. Please try again.", { type: "error" });
+      } else showAlert("Failed to cancel booking. Please try again.", { type: "error" });
     }
   };
 
-  // Current/next booking
+  // Current/next booking (cancelled ones never count)
   const { currentBooking, nextBooking } = useMemo(() => {
-    if (!allBookings?.length) return { currentBooking: null, nextBooking: null };
+    const active = (allBookings || []).filter(b => b?.start_time && b.status !== "cancelled");
+    if (!active.length) return { currentBooking: null, nextBooking: null };
     const now = DateTime.now().setZone(OFFICE_TIMEZONE);
-    const current = allBookings.find(b => {
-      if (!b?.start_time) return false;
+    const current = active.find(b => {
       const s = DateTime.fromISO(b.start_time).setZone(OFFICE_TIMEZONE);
       const e = DateTime.fromISO(b.end_time).setZone(OFFICE_TIMEZONE);
       return now >= s && now < e;
     });
-    const future = allBookings.filter(b => {
-      if (!b?.start_time) return false;
+    const future = active.filter(b => {
       return DateTime.fromISO(b.start_time).setZone(OFFICE_TIMEZONE) > now;
     }).sort((a, b) => (DateTime.fromISO(a.start_time) < DateTime.fromISO(b.start_time) ? -1 : 1));
     return { currentBooking: current || null, nextBooking: future[0] || null };
@@ -273,7 +284,7 @@ export function useCalendarBookings(currentMonth: DateTime) {
     saving, validationErrors, setValidationErrors,
     currentBooking, nextBooking,
     handleCloseExpanded, handleEditBooking, handleCancelEdit,
-    handleSaveEdit, handleDeleteClick, handleConfirmDelete,
+    handleSaveEdit, handleDeleteClick, handleConfirmCancel,
     refreshBookings,
   };
 }

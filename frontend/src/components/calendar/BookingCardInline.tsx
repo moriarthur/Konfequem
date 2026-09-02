@@ -24,9 +24,10 @@ const STATUS_STYLES: Record<string, string> = {
   current: "bg-status-success/10 border-status-success/20 text-status-success",
   next: "bg-status-warning/10 border-status-warning/20 text-status-warning",
   future: "bg-accent-primary/5 border-accent-primary/10 text-accent-secondary",
+  cancelled: "bg-status-danger/10 border-status-danger/20 text-status-danger-text",
 };
 
-const STATUS_LABELS: Record<string, string> = { past: "Past", current: "Now", next: "Next", future: "Upcoming" };
+const STATUS_LABELS: Record<string, string> = { past: "Past", current: "Now", next: "Next", future: "Upcoming", cancelled: "Cancelled" };
 
 function formatDuration(startTime: string | null, endTime: string | null): string {
   if (!startTime || !endTime) return "--";
@@ -52,11 +53,15 @@ export default function BookingCardInline({
   const bookingEnd = DateTime.fromISO(booking.end_time).setZone(OFFICE_TIMEZONE);
   const isPast = bookingEnd < now;
   const isCurrent = now >= bookingStart && now < bookingEnd;
-  const status = isPast ? "past" : isCurrent ? "current" : isNext ? "next" : "future";
+  const status = booking.status === "cancelled"
+    ? "cancelled"
+    : isPast ? "past" : isCurrent ? "current" : isNext ? "next" : "future";
+  // Cancelled bookings are history — never editable, regardless of canEdit.
+  const editable = canEdit && status !== "cancelled";
 
   return (
     <div className={`border rounded-xl transition-all ${STATUS_STYLES[status]} ${
-      !isEditing && canEdit ? "cursor-pointer hover:ring-2 hover:ring-accent-primary/30" : ""
+      !isEditing && editable ? "cursor-pointer hover:ring-2 hover:ring-accent-primary/30" : ""
     }`}>
       {isEditing ? (
         <div className="p-4 space-y-4">
@@ -145,11 +150,11 @@ export default function BookingCardInline({
           </div>
         </div>
       ) : (
-        <div className="p-4" onClick={() => canEdit && onEdit(booking)}>
+        <div className="p-4" onClick={() => editable && onEdit(booking)}>
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
-                {(isCurrent || isNext) && (
+                {(isCurrent || isNext || status === "cancelled") && (
                   <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-white/50">{STATUS_LABELS[status]}</span>
                 )}
                 <Text className="font-medium truncate">{booking.room_name || (typeof booking.room === "object" ? booking.room.id : booking.room)}</Text>
@@ -163,7 +168,7 @@ export default function BookingCardInline({
                 <span className="text-xs opacity-60">({formatDuration(booking.start_time, booking.end_time)})</span>
               </div>
             </div>
-            {canEdit && (
+            {editable && (
               <div className="flex-shrink-0 p-1">
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 opacity-40">
                   <path d="M13.5203 3.83582C14.0787 3.27745 14.9871 3.27745 15.5455 3.83582L20.1642 8.4545C20.7225 9.01287 20.7225 9.92127 20.1642 10.4796L18.9497 11.6942L12.3058 5.05025L13.5203 3.83582ZM10.8984 6.45762L3.02019 14.3358L2.75166 18.9834L7.39929 18.7149L15.2775 10.8367L10.8984 6.45762Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>

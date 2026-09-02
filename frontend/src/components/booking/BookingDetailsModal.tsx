@@ -32,7 +32,8 @@ function formatDuration(startTime: string, endTime: string): string {
   return `${hours}h ${minutes}m`;
 }
 
-function getBookingStatus(booking: Booking): "upcoming" | "ongoing" | "completed" {
+function getBookingStatus(booking: Booking): "upcoming" | "ongoing" | "completed" | "cancelled" {
+  if (booking.status === "cancelled") return "cancelled";
   const now = DateTime.now().setZone(OFFICE_TIMEZONE);
   const start = DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE);
   const end = DateTime.fromISO(booking.end_time).setZone(OFFICE_TIMEZONE);

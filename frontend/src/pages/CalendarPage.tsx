@@ -23,7 +23,7 @@ export default function CalendarPage() {
     saving, validationErrors, setValidationErrors,
     currentBooking, nextBooking,
     handleCloseExpanded, handleEditBooking, handleCancelEdit,
-    handleSaveEdit, handleDeleteClick, handleConfirmDelete,
+    handleSaveEdit, handleDeleteClick, handleConfirmCancel,
   } = useCalendarBookings(currentMonth);
 
   const handlePreviousMonth = () => setCurrentMonth(currentMonth.minus({ months: 1 }));
@@ -171,7 +171,7 @@ export default function CalendarPage() {
                       booking={booking}
                       isNext={nextBooking?.id === booking.id}
                       isEditing={editingBooking?.id === booking.id}
-                      canEdit={(() => { const now = DateTime.now().setZone(OFFICE_TIMEZONE); const end = DateTime.fromISO(booking.end_time).setZone(OFFICE_TIMEZONE); const start = DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE); return !(end < now) && !(now >= start && now < end); })()}
+                      canEdit={(() => { if (booking.status === "cancelled") return false; const now = DateTime.now().setZone(OFFICE_TIMEZONE); const end = DateTime.fromISO(booking.end_time).setZone(OFFICE_TIMEZONE); const start = DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE); return !(end < now) && !(now >= start && now < end); })()}
                       editForm={editingBooking?.id === booking.id ? editForm : { start_time: "", end_time: "" }}
                       saving={saving}
                       validationErrors={validationErrors}
@@ -191,14 +191,14 @@ export default function CalendarPage() {
               {deleteConfirmBooking && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
                   <div className="bg-surface-base rounded-xl p-6 max-w-sm w-full">
-                    <Heading level={3} className="text-lg font-semibold text-accent-secondary mb-2">Delete booking?</Heading>
+                    <Heading level={3} className="text-lg font-semibold text-accent-secondary mb-2">Cancel booking?</Heading>
                     <Text variant="muted" className="mb-4">
-                      Are you sure you want to delete your booking for <span className="font-medium text-accent-secondary">{deleteConfirmBooking.room_name || (typeof deleteConfirmBooking.room === "number" ? String(deleteConfirmBooking.room) : "Room")}</span>{" "}
-                      on {DateTime.fromISO(deleteConfirmBooking.start_time).toFormat("MMM d")}? This action cannot be undone.
+                      Are you sure you want to cancel your booking for <span className="font-medium text-accent-secondary">{deleteConfirmBooking.room_name || (typeof deleteConfirmBooking.room === "number" ? String(deleteConfirmBooking.room) : "Room")}</span>{" "}
+                      on {DateTime.fromISO(deleteConfirmBooking.start_time).toFormat("MMM d")}? The time slot will become available to others.
                     </Text>
                     <div className="flex gap-2">
-                      <button onClick={() => setDeleteConfirmBooking(null)} className="flex-1 px-4 py-2 border border-border-subtle rounded-lg hover:bg-surface-muted text-accent-secondary">Cancel</button>
-                      <button onClick={handleConfirmDelete} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete</button>
+                      <button onClick={() => setDeleteConfirmBooking(null)} className="flex-1 px-4 py-2 border border-border-subtle rounded-lg hover:bg-surface-muted text-accent-secondary">Keep Booking</button>
+                      <button onClick={handleConfirmCancel} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Cancel Booking</button>
                     </div>
                   </div>
                 </div>
@@ -210,7 +210,9 @@ export default function CalendarPage() {
                 const { date, isCurrentMonth, isToday, isPast, dayBookings } = dayInfo;
                 const hasBookings = dayBookings.length > 0;
                 const now = DateTime.now().setZone(OFFICE_TIMEZONE);
-                const validBookings = dayBookings.filter(b => b?.start_time && b?.end_time);
+                // Busy indicators count only active bookings; cancelled ones
+                // stay visible in the expanded day list.
+                const validBookings = dayBookings.filter(b => b?.start_time && b?.end_time && b.status !== "cancelled");
                 const isCurrent = validBookings.some(b => { const s = DateTime.fromISO(b.start_time).setZone(OFFICE_TIMEZONE); const e = DateTime.fromISO(b.end_time).setZone(OFFICE_TIMEZONE); return now >= s && now < e; });
                 const isNext = validBookings.some(b => nextBooking?.id === b.id);
                 const showDots = hasBookings && !isPast;
@@ -265,6 +267,7 @@ export default function CalendarPage() {
           <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-status-warning/10 border border-status-warning/20 rounded"></div><span>Upcoming</span></div>
           <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-accent-primary/5 border border-accent-primary/10 rounded"></div><span>Future</span></div>
           <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-surface-muted border border-border-subtle rounded relative flex items-center justify-center"><svg className="w-2 h-2 text-accent-secondary/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></div><span>Past</span></div>
+          <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-status-danger/10 border border-status-danger/20 rounded"></div><span>Cancelled</span></div>
         </div>
       </div>
 

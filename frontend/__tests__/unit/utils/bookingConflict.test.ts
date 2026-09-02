@@ -172,3 +172,23 @@ describe('useFormConflict', () => {
     expect(result.message).not.toBeNull()
   })
 })
+
+describe('checkBookingConflict with cancelled bookings', () => {
+  it('ignores cancelled bookings', () => {
+    const bookings: BookingConflictInput[] = [
+      { ...makeBooking(9, 11), status: 'cancelled' },
+    ]
+    const result = checkBookingConflict(dt(9), dt(10), bookings, 1)
+    expect(result).toBeNull()
+  })
+
+  it('still detects conflicts from active bookings alongside cancelled ones', () => {
+    const bookings: BookingConflictInput[] = [
+      { ...makeBooking(9, 11, 1, 10), status: 'cancelled' },
+      makeBooking(9, 11, 1, 11),
+    ]
+    const result = checkBookingConflict(dt(9), dt(10), bookings, 1)
+    expect(result).not.toBeNull()
+    expect(result!.booking.id).toBe(11)
+  })
+})

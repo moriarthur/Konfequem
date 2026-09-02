@@ -53,21 +53,13 @@ export default function Home() {
 
   const handleCancelBooking = async (booking: BookingData) => {
     try {
-      await authFetch(`/api/bookings/${booking.id}/`, { method: "DELETE" });
+      await authFetch(`/api/bookings/${booking.id}/cancel/`, { method: "POST" });
       success("Booking cancelled successfully");
       setConfirmCancel(null);
       setDetailsBooking(null);
       refreshBookings();
-    } catch (err) {
-      const msg = (err as { message?: string })?.message || "";
-      if (msg.includes("JSON.parse") || msg.includes("unexpected end of data")) {
-        success("Booking cancelled successfully");
-        setConfirmCancel(null);
-        setDetailsBooking(null);
-        refreshBookings();
-      } else {
-        showError("Failed to cancel booking. Please try again.");
-      }
+    } catch {
+      showError("Failed to cancel booking. Please try again.");
     }
   };
 
@@ -75,7 +67,9 @@ export default function Home() {
     authFetch("/api/bookings/")
       .then(data => {
         const resp = data as PaginatedResponse<BookingData>;
-        setBookings(resp.results || []);
+        // Cancelled bookings are history — Home's lists and stats are about
+        // what is actually happening, so they stay calendar-only.
+        setBookings((resp.results || []).filter(b => b.status !== "cancelled"));
       })
       .catch(logError);
   };
@@ -107,7 +101,7 @@ export default function Home() {
         setRooms(roomsResponse.results || []);
 
         const bookingsResponse = await fetch("/api/bookings/") as PaginatedResponse<BookingData>;
-        setBookings(bookingsResponse.results || []);
+        setBookings((bookingsResponse.results || []).filter(b => b.status !== "cancelled"));
       } catch (err) {
         logError("Error fetching data:", err);
         // 429 already surfaces a toast from authFetch; keep loaded data

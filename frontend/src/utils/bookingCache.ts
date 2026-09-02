@@ -74,7 +74,9 @@ export async function fetchMonthBookings(
       `/api/bookings/?room=${roomId}&month=${monthStart.toFormat("yyyy-MM")}`
     );
 
-    const bookings = (response.results || response) as BookingData[];
+    const rawBookings = (response.results || response) as BookingData[];
+    // Cancelled bookings don't block slots — keep them out of the cache.
+    const bookings = rawBookings.filter((booking) => booking.status !== "cancelled");
 
     const bookingsByDate = new Map<string, BookingData[]>();
     bookings.forEach((booking) => {

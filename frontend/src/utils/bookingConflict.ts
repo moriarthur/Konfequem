@@ -5,6 +5,8 @@ export interface BookingConflictInput {
   end_time: string;
   room?: number | { id: number };
   id?: number;
+  /** Computed server-side; cancelled bookings never conflict. */
+  status?: string;
   [key: string]: unknown;
 }
 
@@ -39,6 +41,7 @@ export function checkBookingConflict(
         ? (booking.room as { id: number }).id
         : booking.room;
     if (excludeBookingId && booking.id === excludeBookingId) return false;
+    if (booking.status === "cancelled") return false;
     return bookingRoomId === roomId && bookingStart.hasSame(slotStart, "day");
   });
 

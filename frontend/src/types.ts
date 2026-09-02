@@ -19,6 +19,7 @@ export interface Booking {
   start_time: string;
   end_time: string;
   created_at?: string;
+  /** Computed server-side: upcoming | ongoing | completed | cancelled. */
   status?: string;
   user?: number;
   [key: string]: unknown;

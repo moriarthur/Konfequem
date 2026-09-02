@@ -502,6 +502,25 @@ export const handlers = [
 
     return createErrorResponse('Not found', 404)
   }),
+
+  // Cancel booking (soft — row stays, slot frees)
+  http.post('/api/bookings/:id/cancel/', ({ params }) => {
+    const { id } = params
+
+    if (id === '1') {
+      return createJsonResponse({
+        id: 1,
+        room: 1,
+        room_name: 'Conference Room A',
+        start_time: '2025-01-28T10:00:00+01:00',
+        end_time: '2025-01-28T12:00:00+01:00',
+        user: 1,
+        status: 'cancelled',
+      })
+    }
+
+    return createErrorResponse('Not found', 404)
+  }),
 ]
 
 // ============================================================================
