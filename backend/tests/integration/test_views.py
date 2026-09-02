@@ -993,3 +993,137 @@ class TestBookingOverlapConstraint:
             date=(now + timedelta(days=1)).date(),
         )
         assert booking.pk is not None
+
+
+@pytest.mark.integration
+class TestBookingCancel:
+    """Soft cancel: row stays, slot frees, rules mirror delete."""
+
+    def test_cancel_own_future_booking(self, db, authenticated_api_client, booking):
+        response = authenticated_api_client.post(f"/api/bookings/{booking.id}/cancel/")
+
+        assert response.status_code == 200
+        assert response.data["status"] == "cancelled"
+        booking.refresh_from_db()
+        assert booking.status == "cancelled"
+
+    def test_cancel_is_idempotent(self, db, authenticated_api_client, booking):
+        authenticated_api_client.post(f"/api/bookings/{booking.id}/cancel/")
+
+        response = authenticated_api_client.post(f"/api/bookings/{booking.id}/cancel/")
+
+        assert response.status_code == 200
+        assert response.data["status"] == "cancelled"
+
+    def test_cancel_requires_auth(self, db, api_client, booking):
+        response = api_client.post(f"/api/bookings/{booking.id}/cancel/")
+        assert response.status_code == 401
+
+    def test_cancel_other_users_booking_hidden(self, db, staff_api_client, booking):
+        """Queryset is user-scoped: someone else's booking is a 404."""
+        response = staff_api_client.post(f"/api/bookings/{booking.id}/cancel/")
+        assert response.status_code == 404
+
+    def test_cancel_ended_booking_forbidden(
+        self, db, authenticated_api_client, user, room, organization
+    ):
+        now = timezone.now()
+        booking = Booking.objects.create(
+            room=room,
+            user=user,
+            organization=organization,
+            start_time=now - timedelta(hours=2),
+            end_time=now - timedelta(hours=1),
+            date=(now - timedelta(hours=2)).date(),
+        )
+
+        response = authenticated_api_client.post(f"/api/bookings/{booking.id}/cancel/")
+
+        assert response.status_code == 403
+
+    def test_cancel_in_progress_booking_forbidden(
+        self, db, authenticated_api_client, user, room, organization
+    ):
+        now = timezone.now()
+        booking = Booking.objects.create(
+            room=room,
+            user=user,
+            organization=organization,
+            start_time=now - timedelta(minutes=30),
+            end_time=now + timedelta(minutes=30),
+            date=now.date(),
+        )
+
+        response = authenticated_api_client.post(f"/api/bookings/{booking.id}/cancel/")
+
+        assert response.status_code == 403
+
+    def test_patch_cancelled_booking_forbidden(
+        self, db, authenticated_api_client, booking
+    ):
+        booking.status = "cancelled"
+        booking.save()
+
+        response = authenticated_api_client.patch(
+            f"/api/bookings/{booking.id}/",
+            {"start_time": booking.start_time.isoformat()},
+            format="json",
+        )
+
+        assert response.status_code == 403
+
+    def test_delete_cancelled_booking_allowed(
+        self, db, authenticated_api_client, booking
+    ):
+        booking.status = "cancelled"
+        booking.save()
+
+        response = authenticated_api_client.delete(f"/api/bookings/{booking.id}/")
+
+        assert response.status_code == 204
+
+    def test_cancelled_booking_frees_the_slot(
+        self, db, authenticated_api_client, booking, room
+    ):
+        start = booking.start_time
+        end = booking.end_time
+
+        response = authenticated_api_client.post(f"/api/bookings/{booking.id}/cancel/")
+        assert response.status_code == 200
+
+        # Overlapping the now-cancelled slot must succeed.
+        response = authenticated_api_client.post(
+            "/api/bookings/",
+            {
+                "room": room.id,
+                "start_time": (start + timedelta(minutes=30)).isoformat(),
+                "end_time": (end + timedelta(minutes=30)).isoformat(),
+            },
+            format="json",
+        )
+        assert response.status_code == 201
+
+    def test_cancelled_row_does_not_block_overlapping_insert(
+        self, db, room, user, organization
+    ):
+        now = timezone.now()
+        Booking.objects.create(
+            room=room,
+            user=user,
+            organization=organization,
+            start_time=now + timedelta(days=1, hours=10),
+            end_time=now + timedelta(days=1, hours=11),
+            date=(now + timedelta(days=1)).date(),
+            status="cancelled",
+        )
+
+        # Overlaps the cancelled row — the partial constraint must allow it.
+        booking = Booking.objects.create(
+            room=room,
+            user=user,
+            organization=organization,
+            start_time=now + timedelta(days=1, hours=10, minutes=30),
+            end_time=now + timedelta(days=1, hours=11, minutes=30),
+            date=(now + timedelta(days=1)).date(),
+        )
+        assert booking.pk is not None

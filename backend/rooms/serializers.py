@@ -91,8 +91,10 @@ class BookingSerializer(serializers.ModelSerializer):
             # simultaneously are caught by the DB exclusion constraint
             # (rooms migration 0002) and surfaced as the same 400 by the
             # viewset's IntegrityError handling.
-            overlapping = Booking.objects.filter(room=room).filter(
-                Q(start_time__lt=end) & Q(end_time__gt=start)
+            overlapping = (
+                Booking.objects.filter(room=room)
+                .exclude(status="cancelled")
+                .filter(Q(start_time__lt=end) & Q(end_time__gt=start))
             )
             if self.instance:
                 overlapping = overlapping.exclude(pk=self.instance.pk)

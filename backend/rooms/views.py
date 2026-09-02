@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.throttling import ScopedRateThrottle
@@ -178,7 +179,10 @@ class BookingViewSet(viewsets.ModelViewSet):
             )
 
     def update(self, request, *args, **kwargs):
-        _check_booking_modifiable(self.get_object(), "modify")
+        booking = self.get_object()
+        if booking.status == "cancelled":
+            raise PermissionDenied("Cannot modify a cancelled booking.")
+        _check_booking_modifiable(booking, "modify")
         return super().update(request, *args, **kwargs)
 
     def perform_update(self, serializer):
@@ -200,6 +204,19 @@ class BookingViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         _check_booking_modifiable(self.get_object(), "delete")
         return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, *args, **kwargs):
+        """Soft-cancel a booking: the row stays for history, the slot frees."""
+        booking = self.get_object()
+
+        if booking.status == "cancelled":
+            return Response(BookingSerializer(booking).data)
+
+        _check_booking_modifiable(booking, "cancel")
+        booking.status = "cancelled"
+        booking.save(update_fields=["status", "updated_at"])
+        return Response(BookingSerializer(booking).data)
 
     def perform_destroy(self, instance):
         if instance.user != self.request.user:
