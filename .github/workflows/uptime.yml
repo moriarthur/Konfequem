@@ -26,7 +26,8 @@ jobs:
           code=$(curl -sS -o /tmp/be.json -w '%{http_code}' --max-time 120 https://konfequem-backend.onrender.com/api/room-features/)
           echo "backend api: $code"
           [ "$code" = "200" ]
-          grep -q '"id"' /tmp/be.json
+          # Paginated DRF shape — data-independent sanity check.
+          grep -q '"results"' /tmp/be.json
 
       - name: Backend admin login page
         run: |
