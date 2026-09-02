@@ -121,6 +121,24 @@ class RoomSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "location", "capacity", "features"]
 
 
+class RoomWriteSerializer(serializers.ModelSerializer):
+    """Create/update serializer — features referenced by primary key.
+
+    Write responses return feature PKs (not nested objects); the client
+    re-fetches the room list after mutations.
+    """
+
+    features = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=RoomFeature.objects.all(),
+        required=False,
+    )
+
+    class Meta:
+        model = Room
+        fields = ["id", "name", "location", "capacity", "features"]
+
+
 # ---------------------------------------------------------------------------
 # Auth serializers
 # ---------------------------------------------------------------------------

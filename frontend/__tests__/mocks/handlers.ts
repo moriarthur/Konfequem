@@ -267,25 +267,41 @@ export const handlers = [
         name: 'Conference Room A',
         location: 'Floor 1',
         capacity: 10,
+        features: [{ id: 1, name: 'Projector', icon: 'projector' }],
       },
       {
         id: 2,
         name: 'Conference Room B',
         location: 'Floor 1',
         capacity: 15,
+        features: [{ id: 2, name: 'Whiteboard', icon: 'whiteboard' }],
       },
       {
         id: 3,
         name: 'Huddle Room',
         location: 'Floor 2',
         capacity: 4,
+        features: [],
       },
       {
         id: 4,
         name: 'Main Hall',
         location: 'Ground Floor',
         capacity: 50,
+        features: [
+          { id: 1, name: 'Projector', icon: 'projector' },
+          { id: 3, name: 'Phone', icon: 'phone' },
+        ],
       },
+    ])
+  }),
+
+  // List room features
+  http.get('/api/room-features/', () => {
+    return createJsonResponse([
+      { id: 1, name: 'Projector', icon: 'projector' },
+      { id: 2, name: 'Whiteboard', icon: 'whiteboard' },
+      { id: 3, name: 'Phone', icon: 'phone' },
     ])
   }),
 
@@ -299,9 +315,68 @@ export const handlers = [
         name: 'Conference Room A',
         location: 'Floor 1',
         capacity: 10,
+        features: [{ id: 1, name: 'Projector', icon: 'projector' }],
       })
     }
 
+    return createErrorResponse('Not found', 404)
+  }),
+
+  // Create room (validates like the backend: field-keyed 400s)
+  http.post('/api/rooms/', async ({ request }) => {
+    const body = (await request.json()) as {
+      name?: string
+      location?: string
+      capacity?: number
+      features?: number[]
+    }
+    const errors: Record<string, string[]> = {}
+
+    if (!body.name?.trim()) {
+      errors.name = ['This field is required.']
+    } else if (!/^[a-zA-Z0-9 .-]+$/.test(body.name.trim())) {
+      errors.name = ['Room name can only contain letters, numbers, spaces, hyphens, and periods.']
+    }
+    if (body.capacity == null || !Number.isInteger(body.capacity) || body.capacity < 1 || body.capacity > 50) {
+      errors.capacity = ['Capacity must be between 1 and 50.']
+    }
+
+    if (Object.keys(errors).length > 0) {
+      return HttpResponse.json(errors, { status: 400 })
+    }
+
+    return createJsonResponse(
+      {
+        id: 5,
+        name: body.name!.trim(),
+        location: body.location ?? '',
+        capacity: body.capacity,
+        features: body.features ?? [],
+      },
+      201
+    )
+  }),
+
+  // Update room
+  http.put('/api/rooms/:id/', async ({ params, request }) => {
+    if (params.id !== '1') {
+      return createErrorResponse('Not found', 404)
+    }
+    const body = (await request.json()) as Record<string, unknown>
+    return createJsonResponse({ id: 1, ...body })
+  }),
+
+  // Delete room (id '2' simulates the future-bookings guard)
+  http.delete('/api/rooms/:id/', ({ params }) => {
+    if (params.id === '2') {
+      return createJsonResponse(
+        { general: ['Room has upcoming bookings and cannot be deleted.'] },
+        400
+      )
+    }
+    if (params.id === '1') {
+      return new HttpResponse(null, { status: 204 })
+    }
     return createErrorResponse('Not found', 404)
   }),
 

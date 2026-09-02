@@ -3,6 +3,7 @@ import { Heading, Text } from "./ui/Typography";
 import Button from "./ui/Button";
 import RoomMiniAvailability from "./RoomMiniAvailability";
 import { RoomFeatureBadges } from "./RoomFeatureBadges";
+import { FiEdit2, FiTrash2 } from "react-icons/fi";
 import type { BookingData } from "../utils/bookingUtils";
 
 interface Room {
@@ -18,9 +19,20 @@ interface RoomCardProps {
   isActive: boolean;
   onToggleBookingForm: (roomId: number) => void;
   bookings?: BookingData[];
+  isAdmin?: boolean;
+  onEditRoom?: (room: Room) => void;
+  onDeleteRoom?: (room: Room) => void;
 }
 
-export default function RoomCard({ room, isActive, onToggleBookingForm, bookings = [] }: RoomCardProps) {
+export default function RoomCard({
+  room,
+  isActive,
+  onToggleBookingForm,
+  bookings = [],
+  isAdmin = false,
+  onEditRoom,
+  onDeleteRoom,
+}: RoomCardProps) {
   return (
     <Card padding="" className="relative h-full flex flex-col">
       {isActive && (
@@ -71,14 +83,40 @@ export default function RoomCard({ room, isActive, onToggleBookingForm, bookings
       </div>
 
       <div className="border-t border-border-subtle p-4">
-        <Button
-          variant={isActive ? "danger" : "primary"}
-          onClick={() => onToggleBookingForm(room.id)}
-          className="w-full"
-          size="lg"
-        >
-          {isActive ? "Cancel" : "Book this room"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={isActive ? "danger" : "primary"}
+            onClick={() => onToggleBookingForm(room.id)}
+            className="flex-1"
+            size="lg"
+          >
+            {isActive ? "Cancel" : "Book this room"}
+          </Button>
+          {isAdmin && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onEditRoom?.(room)}
+                aria-label={`Edit room ${room.name}`}
+                title={`Edit room ${room.name}`}
+                className="self-stretch border border-border-subtle hover:border-accent-primary/40 hover:text-accent-primary"
+              >
+                <FiEdit2 className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onDeleteRoom?.(room)}
+                aria-label={`Delete room ${room.name}`}
+                title={`Delete room ${room.name}`}
+                className="self-stretch border border-border-subtle hover:border-status-danger-border hover:text-status-danger-text"
+              >
+                <FiTrash2 className="w-4 h-4" />
+              </Button>
+            </>
+          )}
+        </div>
       </div>
     </Card>
   );

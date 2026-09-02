@@ -1,4 +1,4 @@
-import type { HTMLAttributes, ReactNode } from "react";
+import type { HTMLAttributes, LabelHTMLAttributes, ReactNode } from "react";
 
 interface HeadingProps extends HTMLAttributes<HTMLHeadingElement> {
   level?: 1 | 2 | 3 | 4 | 5 | 6;
@@ -61,7 +61,7 @@ export function Text({ children, variant = "default", className = "", ...props }
   );
 }
 
-interface LabelProps extends HTMLAttributes<HTMLLabelElement> {
+interface LabelProps extends LabelHTMLAttributes<HTMLLabelElement> {
   children: ReactNode;
   className?: string;
 }

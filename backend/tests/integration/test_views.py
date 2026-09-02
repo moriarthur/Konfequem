@@ -13,6 +13,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from datetime import timedelta
 
 from rooms.models import Room, Booking
+from rooms.models_users import Organization
 
 User = get_user_model()
 
@@ -113,27 +114,172 @@ class TestRoomViewSet:
     # ========================================================================
     # HTTP Method Tests
     # ========================================================================
+    # Room Management (org_admin) Tests
+    # ========================================================================
 
-    def test_rooms_read_only(self, db, authenticated_api_client, organization):
-        """Test that rooms cannot be created/updated/deleted via API."""
-        create_response = authenticated_api_client.post(
+    def test_member_cannot_create_room(self, db, authenticated_api_client):
+        """Members get 403 (not 405) when creating rooms."""
+        response = authenticated_api_client.post(
             "/api/rooms/", {"name": "New Room", "location": "Floor 1", "capacity": 10}
         )
-        assert create_response.status_code == 405
+        assert response.status_code == 403
 
-        room = Room.objects.create(
-            name="Test Room", capacity=5, organization=organization
+    def test_staff_cannot_create_room(self, db, staff_api_client):
+        """Staff/platform admins manage rooms via Django admin, not the API."""
+        response = staff_api_client.post(
+            "/api/rooms/", {"name": "New Room", "capacity": 10}, format="json"
+        )
+        assert response.status_code == 403
+
+    def test_org_admin_can_create_room(
+        self, db, admin_api_client, organization, room_features
+    ):
+        """Org admin creates a room; organization is assigned server-side."""
+        response = admin_api_client.post(
+            "/api/rooms/",
+            {
+                "name": "New Room",
+                "location": "Floor 1",
+                "capacity": 10,
+                "features": [room_features[0].id, room_features[1].id],
+            },
+            format="json",
+        )
+        assert response.status_code == 201
+        room = Room.objects.get(name="New Room")
+        assert room.organization == organization
+        assert list(room.features.values_list("id", flat=True)) == sorted(
+            [room_features[0].id, room_features[1].id]
+        )
+        # Write responses return feature PKs, not nested objects
+        assert sorted(response.data["features"]) == sorted(
+            [room_features[0].id, room_features[1].id]
         )
 
-        update_response = authenticated_api_client.put(
+    def test_org_admin_create_room_invalid_data(self, db, admin_api_client):
+        """Field-level validation errors map to their keys."""
+        response = admin_api_client.post(
+            "/api/rooms/",
+            {"name": "Bad@Room!", "location": "Floor 1", "capacity": 51},
+            format="json",
+        )
+        assert response.status_code == 400
+        assert "name" in response.data
+        assert "capacity" in response.data
+
+    def test_org_admin_create_room_invalid_feature(
+        self, db, admin_api_client, room_features
+    ):
+        """Unknown feature PKs are rejected."""
+        response = admin_api_client.post(
+            "/api/rooms/",
+            {"name": "New Room", "capacity": 10, "features": [9999]},
+            format="json",
+        )
+        assert response.status_code == 400
+        assert "features" in response.data
+
+    def test_member_cannot_update_room(self, db, authenticated_api_client, room):
+        response = authenticated_api_client.put(
             f"/api/rooms/{room.id}/",
             {"name": "Updated Room", "capacity": 15},
             format="json",
         )
-        assert update_response.status_code == 405
+        assert response.status_code == 403
 
-        delete_response = authenticated_api_client.delete(f"/api/rooms/{room.id}/")
-        assert delete_response.status_code == 405
+    def test_staff_cannot_update_room(self, db, staff_api_client, room):
+        response = staff_api_client.put(
+            f"/api/rooms/{room.id}/",
+            {"name": "Updated Room", "capacity": 15},
+            format="json",
+        )
+        assert response.status_code == 403
+
+    def test_org_admin_can_update_room(self, db, admin_api_client, room, room_features):
+        """PUT replaces the feature set (explicit list semantics)."""
+        room.features.add(room_features[0])
+
+        response = admin_api_client.put(
+            f"/api/rooms/{room.id}/",
+            {
+                "name": "Updated Room",
+                "location": "Floor 2",
+                "capacity": 15,
+                "features": [room_features[1].id],
+            },
+            format="json",
+        )
+        assert response.status_code == 200
+        room.refresh_from_db()
+        assert room.name == "Updated Room"
+        assert room.capacity == 15
+        assert list(room.features.all()) == [room_features[1]]
+
+    def test_org_admin_can_partial_update_room(
+        self, db, admin_api_client, room, room_features
+    ):
+        """PATCH without a features key leaves the M2M unchanged."""
+        room.features.add(room_features[0])
+
+        response = admin_api_client.patch(
+            f"/api/rooms/{room.id}/", {"capacity": 8}, format="json"
+        )
+        assert response.status_code == 200
+        room.refresh_from_db()
+        assert room.capacity == 8
+        assert list(room.features.all()) == [room_features[0]]
+
+    def test_org_admin_cannot_update_other_org_room(
+        self, db, admin_api_client, organization
+    ):
+        """Cross-org writes are hidden by queryset scoping (404)."""
+        other_org = Organization.objects.create(name="Other", slug="other")
+        other_room = Room.objects.create(
+            name="Other Org Room", capacity=5, organization=other_org
+        )
+
+        response = admin_api_client.put(
+            f"/api/rooms/{other_room.id}/",
+            {"name": "Hacked", "capacity": 5},
+            format="json",
+        )
+        assert response.status_code == 404
+
+    def test_member_cannot_delete_room(self, db, authenticated_api_client, room):
+        response = authenticated_api_client.delete(f"/api/rooms/{room.id}/")
+        assert response.status_code == 403
+
+    def test_staff_cannot_delete_room(self, db, staff_api_client, room):
+        response = staff_api_client.delete(f"/api/rooms/{room.id}/")
+        assert response.status_code == 403
+
+    def test_org_admin_can_delete_room_without_future_bookings(
+        self, db, admin_api_client, room, user, organization
+    ):
+        """Rooms with only past bookings can be deleted (bookings cascade)."""
+        now = timezone.now()
+        Booking.objects.create(
+            room=room,
+            user=user,
+            organization=organization,
+            start_time=now - timedelta(hours=2),
+            end_time=now - timedelta(hours=1),
+            date=(now - timedelta(hours=2)).date(),
+        )
+
+        response = admin_api_client.delete(f"/api/rooms/{room.id}/")
+
+        assert response.status_code == 204
+        assert not Room.objects.filter(pk=room.pk).exists()
+
+    def test_delete_room_with_future_bookings_blocked(
+        self, db, admin_api_client, room, booking
+    ):
+        response = admin_api_client.delete(f"/api/rooms/{room.id}/")
+
+        assert response.status_code == 400
+        assert "general" in response.data
+        assert Room.objects.filter(pk=room.pk).exists()
 
 
 @pytest.mark.integration

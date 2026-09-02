@@ -7,6 +7,7 @@ import BottomNav from "../components/BottomNav";
 import RoomList from "../components/RoomList";
 import RoomFilters from "../components/RoomFilters";
 import BookingForm from "../components/BookingForm";
+import RoomFormModal from "../components/RoomFormModal";
 import { Heading, Text } from "../components/ui/Typography";
 import { RoomCardSkeleton } from "../components/ui/Skeleton";
 import EmptyState from "../components/ui/EmptyState";
@@ -14,8 +15,9 @@ import { Room, Feature, ActiveFilters, PaginatedResponse } from "../types";
 import { BookingData } from "../utils/bookingUtils";
 
 export default function RoomsPage() {
-  const { authFetch, authFetchRef, isAuthenticated, access } = useAuth();
+  const { authFetch, authFetchRef, isAuthenticated, access, user } = useAuth();
   const { showAlert } = useAlert();
+  const isAdmin = (user?.role as string | undefined) === "org_admin";
   const [rooms, setRooms] = useState<Room[]>([]);
   const [features, setFeatures] = useState<Feature[]>([]);
   const [bookings, setBookings] = useState<BookingData[]>([]);
@@ -28,6 +30,11 @@ export default function RoomsPage() {
     capacity: null,
     features: [],
   });
+  // undefined = closed, null = create mode, Room = edit mode
+  const [formTarget, setFormTarget] = useState<Room | null | undefined>(undefined);
+  const [deleteTarget, setDeleteTarget] = useState<Room | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -93,6 +100,62 @@ export default function RoomsPage() {
     }
   };
 
+  const refreshData = async () => {
+    const [roomsData, bookingsData] = await Promise.all([
+      authFetch("/api/rooms/"),
+      authFetch("/api/bookings/"),
+    ]);
+    setRooms((roomsData as PaginatedResponse<Room>).results || (roomsData as Room[]));
+    setBookings((bookingsData as PaginatedResponse<BookingData>).results || (bookingsData as BookingData[]));
+  };
+
+  const closeBookingSheet = () => {
+    setShowBookingForm(false);
+    setSelectedRoomId(null);
+    setIsFormValid(false);
+  };
+
+  const openRoomForm = (target: Room | null) => {
+    closeBookingSheet();
+    setFormTarget(target);
+  };
+
+  const handleRoomSaved = async () => {
+    try {
+      await refreshData();
+      showAlert(formTarget ? "Room updated" : "Room created", { type: "success" });
+    } catch (err) {
+      logError("Error refreshing rooms:", err);
+      showAlert("Room saved, but the list could not be refreshed.", { type: "warning" });
+    } finally {
+      setFormTarget(undefined);
+    }
+  };
+
+  const openDeleteConfirm = (room: Room) => {
+    closeBookingSheet();
+    setDeleteError("");
+    setDeleteTarget(room);
+  };
+
+  const handleDeleteRoom = async () => {
+    if (!deleteTarget) return;
+    try {
+      setDeleting(true);
+      await authFetch(`/api/rooms/${deleteTarget.id}/`, { method: "DELETE" });
+      await refreshData();
+      showAlert("Room deleted", { type: "success" });
+      setDeleteTarget(null);
+    } catch (err) {
+      const e = err as { general?: string[]; detail?: string };
+      setDeleteError(
+        e.general?.[0] || e.detail || "Could not delete room. Please try again."
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handleFilterChange = (type: string | ActiveFilters, value?: number | number[] | null) => {
     if (type === "capacity") {
       setActiveFilters(prev => ({ ...prev, capacity: (value as number) ?? null }));
@@ -145,9 +208,16 @@ export default function RoomsPage() {
   return (
     <div className="min-h-screen bg-surface-muted pb-20">
       <div className="px-4 py-6 max-w-4xl mx-auto">
-        <Heading level={1} className="text-2xl font-semibold text-accent-secondary mb-2">
-          Rooms
-        </Heading>
+        <div className="flex items-center justify-between gap-4 mb-2">
+          <Heading level={1} className="text-2xl font-semibold text-accent-secondary">
+            Rooms
+          </Heading>
+          {isAdmin && (
+            <Button variant="primary" onClick={() => openRoomForm(null)}>
+              + Add Room
+            </Button>
+          )}
+        </div>
         <Text variant="muted" className="mb-6">
           Browse and book available rooms
         </Text>
@@ -172,7 +242,29 @@ export default function RoomsPage() {
 
         {!loading && (
           <>
-            {filteredRooms.length === 0 ? (
+            {rooms.length === 0 ? (
+              <EmptyState
+                icon={
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-12 h-12">
+                    <path d="M3 21H21V9L12 3L3 9V21Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                    <path d="M9 21V13H15V21" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                  </svg>
+                }
+                title={isAdmin ? "No rooms yet" : "No rooms available"}
+                description={
+                  isAdmin
+                    ? "Create your first room so your team can start booking."
+                    : "There are no rooms configured in the system."
+                }
+                action={
+                  isAdmin ? (
+                    <Button variant="primary" onClick={() => openRoomForm(null)}>
+                      Add your first room
+                    </Button>
+                  ) : undefined
+                }
+              />
+            ) : filteredRooms.length === 0 ? (
               <EmptyState
                 icon={
                   <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-12 h-12">
@@ -198,6 +290,9 @@ export default function RoomsPage() {
                 bookings={bookings}
                 activeRoomId={selectedRoomId}
                 onToggleBookingForm={handleToggleBookingForm}
+                isAdmin={isAdmin}
+                onEditRoom={(room) => openRoomForm(room)}
+                onDeleteRoom={openDeleteConfirm}
               />
             )}
           </>
@@ -250,6 +345,63 @@ export default function RoomsPage() {
                 }`}
               >
                 Book a Room
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {formTarget !== undefined && (
+        <RoomFormModal
+          room={formTarget}
+          features={features}
+          onClose={() => setFormTarget(undefined)}
+          onSaved={handleRoomSaved}
+        />
+      )}
+
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-room-title"
+        >
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => !deleting && setDeleteTarget(null)}
+            aria-hidden="true"
+          />
+          <div className="relative bg-surface-base border border-border-subtle rounded-2xl shadow-soft p-6 max-w-sm w-full">
+            <Heading level={3} id="delete-room-title" className="text-lg font-medium text-accent-secondary mb-4">
+              Delete Room
+            </Heading>
+            <p className="text-accent-secondary/70 mb-4">
+              Are you sure you want to delete <span className="font-semibold text-accent-secondary">{deleteTarget.name}</span>
+              {deleteTarget.location ? ` (${deleteTarget.location})` : ""}? Past bookings
+              in this room will be removed as well.
+            </p>
+            {deleteError && (
+              <p className="p-3 bg-status-danger-soft border border-status-danger-border rounded-lg text-status-danger-text text-sm mb-4" role="alert">
+                {deleteError}
+              </p>
+            )}
+            <div className="flex gap-3">
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+              >
+                Keep Room
+              </Button>
+              <Button
+                variant="danger"
+                className="flex-1"
+                onClick={handleDeleteRoom}
+                disabled={deleting}
+              >
+                {deleting ? "Deleting..." : "Delete Room"}
               </Button>
             </div>
           </div>

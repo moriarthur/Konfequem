@@ -17,8 +17,10 @@ from rest_framework_simplejwt.views import (
 
 from .models import Room, Booking, RoomFeature
 from .models_users import Organization, User
+from .permissions import IsOrgAdminOrReadOnly
 from .serializers import (
     RoomSerializer,
+    RoomWriteSerializer,
     BookingSerializer,
     RoomFeatureSerializer,
     RegisterSerializer,
@@ -79,17 +81,36 @@ class ThrottledTokenBlacklistView(TokenBlacklistView):
     throttle_scope = "token_blacklist"
 
 
-class RoomViewSet(viewsets.ReadOnlyModelViewSet):
-    """Read-only view for rooms, scoped to the user's organization."""
+class RoomViewSet(viewsets.ModelViewSet):
+    """CRUD view for rooms, scoped to the user's organization.
+
+    Writes are restricted to org admins; staff/platform admins keep
+    read-all access but manage rooms via Django admin.
+    """
 
     serializer_class = RoomSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsOrgAdminOrReadOnly]
 
     def get_queryset(self):
         user = self.request.user
         if user.is_staff:
             return Room.objects.all()
         return Room.objects.filter(organization=user.organization)
+
+    def get_serializer_class(self):
+        if self.action in ("create", "update", "partial_update"):
+            return RoomWriteSerializer
+        return RoomSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(organization=self.request.user.organization)
+
+    def perform_destroy(self, instance):
+        if instance.bookings.filter(end_time__gt=timezone.now()).exists():
+            raise ValidationError(
+                {"general": ["Room has upcoming bookings and cannot be deleted."]}
+            )
+        instance.delete()
 
 
 class RoomFeatureViewSet(viewsets.ReadOnlyModelViewSet):

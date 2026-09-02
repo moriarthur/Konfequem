@@ -29,9 +29,20 @@ interface RoomListProps {
   bookings?: BookingData[];
   activeRoomId?: number | null;
   onToggleBookingForm: (roomId: number) => void;
+  isAdmin?: boolean;
+  onEditRoom?: (room: Room) => void;
+  onDeleteRoom?: (room: Room) => void;
 }
 
-export default function RoomList({ rooms, bookings = [], activeRoomId = null, onToggleBookingForm }: RoomListProps) {
+export default function RoomList({
+  rooms,
+  bookings = [],
+  activeRoomId = null,
+  onToggleBookingForm,
+  isAdmin = false,
+  onEditRoom,
+  onDeleteRoom,
+}: RoomListProps) {
   if (!rooms) {
     return <EmptyState icon={<BuildingIcon />} title="Loading rooms..." description="Please wait while we fetch available rooms." />;
   }
@@ -49,6 +60,9 @@ export default function RoomList({ rooms, bookings = [], activeRoomId = null, on
           isActive={activeRoomId === room.id}
           onToggleBookingForm={onToggleBookingForm}
           bookings={bookings}
+          isAdmin={isAdmin}
+          onEditRoom={onEditRoom}
+          onDeleteRoom={onDeleteRoom}
         />
       ))}
     </div>

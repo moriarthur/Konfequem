@@ -14,7 +14,7 @@ from rest_framework.throttling import SimpleRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from freezegun import freeze_time
 
-from rooms.models import Room, Booking
+from rooms.models import Room, Booking, RoomFeature
 from rooms.models_users import Organization
 
 User = get_user_model()
@@ -102,6 +102,20 @@ def staff_user(db, organization):
 
 
 @pytest.fixture
+def org_admin(db, organization):
+    """Create an organization admin (role='org_admin')."""
+    return User.objects.create_user(
+        username="orgadmin",
+        email="orgadmin@example.com",
+        password="adminpass123",
+        first_name="Org",
+        last_name="Admin",
+        role="org_admin",
+        organization=organization,
+    )
+
+
+@pytest.fixture
 def authenticated_client(client, user):
     """Return an authenticated APIClient for the given user."""
     refresh = RefreshToken.for_user(user)
@@ -123,9 +137,36 @@ def authenticated_api_client(api_client, user):
     return api_client
 
 
+@pytest.fixture
+def admin_api_client(api_client, org_admin):
+    """Return an authenticated APIClient for the org admin."""
+    refresh = RefreshToken.for_user(org_admin)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+    return api_client
+
+
+@pytest.fixture
+def staff_api_client(api_client, staff_user):
+    """Return an authenticated APIClient for the staff user."""
+    refresh = RefreshToken.for_user(staff_user)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+    return api_client
+
+
 # ============================================================================
 # Model Fixtures
 # ============================================================================
+
+
+@pytest.fixture
+def room_features(db):
+    """Create a fixed set of room features."""
+    features = [
+        RoomFeature(name="Projector", icon="projector"),
+        RoomFeature(name="Whiteboard", icon="whiteboard"),
+        RoomFeature(name="Phone", icon="phone"),
+    ]
+    return list(RoomFeature.objects.bulk_create(features))
 
 
 @pytest.fixture
