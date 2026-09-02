@@ -1,0 +1,56 @@
+name: Backup
+
+# Daily pg_dump of the Supabase database into a workflow artifact.
+# GitHub's free artifact quota is far more than a dump of this size needs;
+# retention-days keeps a rolling window of dailies.
+#
+# Requires the repo secret SUPABASE_DB_URL — a full connection URI against
+# the SESSION pooler (port 5432), NOT the transaction pooler (:6543) the app
+# uses: pg_dump does not work through transaction-mode pooling.
+#   gh secret set SUPABASE_DB_URL --repo moriarthur/Konfequem
+#   postgresql://postgres.debmjuxnibreictnydfe:<PASSWORD>@aws-0-eu-west-1.pooler.supabase.com:5432/postgres
+#
+# Restore recipe (test it once in a while):
+#   gh run download <run-id> -n supabase-backup -D /tmp/bak
+#   docker run --rm -v /tmp/bak:/bak -e DB_URL="$SUPABASE_DB_URL" postgres:17 \
+#     sh -c 'createdb "$DB_URL" -T template0 konfequem_restore && \
+#            pg_restore "$DB_URL" --dbname=konfequem_restore --no-owner /bak/dump.dump'
+on:
+  schedule:
+    # Daily at 03:23 UTC, off the round hour.
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  pg_dump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail fast if the secret is missing
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::SUPABASE_DB_URL secret is not set (see the comment at the top of this file)."
+            exit 1
+          fi
+
+      - name: Dump database
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          mkdir -p /tmp/backup
+          # postgres:17 client matches the Supabase server version; the URI is
+          # passed through the environment so it never appears in argv or logs.
+          docker run --rm \
+            -e DB_URL="$SUPABASE_DB_URL" \
+            -v /tmp/backup:/backup \
+            postgres:17 \
+            sh -c 'pg_dump "$DB_URL" --format=custom --file=/backup/dump.dump'
+          ls -lh /tmp/backup/dump.dump
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-backup
+          path: /tmp/backup/dump.dump
+          retention-days: 30
