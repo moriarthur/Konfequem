@@ -2,6 +2,7 @@ import uuid as uuid_mod
 
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -159,10 +160,22 @@ class BookingViewSet(viewsets.ModelViewSet):
         return queryset.select_related("room")
 
     def perform_create(self, serializer):
-        serializer.save(
-            user=self.request.user,
-            organization=self.request.user.organization,
-        )
+        try:
+            with transaction.atomic():
+                serializer.save(
+                    user=self.request.user,
+                    organization=self.request.user.organization,
+                )
+        except IntegrityError:
+            # The DB exclusion constraint (rooms migration 0002) catches the
+            # race where two requests both pass the serializer overlap check.
+            raise ValidationError(
+                {
+                    "general": [
+                        "This room is already booked for the selected time range."
+                    ]
+                }
+            )
 
     def update(self, request, *args, **kwargs):
         _check_booking_modifiable(self.get_object(), "modify")
@@ -172,7 +185,17 @@ class BookingViewSet(viewsets.ModelViewSet):
         if serializer.instance.user != self.request.user:
             raise PermissionDenied("You can only modify your own bookings")
         _check_booking_modifiable(serializer.instance, "modify")
-        return super().perform_update(serializer)
+        try:
+            with transaction.atomic():
+                return super().perform_update(serializer)
+        except IntegrityError:
+            raise ValidationError(
+                {
+                    "general": [
+                        "This room is already booked for the selected time range."
+                    ]
+                }
+            )
 
     def destroy(self, request, *args, **kwargs):
         _check_booking_modifiable(self.get_object(), "delete")

@@ -87,11 +87,10 @@ class BookingSerializer(serializers.ModelSerializer):
 
         # --- Logical validation ---
         if room and start and end:
-            # Check for overlapping bookings
-            # Note: There is a theoretical race condition where two users could
-            # validate simultaneously and both see no overlaps, then both create.
-            # This is rare in practice. A proper fix would require database
-            # constraints or different locking strategy.
+            # Check for overlapping bookings. Two requests that pass this check
+            # simultaneously are caught by the DB exclusion constraint
+            # (rooms migration 0002) and surfaced as the same 400 by the
+            # viewset's IntegrityError handling.
             overlapping = Booking.objects.filter(room=room).filter(
                 Q(start_time__lt=end) & Q(end_time__gt=start)
             )
@@ -137,6 +136,23 @@ class RoomWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Room
         fields = ["id", "name", "location", "capacity", "features"]
+
+    def validate(self, data):
+        instance = self.instance
+        organization = (
+            instance.organization
+            if instance
+            else self.context["request"].user.organization
+        )
+        name = (data.get("name") or (instance.name if instance else "")).strip()
+        duplicates = Room.objects.filter(organization=organization, name__iexact=name)
+        if instance:
+            duplicates = duplicates.exclude(pk=instance.pk)
+        if duplicates.exists():
+            raise serializers.ValidationError(
+                {"name": ["A room with this name already exists in your organization."]}
+            )
+        return data
 
 
 # ---------------------------------------------------------------------------

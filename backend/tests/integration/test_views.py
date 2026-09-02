@@ -8,6 +8,7 @@ Tests validate:
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, connection
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 from datetime import timedelta
@@ -905,3 +906,90 @@ class TestBookingStatus:
 
         assert response.status_code == 200
         assert response.data["results"][0]["status"] == "upcoming"
+
+
+class TestRoomNameUniqueness:
+    """Room names are unique per organization (case-insensitive)."""
+
+    def test_duplicate_name_rejected(self, db, admin_api_client, room):
+        response = admin_api_client.post(
+            "/api/rooms/",
+            {"name": room.name.lower(), "location": "Floor 1", "capacity": 4},
+            format="json",
+        )
+        assert response.status_code == 400
+        assert "name" in response.data
+
+    def test_same_name_in_other_org_allowed(self, db, admin_api_client):
+        other_org = Organization.objects.create(name="Other", slug="other-2")
+        Room.objects.create(name="Foreign Name", capacity=5, organization=other_org)
+
+        response = admin_api_client.post(
+            "/api/rooms/",
+            {"name": "Foreign Name", "capacity": 4},
+            format="json",
+        )
+        assert response.status_code == 201
+
+    def test_rename_to_own_name_allowed(self, db, admin_api_client, room):
+        response = admin_api_client.patch(
+            f"/api/rooms/{room.id}/", {"location": "Floor 9"}, format="json"
+        )
+        assert response.status_code == 200
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(
+    connection.vendor != "postgresql",
+    reason="exclusion constraint is PostgreSQL-only (rooms migration 0002)",
+)
+class TestBookingOverlapConstraint:
+    """DB-level backstop behind the serializer overlap check.
+
+    Runs only when pytest is pointed at PostgreSQL (CI's migrate step
+    validates the DDL; the default SQLite test suite skips these).
+    """
+
+    def test_overlapping_insert_raises_integrity_error(
+        self, db, room, user, organization
+    ):
+        now = timezone.now()
+        Booking.objects.create(
+            room=room,
+            user=user,
+            organization=organization,
+            start_time=now + timedelta(days=1, hours=10),
+            end_time=now + timedelta(days=1, hours=11),
+            date=(now + timedelta(days=1)).date(),
+        )
+
+        with pytest.raises(IntegrityError):
+            Booking.objects.create(
+                room=room,
+                user=user,
+                organization=organization,
+                start_time=now + timedelta(days=1, hours=10, minutes=30),
+                end_time=now + timedelta(days=1, hours=11, minutes=30),
+                date=(now + timedelta(days=1)).date(),
+            )
+
+    def test_adjacent_booking_allowed(self, db, room, user, organization):
+        now = timezone.now()
+        Booking.objects.create(
+            room=room,
+            user=user,
+            organization=organization,
+            start_time=now + timedelta(days=1, hours=10),
+            end_time=now + timedelta(days=1, hours=11),
+            date=(now + timedelta(days=1)).date(),
+        )
+
+        booking = Booking.objects.create(
+            room=room,
+            user=user,
+            organization=organization,
+            start_time=now + timedelta(days=1, hours=11),
+            end_time=now + timedelta(days=1, hours=12),
+            date=(now + timedelta(days=1)).date(),
+        )
+        assert booking.pk is not None
