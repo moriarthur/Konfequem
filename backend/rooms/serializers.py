@@ -30,6 +30,7 @@ class BookingSerializer(serializers.ModelSerializer):
         berlin_tz = timezone.get_default_timezone()
         ret["start_time"] = instance.start_time.astimezone(berlin_tz).isoformat()
         ret["end_time"] = instance.end_time.astimezone(berlin_tz).isoformat()
+        ret["status"] = instance.current_status
         return ret
 
     def validate(self, data):

@@ -655,3 +655,107 @@ class TestBookingViewSet:
 
         # Should succeed (200 OK)
         assert response.status_code == 200
+
+
+class TestBookingStatus:
+    """Computed `status` in booking responses (stored 'cancelled' wins)."""
+
+    @staticmethod
+    def _create_booking(user, room, organization, start, end, status=None):
+        kwargs = dict(
+            room=room,
+            user=user,
+            organization=organization,
+            start_time=start,
+            end_time=end,
+            date=start.date(),
+        )
+        if status:
+            kwargs["status"] = status
+        return Booking.objects.create(**kwargs)
+
+    def test_future_booking_is_upcoming(
+        self, db, authenticated_api_client, user, room, organization
+    ):
+        now = timezone.now()
+        booking = self._create_booking(
+            user,
+            room,
+            organization,
+            now + timedelta(hours=1),
+            now + timedelta(hours=2),
+        )
+
+        response = authenticated_api_client.get(f"/api/bookings/{booking.id}/")
+
+        assert response.status_code == 200
+        assert response.data["status"] == "upcoming"
+
+    def test_spanning_booking_is_ongoing(
+        self, db, authenticated_api_client, user, room, organization
+    ):
+        now = timezone.now()
+        booking = self._create_booking(
+            user,
+            room,
+            organization,
+            now - timedelta(minutes=30),
+            now + timedelta(minutes=30),
+        )
+
+        response = authenticated_api_client.get(f"/api/bookings/{booking.id}/")
+
+        assert response.status_code == 200
+        assert response.data["status"] == "ongoing"
+
+    def test_past_booking_is_completed(
+        self, db, authenticated_api_client, user, room, organization
+    ):
+        now = timezone.now()
+        booking = self._create_booking(
+            user,
+            room,
+            organization,
+            now - timedelta(hours=2),
+            now - timedelta(hours=1),
+        )
+
+        response = authenticated_api_client.get(f"/api/bookings/{booking.id}/")
+
+        assert response.status_code == 200
+        assert response.data["status"] == "completed"
+
+    def test_cancelled_status_wins_over_time_derived(
+        self, db, authenticated_api_client, user, room, organization
+    ):
+        now = timezone.now()
+        booking = self._create_booking(
+            user,
+            room,
+            organization,
+            now + timedelta(hours=1),
+            now + timedelta(hours=2),
+            status="cancelled",
+        )
+
+        response = authenticated_api_client.get(f"/api/bookings/{booking.id}/")
+
+        assert response.status_code == 200
+        assert response.data["status"] == "cancelled"
+
+    def test_status_in_list_response(
+        self, db, authenticated_api_client, user, room, organization
+    ):
+        now = timezone.now()
+        self._create_booking(
+            user,
+            room,
+            organization,
+            now + timedelta(hours=1),
+            now + timedelta(hours=2),
+        )
+
+        response = authenticated_api_client.get("/api/bookings/")
+
+        assert response.status_code == 200
+        assert response.data["results"][0]["status"] == "upcoming"

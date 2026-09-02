@@ -140,6 +140,22 @@ class Booking(models.Model):
             self.date = self.start_time.date()
         super().save(*args, **kwargs)
 
+    @property
+    def current_status(self):
+        """Effective status: stored 'cancelled' wins, otherwise derived from times.
+
+        The stored `status` column defaults to 'ongoing' and is never
+        recomputed, so it is only meaningful as a 'cancelled' marker.
+        """
+        if self.status == "cancelled":
+            return "cancelled"
+        now = timezone.now()
+        if now < self.start_time:
+            return "upcoming"
+        if now < self.end_time:
+            return "ongoing"
+        return "completed"
+
     def __str__(self):
         start_str = self.start_time.strftime("%H:%M")
         end_str = self.end_time.strftime("%H:%M")
