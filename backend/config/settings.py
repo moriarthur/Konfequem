@@ -204,6 +204,10 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     X_FRAME_OPTIONS = "DENY"
+    # HTTPS-only behind Render's proxy (which already 308-redirects to https);
+    # HSTS tells browsers to stay on https for a year.
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000
 
 # Logging
 LOGGING = {
