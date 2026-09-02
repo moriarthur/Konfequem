@@ -39,9 +39,12 @@ cd frontend && npm run dev
 - `GET /api/invites/<key>/` — org preview before joining
 - `GET /api/users/me/` / `PUT /api/users/me/` — current user
 - `POST /api/users/change-password/` — change password
-- `/api/rooms/` — rooms (org-scoped, auth required)
+- `/api/rooms/` — rooms (org-scoped, auth required; create/update/delete org_admin only,
+  deletion blocked while future bookings exist; write serializer takes feature PKs)
 - `/api/room-features/` — room features (read-only)
 - `/api/bookings/` — bookings CRUD (authenticated, org-scoped)
+- `POST /api/bookings/<id>/cancel/` — soft cancel (row stays for history, slot
+  frees; future-only, idempotent; cancelled excluded from overlap checks + DB constraint)
 - `GET /api/org/members/` — list org members (org_admin only)
 - `POST /api/org/invite/regenerate/` — rotate invite key (org_admin only)
 
