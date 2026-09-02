@@ -34,3 +34,16 @@ export interface PaginatedResponse<T> {
   count?: number;
   [key: string]: unknown;
 }
+
+/** Shape of GET /api/users/me/ and the auth/register/join user objects. */
+export interface User {
+  id: number;
+  username: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  /** "member" | "org_admin" (platform admins use the Django admin only). */
+  role: string;
+  organization?: { id: number; name: string; slug: string } | null;
+  [key: string]: unknown;
+}

@@ -13,11 +13,12 @@ import { RoomCardSkeleton } from "../components/ui/Skeleton";
 import EmptyState from "../components/ui/EmptyState";
 import { Room, Feature, ActiveFilters, PaginatedResponse } from "../types";
 import { BookingData } from "../utils/bookingUtils";
+import { isOrgAdmin } from "../utils/roles";
 
 export default function RoomsPage() {
   const { authFetch, authFetchRef, isAuthenticated, access, user } = useAuth();
   const { showAlert } = useAlert();
-  const isAdmin = (user?.role as string | undefined) === "org_admin";
+  const isAdmin = isOrgAdmin(user);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [features, setFeatures] = useState<Feature[]>([]);
   const [bookings, setBookings] = useState<BookingData[]>([]);

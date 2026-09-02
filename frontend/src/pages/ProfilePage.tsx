@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { error as logError } from "../utils/logger";
 import { OFFICE_TIMEZONE, BookingData } from "../utils/bookingUtils";
+import { isOrgAdmin } from "../utils/roles";
 import { useAlert } from "../context/AlertContext";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import BottomNav from "../components/BottomNav";
@@ -187,15 +188,15 @@ export default function ProfilePage() {
   const lastName = user?.last_name as string | undefined;
   const username = user?.username as string | undefined;
   const email = user?.email as string | undefined;
-  const role = user?.role as string | undefined;
+  const isAdmin = isOrgAdmin(user);
   const org = user?.organization as { id: number; name: string; slug: string } | null | undefined;
 
   useEffect(() => {
-    if (role !== "org_admin") return;
+    if (!isAdmin) return;
     authFetch("/api/org/members/")
       .then((data) => setMembers(data as typeof members))
       .catch(() => {});
-  }, [role, authFetch]);
+  }, [isAdmin, authFetch]);
 
   const handleRegenerate = async () => {
     setRegenerating(true);
@@ -359,7 +360,7 @@ export default function ProfilePage() {
               <Text variant="muted" className="text-sm">/{org.slug}</Text>
             </div>
 
-            {role === "org_admin" && (
+            {isAdmin && (
               <div className="mt-4 space-y-4">
                 <div>
                   <Text variant="muted" className="text-xs mb-1">Invite link</Text>
