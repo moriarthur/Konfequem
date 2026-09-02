@@ -1,0 +1,35 @@
+name: Uptime
+
+# Scheduled smoke checks against production. A failing run triggers GitHub's
+# "first failure after success" email — the same channel that missed three
+# months of red CI is now wired to watch production itself. Side benefit:
+# pinging every 30 min keeps the Render free tier from spinning down.
+on:
+  schedule:
+    # Every 30 minutes, off the :00/:30 marks to dodge cron congestion.
+    - cron: "17,47 * * * *"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Frontend (Netlify)
+        run: |
+          code=$(curl -sS -o /tmp/fe.html -w '%{http_code}' --max-time 60 https://konfequem.netlify.app/)
+          echo "frontend: $code"
+          [ "$code" = "200" ]
+          grep -q "Konfequem" /tmp/fe.html
+
+      - name: Backend API (Render)
+        run: |
+          code=$(curl -sS -o /tmp/be.json -w '%{http_code}' --max-time 120 https://konfequem-backend.onrender.com/api/room-features/)
+          echo "backend api: $code"
+          [ "$code" = "200" ]
+          grep -q '"id"' /tmp/be.json
+
+      - name: Backend admin login page
+        run: |
+          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 120 https://konfequem-backend.onrender.com/admin/login/)
+          echo "admin: $code"
+          [ "$code" = "200" ]
