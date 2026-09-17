@@ -1127,6 +1127,21 @@ class TestBookingTenantTrigger:
         room.refresh_from_db()
         assert room.organization == foreign_org
 
+    def test_trigger_allows_user_org_change_without_bookings(self, db, organization):
+        """A user with no bookings can still be moved freely."""
+        foreign_org = self._foreign_org("trigger-foreign-6")
+        bookingless = User.objects.create_user(
+            username="trigger-movable",
+            email="trigger-movable@example.com",
+            password="trigger-pass-123",
+            organization=organization,
+        )
+
+        User.objects.filter(pk=bookingless.pk).update(organization=foreign_org)
+
+        bookingless.refresh_from_db()
+        assert bookingless.organization == foreign_org
+
 
 @pytest.mark.integration
 class TestBookingCancel:

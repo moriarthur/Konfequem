@@ -4,8 +4,10 @@ The booking tenant trigger (migration 0006) only fires on
 rooms_booking writes. But moving a Room or a User to another
 organization AFTER bookings exist silently turns those bookings
 cross-tenant — again leaking foreign room names through availability.
-These triggers forbid organization changes while any booking
-references the row. Rooms/users without bookings can still be moved.
+These triggers forbid organization changes while ANY booking
+references the row — including cancelled and completed ones: bookings
+are history and must stay anchored to the org they were made in.
+Rooms/users without bookings can still be moved.
 
 No-op on SQLite, where the test suite runs (pg-only tests cover the
 behavior when pytest is pointed at PostgreSQL).

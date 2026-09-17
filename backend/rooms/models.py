@@ -73,8 +73,10 @@ class Room(models.Model):
     def clean(self):
         super().clean()
         # Moving a room to another organization would silently turn its
-        # existing bookings cross-tenant. Forbidden while bookings exist —
-        # matched by the rooms_room_org_guard DB trigger (migration 0007).
+        # existing bookings cross-tenant. Forbidden while ANY booking
+        # references it — including cancelled and completed ones: they are
+        # history and must stay anchored to the org they were made in.
+        # Matched by the rooms_room_org_guard DB trigger (migration 0007).
         if not self.pk:
             return
         old_org_id = (

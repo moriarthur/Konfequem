@@ -45,9 +45,10 @@ class User(AbstractUser):
         super().clean()
         # Changing a user's organization would silently turn their existing
         # bookings cross-tenant (booking.organization no longer matches
-        # user.organization). Forbidden while bookings exist — matched by
-        # the rooms_user_org_guard DB trigger (migration 0007) for writers
-        # that bypass validation.
+        # user.organization). Forbidden while ANY booking references the
+        # user — including cancelled and completed ones: they are history.
+        # Matched by the rooms_user_org_guard DB trigger (migration 0007)
+        # for writers that bypass validation.
         if not self.pk:
             return
         old_org_id = (
