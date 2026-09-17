@@ -22,15 +22,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config("DJANGO_SECRET_KEY")
 DEBUG = config("DJANGO_DEBUG", default=False, cast=bool)
 
-IS_DOCKER = config("DOCKER", default=False, cast=bool)
-
 ALLOWED_HOSTS = [
     host.strip() for host in os.getenv("ALLOWED_HOSTS", "").split(",") if host.strip()
 ]
 
-if not ALLOWED_HOSTS:
-    if DEBUG or IS_DOCKER:
-        ALLOWED_HOSTS = ["*"]
+# Wildcard fallback ONLY for local debug runs. DOCKER must not enable it:
+# one stray DOCKER=true in a prod env must fail closed (DisallowedHost),
+# not open every host header.
+if not ALLOWED_HOSTS and DEBUG:
+    ALLOWED_HOSTS = ["*"]
 
 # ==== Database configuration ====
 db_url = os.environ.get("DATABASE_URL") or config("DATABASE_URL", default=None)
