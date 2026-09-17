@@ -12,7 +12,8 @@ import Logo from "../components/Logo";
 import { Heading, Text } from "../components/ui/Typography";
 import { StatCardSkeleton } from "../components/ui/Skeleton";
 import { DateTime } from "luxon";
-import { PaginatedResponse, Room } from "../types";
+import { Room } from "../types";
+import { fetchAllPages } from "../utils/pagination";
 
 interface UserStats {
   totalBookings: number;
@@ -95,15 +96,10 @@ export default function ProfilePage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [bookingsData, roomsData] = await Promise.all([
-          authFetch("/api/bookings/"),
-          authFetch("/api/rooms/"),
+        const [bookings, rooms] = await Promise.all([
+          fetchAllPages<BookingData>(authFetch, "/api/bookings/"),
+          fetchAllPages<Room>(authFetch, "/api/rooms/"),
         ]);
-
-        const bookingsResp = bookingsData as PaginatedResponse<BookingData>;
-        const roomsResp = roomsData as PaginatedResponse<Room>;
-        const bookings = bookingsResp.results || [];
-        const rooms = roomsResp.results || [];
 
         const now = DateTime.now().setZone(OFFICE_TIMEZONE);
         const current = bookings.filter(
@@ -114,10 +110,10 @@ export default function ProfilePage() {
         ).length;
 
         setStats({
-          totalBookings: bookingsResp.count || bookings.length,
+          totalBookings: bookings.length,
           currentBookings: current,
           upcomingBookings: upcoming,
-          totalRooms: roomsResp.count || rooms.length,
+          totalRooms: rooms.length,
         });
       } catch (err) {
         logError("Error fetching profile data:", err);
@@ -198,7 +194,10 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!isAdmin) return;
-    authFetch("/api/org/members/")
+    fetchAllPages<{ id: number; username: string; email: string; role: string; first_name: string; last_name: string }>(
+      authFetch,
+      "/api/org/members/"
+    )
       .then((data) => setMembers(data as typeof members))
       .catch(() => {});
   }, [isAdmin, authFetch]);

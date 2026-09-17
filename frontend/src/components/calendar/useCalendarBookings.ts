@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useAlert } from "../../context/AlertContext";
 import { error as logError } from "../../utils/logger";
 import { OFFICE_TIMEZONE } from "../../utils/bookingUtils";
+import { fetchAllPages } from "../../utils/pagination";
 
 export interface CalendarBooking {
   id: number;
@@ -73,11 +74,11 @@ export function useCalendarBookings(currentMonth: DateTime) {
         // current/next detection.
         const [availabilityData, allBookingsData] = await Promise.all([
           authFetch(`/api/availability/?month=${monthStr}`),
-          authFetch("/api/bookings/"),
+          fetchAllPages<CalendarBooking>(authFetch, "/api/bookings/"),
         ]);
         if (!isMountedRef.current) return;
         setBookings(extractResults(availabilityData));
-        setAllBookings(extractResults(allBookingsData));
+        setAllBookings(allBookingsData);
       } catch (err) {
         if (isMountedRef.current) {
           logError("Error fetching bookings:", err);
@@ -115,12 +116,11 @@ export function useCalendarBookings(currentMonth: DateTime) {
   // Refresh helper
   const refreshBookings = async () => {
     const monthStr = currentMonth.toFormat("yyyy-MM");
-    const [availabilityData, allBookingsData] = await Promise.all([
+    const [availabilityData, newAllBookings] = await Promise.all([
       authFetch(`/api/availability/?month=${monthStr}`),
-      authFetch("/api/bookings/"),
+      fetchAllPages<CalendarBooking>(authFetch, "/api/bookings/"),
     ]);
     const newBookings = extractResults(availabilityData);
-    const newAllBookings = extractResults(allBookingsData);
     setBookings(newBookings);
     setAllBookings(newAllBookings);
     return { newBookings, newAllBookings };

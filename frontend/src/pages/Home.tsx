@@ -13,7 +13,8 @@ import { Skeleton, StatCardSkeleton, BookingListSkeleton } from "../components/u
 import EmptyState from "../components/ui/EmptyState";
 import BookingDetailsModal from "../components/booking/BookingDetailsModal";
 import { DateTime } from "luxon";
-import { Room, PaginatedResponse } from "../types";
+import { Room } from "../types";
+import { fetchAllPages } from "../utils/pagination";
 
 function roomDisplayName(room: number | { id: number } | undefined): string {
   if (!room) return "Room";
@@ -64,12 +65,11 @@ export default function Home() {
   };
 
   const refreshBookings = () => {
-    authFetch("/api/bookings/")
-      .then(data => {
-        const resp = data as PaginatedResponse<BookingData>;
+    fetchAllPages<BookingData>(authFetch, "/api/bookings/")
+      .then(bookings => {
         // Cancelled bookings are history — Home's lists and stats are about
         // what is actually happening, so they stay calendar-only.
-        setBookings((resp.results || []).filter(b => b.status !== "cancelled"));
+        setBookings(bookings.filter(b => b.status !== "cancelled"));
       })
       .catch(logError);
   };
@@ -97,11 +97,10 @@ export default function Home() {
     const fetchData = async () => {
       try {
         const fetch = authFetchRef.current!;
-        const roomsResponse = await fetch("/api/rooms/") as PaginatedResponse<Room>;
-        setRooms(roomsResponse.results || []);
+        setRooms(await fetchAllPages<Room>(fetch, "/api/rooms/"));
 
-        const bookingsResponse = await fetch("/api/bookings/") as PaginatedResponse<BookingData>;
-        setBookings((bookingsResponse.results || []).filter(b => b.status !== "cancelled"));
+        const bookings = await fetchAllPages<BookingData>(fetch, "/api/bookings/");
+        setBookings(bookings.filter(b => b.status !== "cancelled"));
       } catch (err) {
         logError("Error fetching data:", err);
         // 429 already surfaces a toast from authFetch; keep loaded data

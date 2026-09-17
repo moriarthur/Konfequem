@@ -11,7 +11,8 @@ import RoomFormModal from "../components/RoomFormModal";
 import { Heading, Text } from "../components/ui/Typography";
 import { RoomCardSkeleton } from "../components/ui/Skeleton";
 import EmptyState from "../components/ui/EmptyState";
-import { Room, Feature, ActiveFilters, PaginatedResponse } from "../types";
+import { Room, Feature, ActiveFilters } from "../types";
+import { fetchAllPages } from "../utils/pagination";
 import { BookingData } from "../utils/bookingUtils";
 import { isOrgAdmin } from "../utils/roles";
 
@@ -56,17 +57,14 @@ export default function RoomsPage() {
         setLoading(true);
         const fetch = authFetchRef.current!;
         const [roomsData, featuresData, bookingsData] = await Promise.all([
-          fetch("/api/rooms/"),
-          fetch("/api/room-features/"),
-          fetch("/api/bookings/"),
+          fetchAllPages<Room>(fetch, "/api/rooms/"),
+          fetchAllPages<Feature>(fetch, "/api/room-features/"),
+          fetchAllPages<BookingData>(fetch, "/api/bookings/"),
         ]);
-        setRooms((roomsData as PaginatedResponse<Room>).results || (roomsData as Room[]));
-        setFeatures((featuresData as PaginatedResponse<Feature>).results || (featuresData as Feature[]));
+        setRooms(roomsData);
+        setFeatures(featuresData);
         // Cancelled bookings are history — availability logic stays time-only.
-        setBookings(
-          ((bookingsData as PaginatedResponse<BookingData>).results || (bookingsData as BookingData[]))
-            .filter(b => b.status !== "cancelled")
-        );
+        setBookings(bookingsData.filter(b => b.status !== "cancelled"));
       } catch (err) {
         logError("Error fetching data:", err);
         // 429 already surfaces a toast from authFetch; keep loaded data
@@ -95,8 +93,8 @@ export default function RoomsPage() {
 
   const handleBookingCreated = async () => {
     try {
-      const bookingsData = await authFetch("/api/bookings/");
-      setBookings((bookingsData as PaginatedResponse<BookingData>).results || (bookingsData as BookingData[]));
+      const bookingsData = await fetchAllPages<BookingData>(authFetch, "/api/bookings/");
+      setBookings(bookingsData);
       setShowBookingForm(false);
       setSelectedRoomId(null);
       setIsFormValid(false);
@@ -107,14 +105,11 @@ export default function RoomsPage() {
 
   const refreshData = async () => {
     const [roomsData, bookingsData] = await Promise.all([
-      authFetch("/api/rooms/"),
-      authFetch("/api/bookings/"),
+      fetchAllPages<Room>(authFetch, "/api/rooms/"),
+      fetchAllPages<BookingData>(authFetch, "/api/bookings/"),
     ]);
-    setRooms((roomsData as PaginatedResponse<Room>).results || (roomsData as Room[]));
-    setBookings(
-      ((bookingsData as PaginatedResponse<BookingData>).results || (bookingsData as BookingData[]))
-        .filter(b => b.status !== "cancelled")
-    );
+    setRooms(roomsData);
+    setBookings(bookingsData.filter(b => b.status !== "cancelled"));
   };
 
   const closeBookingSheet = () => {
