@@ -15,6 +15,11 @@ class RoomFeatureSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "icon"]
 
 
+def _berlin_iso(dt):
+    """ISO string in the project timezone (Europe/Berlin)."""
+    return dt.astimezone(timezone.get_default_timezone()).isoformat()
+
+
 class BookingSerializer(serializers.ModelSerializer):
     room_name = serializers.CharField(source="room.name", read_only=True)
     user = serializers.PrimaryKeyRelatedField(read_only=True)
@@ -27,9 +32,8 @@ class BookingSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         """Convert times to Berlin timezone for consistent display"""
         ret = super().to_representation(instance)
-        berlin_tz = timezone.get_default_timezone()
-        ret["start_time"] = instance.start_time.astimezone(berlin_tz).isoformat()
-        ret["end_time"] = instance.end_time.astimezone(berlin_tz).isoformat()
+        ret["start_time"] = _berlin_iso(instance.start_time)
+        ret["end_time"] = _berlin_iso(instance.end_time)
         ret["status"] = instance.current_status
         return ret
 
@@ -122,6 +126,27 @@ class BookingSerializer(serializers.ModelSerializer):
         return data
 
     # User is assigned in the viewset's perform_create
+
+
+class AvailabilitySerializer(serializers.ModelSerializer):
+    """Org-wide busy slots: minimal fields, no personal data.
+
+    Exposes id/room/room_name/times + computed status. Deliberately omits
+    `user` — the calendar and conflict pre-checks only need occupancy.
+    """
+
+    room_name = serializers.CharField(source="room.name", read_only=True)
+    status = serializers.CharField(source="current_status", read_only=True)
+
+    class Meta:
+        model = Booking
+        fields = ["id", "room", "room_name", "start_time", "end_time", "status"]
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret["start_time"] = _berlin_iso(instance.start_time)
+        ret["end_time"] = _berlin_iso(instance.end_time)
+        return ret
 
 
 class RoomSerializer(serializers.ModelSerializer):

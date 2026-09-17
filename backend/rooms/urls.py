@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     RoomViewSet,
     BookingViewSet,
+    AvailabilityView,
     CurrentUserView,
     RoomFeatureViewSet,
     ChangePasswordView,
@@ -39,6 +40,7 @@ urlpatterns = [
         name="token_blacklist",
     ),
     path("users/me/", CurrentUserView.as_view(), name="current_user"),
+    path("availability/", AvailabilityView.as_view(), name="availability"),
     path(
         "users/change-password/", ChangePasswordView.as_view(), name="change_password"
     ),

@@ -24,6 +24,7 @@ from .serializers import (
     RoomSerializer,
     RoomWriteSerializer,
     BookingSerializer,
+    AvailabilitySerializer,
     RoomFeatureSerializer,
     RegisterSerializer,
     JoinSerializer,
@@ -231,6 +232,68 @@ class BookingViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("You can only delete your own bookings")
         _check_booking_modifiable(instance, "delete")
         return super().perform_destroy(instance)
+
+
+class AvailabilityView(APIView):
+    """Org-wide busy slots for the calendar and conflict pre-checks.
+
+    GET /api/availability/?month=YYYY-MM[&room=<id>]
+
+    Returns minimal, non-personal fields (id, room, room_name, times,
+    computed status) for every active booking in the requester's
+    organization. Cancelled bookings are excluded — they are history,
+    not occupancy. Strict month validation; a foreign or nonexistent
+    room yields 404 (no existence leak). Users without an organization
+    (e.g. platform staff) get an empty list.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if not user.organization_id:
+            return Response([])
+
+        month_str = request.query_params.get("month")
+        try:
+            parts = (month_str or "").split("-")
+            if len(parts) != 2:
+                raise ValueError("Month parameter must be in YYYY-MM format")
+            year, month = map(int, parts)
+            if not (1 <= month <= 12) or year < 2020 or year > 2100:
+                raise ValueError("Invalid year or month values")
+        except (ValueError, TypeError):
+            raise ValidationError(
+                f"Invalid month parameter '{month_str}': must be YYYY-MM."
+            )
+
+        room = None
+        room_id = request.query_params.get("room")
+        if room_id is not None:
+            if not room_id.isdigit():
+                raise ValidationError(f"Invalid room parameter '{room_id}'.")
+            # Scoped to the org on purpose: a foreign or unknown room is a
+            # plain 404 either way.
+            room = Room.objects.filter(
+                pk=room_id, organization=user.organization
+            ).first()
+            if room is None:
+                return Response({"error": "Room not found."}, status=404)
+
+        queryset = (
+            Booking.objects.filter(
+                organization=user.organization,
+                start_time__year=year,
+                start_time__month=month,
+            )
+            .exclude(status="cancelled")
+            .select_related("room")
+            .order_by("start_time", "room_id")
+        )
+        if room is not None:
+            queryset = queryset.filter(room=room)
+
+        return Response(AvailabilitySerializer(queryset, many=True).data)
 
 
 class CurrentUserView(APIView):

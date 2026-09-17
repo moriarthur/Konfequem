@@ -1142,6 +1142,188 @@ class TestBookingCancel:
 
 
 @pytest.mark.integration
+class TestAvailabilityView:
+    """GET /api/availability/ — org-wide busy slots, no personal data."""
+
+    def _get(self, client, month, room=None):
+        url = f"/api/availability/?month={month}"
+        if room is not None:
+            url += f"&room={room}"
+        return client.get(url)
+
+    def test_requires_auth(self, db, api_client):
+        response = api_client.get("/api/availability/?month=2026-09")
+        assert response.status_code == 401
+
+    def test_month_required(self, db, authenticated_api_client):
+        response = authenticated_api_client.get("/api/availability/")
+        assert response.status_code == 400
+
+    def test_month_invalid_format(self, db, authenticated_api_client):
+        for bad in ("202609", "bad", "2026-9-x"):
+            response = self._get(authenticated_api_client, bad)
+            assert response.status_code == 400, bad
+
+    def test_month_out_of_range(self, db, authenticated_api_client):
+        response = self._get(authenticated_api_client, "2026-13")
+        assert response.status_code == 400
+
+    def test_room_param_non_numeric(self, db, authenticated_api_client):
+        response = self._get(authenticated_api_client, "2026-09", room="abc")
+        assert response.status_code == 400
+
+    def test_returns_org_wide_bookings_without_personal_data(
+        self,
+        db,
+        authenticated_api_client,
+        user,
+        room,
+        organization,
+        future_start_time,
+    ):
+        """The whole point: a colleague's booking shows up, without user info."""
+        colleague = User.objects.create_user(
+            username="colleague",
+            email="colleague@example.com",
+            password="colleague-pass-123",
+            organization=organization,
+        )
+        Booking.objects.create(
+            room=room,
+            user=colleague,
+            organization=organization,
+            start_time=future_start_time,
+            end_time=future_start_time + timedelta(hours=1),
+            date=future_start_time.date(),
+        )
+
+        response = self._get(
+            authenticated_api_client, future_start_time.strftime("%Y-%m")
+        )
+
+        assert response.status_code == 200
+        assert isinstance(response.data, list)
+        assert len(response.data) == 1
+        item = response.data[0]
+        assert set(item.keys()) == {
+            "id",
+            "room",
+            "room_name",
+            "start_time",
+            "end_time",
+            "status",
+        }
+        assert item["room"] == room.id
+        assert item["room_name"] == room.name
+
+    def test_excludes_cancelled(
+        self, db, authenticated_api_client, booking, future_start_time
+    ):
+        booking.status = "cancelled"
+        booking.save()
+
+        response = self._get(
+            authenticated_api_client, future_start_time.strftime("%Y-%m")
+        )
+
+        assert response.status_code == 200
+        assert response.data == []
+
+    def test_scoped_to_one_month(
+        self,
+        db,
+        authenticated_api_client,
+        user,
+        room,
+        organization,
+        future_start_time,
+    ):
+        other_month = future_start_time + timedelta(days=32)
+        Booking.objects.create(
+            room=room,
+            user=user,
+            organization=organization,
+            start_time=other_month,
+            end_time=other_month + timedelta(hours=1),
+            date=other_month.date(),
+        )
+
+        response = self._get(
+            authenticated_api_client, future_start_time.strftime("%Y-%m")
+        )
+
+        assert response.status_code == 200
+        assert response.data == []
+
+    def test_room_filter(
+        self,
+        db,
+        authenticated_api_client,
+        user,
+        room,
+        small_room,
+        organization,
+        future_start_time,
+    ):
+        for target in (room, small_room):
+            Booking.objects.create(
+                room=target,
+                user=user,
+                organization=organization,
+                start_time=future_start_time,
+                end_time=future_start_time + timedelta(hours=1),
+                date=future_start_time.date(),
+            )
+
+        response = self._get(
+            authenticated_api_client,
+            future_start_time.strftime("%Y-%m"),
+            room=small_room.id,
+        )
+
+        assert response.status_code == 200
+        assert [item["room"] for item in response.data] == [small_room.id]
+
+    def test_foreign_room_404(self, db, authenticated_api_client, future_start_time):
+        """A room from another org is a plain 404 — no existence leak."""
+        foreign_org = Organization.objects.create(
+            name="Foreign Org", slug="foreign-org-avail"
+        )
+        foreign_room = Room.objects.create(
+            name="Foreign Room", organization=foreign_org, capacity=4
+        )
+
+        response = self._get(
+            authenticated_api_client,
+            future_start_time.strftime("%Y-%m"),
+            room=foreign_room.id,
+        )
+
+        assert response.status_code == 404
+
+    def test_nonexistent_room_404(self, db, authenticated_api_client):
+        response = self._get(authenticated_api_client, "2026-09", room=999999)
+        assert response.status_code == 404
+
+    def test_user_without_organization_gets_empty_list(self, db, api_client):
+        """Org-less accounts (platform staff) see no availability data."""
+        orgless = User.objects.create_user(
+            username="orgless",
+            email="orgless@example.com",
+            password="orgless-pass-123",
+            is_staff=True,
+            organization=None,
+        )
+        refresh = RefreshToken.for_user(orgless)
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+
+        response = api_client.get("/api/availability/?month=2026-09")
+
+        assert response.status_code == 200
+        assert response.data == []
+
+
+@pytest.mark.integration
 class TestBookingTenantIsolation:
     """A booking must never target a room from another organization."""
 

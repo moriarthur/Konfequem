@@ -46,6 +46,9 @@ cd frontend && npm run dev
   the user's org; staff/platform_admin cannot write bookings via API — Django admin only)
 - `POST /api/bookings/<id>/cancel/` — soft cancel (row stays for history, slot
   frees; future-only, idempotent; cancelled excluded from overlap checks + DB constraint)
+- `GET /api/availability/?month=YYYY-MM[&room=<id>]` — org-wide busy slots for
+  calendar + conflict pre-checks (minimal fields, no personal data; cancelled
+  excluded; strict month validation; foreign/unknown room → 404)
 - `GET /api/org/members/` — list org members (org_admin only)
 - `POST /api/org/invite/regenerate/` — rotate invite key (org_admin only)
 
