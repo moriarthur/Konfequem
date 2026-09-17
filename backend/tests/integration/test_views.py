@@ -1031,10 +1031,10 @@ class TestBookingCancel:
         response = api_client.post(f"/api/bookings/{booking.id}/cancel/")
         assert response.status_code == 401
 
-    def test_cancel_other_users_booking_hidden(self, db, staff_api_client, booking):
-        """Queryset is user-scoped: someone else's booking is a 404."""
+    def test_cancel_by_staff_forbidden(self, db, staff_api_client, booking):
+        """Staff writes are denied outright — bookings are managed via admin."""
         response = staff_api_client.post(f"/api/bookings/{booking.id}/cancel/")
-        assert response.status_code == 404
+        assert response.status_code == 403
 
     def test_cancel_ended_booking_forbidden(
         self, db, authenticated_api_client, user, room, organization
@@ -1228,3 +1228,70 @@ class TestBookingTenantIsolation:
         )
 
         assert response.status_code == 201
+
+    # ========================================================================
+    # Staff API policy: staff/platform admins read but never write bookings
+    # via the API — they manage them via Django admin. This also closes the
+    # staff bypass of the tenant check above.
+    # ========================================================================
+
+    def test_staff_create_booking_forbidden(
+        self, db, staff_api_client, room, future_start_time
+    ):
+        response = staff_api_client.post(
+            "/api/bookings/",
+            {
+                "room": room.id,
+                "start_time": future_start_time.isoformat(),
+                "end_time": (future_start_time + timedelta(hours=1)).isoformat(),
+            },
+            format="json",
+        )
+
+        assert response.status_code == 403
+        assert not Booking.objects.exists()
+
+    def test_staff_update_own_booking_forbidden(
+        self, db, staff_api_client, staff_user, room, future_start_time
+    ):
+        booking = Booking.objects.create(
+            room=room,
+            user=staff_user,
+            organization=room.organization,
+            start_time=future_start_time,
+            end_time=future_start_time + timedelta(hours=2),
+            date=future_start_time.date(),
+        )
+
+        response = staff_api_client.patch(
+            f"/api/bookings/{booking.id}/",
+            {"start_time": (future_start_time + timedelta(hours=3)).isoformat()},
+            format="json",
+        )
+
+        assert response.status_code == 403
+        booking.refresh_from_db()
+        assert booking.start_time == future_start_time
+
+    def test_staff_delete_own_booking_forbidden(
+        self, db, staff_api_client, staff_user, room, future_start_time
+    ):
+        booking = Booking.objects.create(
+            room=room,
+            user=staff_user,
+            organization=room.organization,
+            start_time=future_start_time,
+            end_time=future_start_time + timedelta(hours=2),
+            date=future_start_time.date(),
+        )
+
+        response = staff_api_client.delete(f"/api/bookings/{booking.id}/")
+
+        assert response.status_code == 403
+        assert Booking.objects.filter(pk=booking.pk).exists()
+
+    def test_staff_can_still_list_bookings(self, db, staff_api_client):
+        """Reads stay open (the queryset is user-scoped anyway)."""
+        response = staff_api_client.get("/api/bookings/")
+
+        assert response.status_code == 200

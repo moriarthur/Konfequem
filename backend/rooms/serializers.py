@@ -88,13 +88,11 @@ class BookingSerializer(serializers.ModelSerializer):
         # --- Tenant isolation ---
         # A booking must target a room in the requester's organization —
         # on create and on update (PATCH/PUT can swap the room). Staff
-        # users keep their read-all access; they manage data via Django admin.
+        # writes never reach this point: StaffReadOnly denies them at the
+        # viewset (staff manage bookings via Django admin).
         if room:
             request_user = self.context["request"].user
-            if (
-                not request_user.is_staff
-                and room.organization_id != request_user.organization_id
-            ):
+            if room.organization_id != request_user.organization_id:
                 errors.append("You can only book rooms in your own organization.")
 
         # --- Logical validation ---

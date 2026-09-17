@@ -19,7 +19,7 @@ from rest_framework_simplejwt.views import (
 
 from .models import Room, Booking, RoomFeature
 from .models_users import Organization, User
-from .permissions import IsOrgAdminOrReadOnly
+from .permissions import IsOrgAdminOrReadOnly, StaffReadOnly
 from .serializers import (
     RoomSerializer,
     RoomWriteSerializer,
@@ -128,10 +128,14 @@ class RoomFeatureViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class BookingViewSet(viewsets.ModelViewSet):
-    """CRUD view for bookings; user must be authenticated."""
+    """CRUD view for bookings; user must be authenticated.
+
+    Writes are denied for staff/platform admins (StaffReadOnly) — they
+    manage bookings via Django admin.
+    """
 
     serializer_class = BookingSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, StaffReadOnly]
 
     def get_queryset(self):
         user = self.request.user

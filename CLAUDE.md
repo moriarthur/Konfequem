@@ -42,7 +42,8 @@ cd frontend && npm run dev
 - `/api/rooms/` — rooms (org-scoped, auth required; create/update/delete org_admin only,
   deletion blocked while future bookings exist; write serializer takes feature PKs)
 - `/api/room-features/` — room features (read-only)
-- `/api/bookings/` — bookings CRUD (authenticated, org-scoped)
+- `/api/bookings/` — bookings CRUD (authenticated, org-scoped; room must belong to
+  the user's org; staff/platform_admin cannot write bookings via API — Django admin only)
 - `POST /api/bookings/<id>/cancel/` — soft cancel (row stays for history, slot
   frees; future-only, idempotent; cancelled excluded from overlap checks + DB constraint)
 - `GET /api/org/members/` — list org members (org_admin only)
