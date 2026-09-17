@@ -1008,6 +1008,77 @@ class TestBookingOverlapConstraint:
 
 
 @pytest.mark.integration
+@pytest.mark.skipif(
+    connection.vendor != "postgresql",
+    reason="tenant trigger is PostgreSQL-only (rooms migration 0006)",
+)
+class TestBookingTenantTrigger:
+    """DB-level backstop behind Booking.clean()'s tenant consistency check.
+
+    Plain ORM writes bypass model validation — this trigger rejects
+    cross-tenant rows no matter who writes them. Same skip logic as
+    TestBookingOverlapConstraint: runs only against PostgreSQL.
+    """
+
+    def _mismatched_room_booking(self, user, organization, foreign_room):
+        start = timezone.now() + timedelta(days=1)
+        return Booking.objects.create(
+            room=foreign_room,
+            user=user,
+            organization=organization,
+            start_time=start,
+            end_time=start + timedelta(hours=1),
+            date=start.date(),
+        )
+
+    def test_trigger_rejects_room_from_other_organization(self, db, user, organization):
+        foreign_org = Organization.objects.create(
+            name="Trigger Foreign", slug="trigger-foreign"
+        )
+        foreign_room = Room.objects.create(
+            name="Trigger Foreign Room", organization=foreign_org, capacity=4
+        )
+
+        with pytest.raises(IntegrityError):
+            self._mismatched_room_booking(user, organization, foreign_room)
+
+    def test_trigger_rejects_user_from_other_organization(self, db, user, room):
+        foreign_org = Organization.objects.create(
+            name="Trigger Foreign", slug="trigger-foreign-2"
+        )
+        colleague = User.objects.create_user(
+            username="trigger-colleague",
+            email="trigger-colleague@example.com",
+            password="trigger-pass-123",
+            organization=foreign_org,
+        )
+        start = timezone.now() + timedelta(days=1)
+
+        with pytest.raises(IntegrityError):
+            Booking.objects.create(
+                room=room,
+                user=colleague,
+                organization=user.organization,
+                start_time=start,
+                end_time=start + timedelta(hours=1),
+                date=start.date(),
+            )
+
+    def test_trigger_allows_consistent_row(self, db, user, room, organization):
+        start = timezone.now() + timedelta(days=1)
+        booking = Booking.objects.create(
+            room=room,
+            user=user,
+            organization=organization,
+            start_time=start,
+            end_time=start + timedelta(hours=1),
+            date=start.date(),
+        )
+
+        assert booking.pk is not None
+
+
+@pytest.mark.integration
 class TestBookingCancel:
     """Soft cancel: row stays, slot frees, rules mirror delete."""
 
