@@ -70,12 +70,15 @@ export async function fetchMonthBookings(
   bookingCache.loading.add(monthKey);
 
   try {
+    // Org-wide availability (not personal /bookings/): conflicts must be
+    // checked against everyone's bookings, not just the user's own.
     const response = await authFetch(
-      `/api/bookings/?room=${roomId}&month=${monthStart.toFormat("yyyy-MM")}`
+      `/api/availability/?room=${roomId}&month=${monthStart.toFormat("yyyy-MM")}`
     );
 
     const rawBookings = (response.results || response) as BookingData[];
-    // Cancelled bookings don't block slots — keep them out of the cache.
+    // Cancelled bookings don't block slots — the server already excludes
+    // them; the filter stays as defense for stale mock/edge data.
     const bookings = rawBookings.filter((booking) => booking.status !== "cancelled");
 
     const bookingsByDate = new Map<string, BookingData[]>();

@@ -398,6 +398,35 @@ export const handlers = [
     ])
   }),
 
+  // Org-wide availability (minimal fields, no personal data, no cancelled)
+  http.get('/api/availability/', ({ request }) => {
+    const url = new URL(request.url)
+    const room = url.searchParams.get('room')
+
+    const items = [
+      {
+        id: 1,
+        room: 1,
+        room_name: 'Conference Room A',
+        start_time: '2025-01-28T10:00:00+01:00',
+        end_time: '2025-01-28T12:00:00+01:00',
+        status: 'upcoming',
+      },
+      {
+        id: 2,
+        room: 2,
+        room_name: 'Conference Room B',
+        start_time: '2025-01-29T13:00:00+01:00',
+        end_time: '2025-01-29T14:00:00+01:00',
+        status: 'upcoming',
+      },
+    ]
+
+    return createJsonResponse(
+      room ? items.filter((item) => item.room === Number(room)) : items
+    )
+  }),
+
   // Create booking
   http.post('/api/bookings/', async ({ request }) => {
     const body = await request.json() as { room: number; start_time: string; end_time: string }

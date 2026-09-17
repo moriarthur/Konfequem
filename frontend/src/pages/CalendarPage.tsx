@@ -15,7 +15,7 @@ export default function CalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(DateTime.now().setZone(OFFICE_TIMEZONE));
 
   const {
-    bookings, loading,
+    bookings, myBookingIds, loading,
     expandedDay, setExpandedDay,
     editingBooking, setEditingBooking,
     deleteConfirmBooking, setDeleteConfirmBooking,
@@ -171,7 +171,7 @@ export default function CalendarPage() {
                       booking={booking}
                       isNext={nextBooking?.id === booking.id}
                       isEditing={editingBooking?.id === booking.id}
-                      canEdit={(() => { if (booking.status === "cancelled") return false; const now = DateTime.now().setZone(OFFICE_TIMEZONE); const end = DateTime.fromISO(booking.end_time).setZone(OFFICE_TIMEZONE); const start = DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE); return !(end < now) && !(now >= start && now < end); })()}
+                      canEdit={(() => { if (!myBookingIds.has(booking.id)) return false; if (booking.status === "cancelled") return false; const now = DateTime.now().setZone(OFFICE_TIMEZONE); const end = DateTime.fromISO(booking.end_time).setZone(OFFICE_TIMEZONE); const start = DateTime.fromISO(booking.start_time).setZone(OFFICE_TIMEZONE); return !(end < now) && !(now >= start && now < end); })()}
                       editForm={editingBooking?.id === booking.id ? editForm : { start_time: "", end_time: "" }}
                       saving={saving}
                       validationErrors={validationErrors}

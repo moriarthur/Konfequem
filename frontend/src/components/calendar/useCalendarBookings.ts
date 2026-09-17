@@ -68,11 +68,16 @@ export function useCalendarBookings(currentMonth: DateTime) {
       try {
         setLoading(true);
         const monthStr = currentMonth.toFormat("yyyy-MM");
-        const bookingsData = await authFetch(`/api/bookings/?month=${monthStr}`);
-        if (isMountedRef.current) setBookings(extractResults(bookingsData));
-
-        const allBookingsData = await authFetch("/api/bookings/");
-        if (isMountedRef.current) setAllBookings(extractResults(allBookingsData));
+        // Org-wide busy slots drive the calendar; the personal list stays
+        // for ownership ("mine" vs colleagues'), own cancelled history and
+        // current/next detection.
+        const [availabilityData, allBookingsData] = await Promise.all([
+          authFetch(`/api/availability/?month=${monthStr}`),
+          authFetch("/api/bookings/"),
+        ]);
+        if (!isMountedRef.current) return;
+        setBookings(extractResults(availabilityData));
+        setAllBookings(extractResults(allBookingsData));
       } catch (err) {
         if (isMountedRef.current) {
           logError("Error fetching bookings:", err);
@@ -90,14 +95,31 @@ export function useCalendarBookings(currentMonth: DateTime) {
     return () => { isMountedRef.current = false };
   }, [authFetch, isAuthenticated, currentMonth]);
 
+  // Bookings the logged-in user owns (across all months) — the ownership
+  // gate for edit/cancel, since `bookings` now shows the whole org.
+  const myBookingIds = useMemo(
+    () => new Set((allBookings || []).map(b => b.id)),
+    [allBookings]
+  );
+
+  // Merged render list: org-wide busy slots + the user's own cancelled
+  // bookings (owner-only history — availability excludes cancelled).
+  const mergedBookings = useMemo(() => {
+    const myCancelled = (allBookings || []).filter(
+      b => b?.start_time && b.status === "cancelled" &&
+        DateTime.fromISO(b.start_time).hasSame(currentMonth, "month")
+    );
+    return [...(bookings || []), ...myCancelled];
+  }, [bookings, allBookings, currentMonth]);
+
   // Refresh helper
   const refreshBookings = async () => {
     const monthStr = currentMonth.toFormat("yyyy-MM");
-    const [bookingsData, allBookingsData] = await Promise.all([
-      authFetch(`/api/bookings/?month=${monthStr}`),
+    const [availabilityData, allBookingsData] = await Promise.all([
+      authFetch(`/api/availability/?month=${monthStr}`),
       authFetch("/api/bookings/"),
     ]);
-    const newBookings = extractResults(bookingsData);
+    const newBookings = extractResults(availabilityData);
     const newAllBookings = extractResults(allBookingsData);
     setBookings(newBookings);
     setAllBookings(newAllBookings);
@@ -122,6 +144,7 @@ export function useCalendarBookings(currentMonth: DateTime) {
     if (isPast) { showAlert("Cannot edit a booking that has already ended.", { type: "error" }); return; }
     if (isCurrent) { showAlert("Cannot edit a booking that is currently in progress.", { type: "error" }); return; }
     if (booking.status === "cancelled") { showAlert("Cannot edit a cancelled booking.", { type: "error" }); return; }
+    if (!myBookingIds.has(booking.id)) { showAlert("You can only edit your own bookings.", { type: "error" }); return; }
 
     setEditingBooking(booking);
     setEditForm({ start_time: booking.start_time, end_time: booking.end_time });
@@ -153,14 +176,16 @@ export function useCalendarBookings(currentMonth: DateTime) {
     if (start < now) errors.start_time = "Cannot modify booking to start in the past";
 
     const editingRoomId = typeof editingBooking.room === "object" ? editingBooking.room.id : editingBooking.room;
-    const roomBookings = Array.isArray(allBookings) ? allBookings.filter(b => {
+    // Overlap pre-check against the WHOLE organization (merged org-wide
+    // view), not just the user's own bookings.
+    const roomBookings = mergedBookings.filter(b => {
       const bookingRoomId = typeof b.room === "object" ? b.room.id : b.room;
       return (
         bookingRoomId === editingRoomId &&
         b.id !== editingBooking.id &&
         b.status !== "cancelled"
       );
-    }) : [];
+    });
     const hasOverlap = roomBookings.some(b => {
       const bs = DateTime.fromISO(b.start_time).setZone(OFFICE_TIMEZONE);
       const be = DateTime.fromISO(b.end_time).setZone(OFFICE_TIMEZONE);
@@ -228,6 +253,7 @@ export function useCalendarBookings(currentMonth: DateTime) {
     if (booking.status === "cancelled") { showAlert("This booking is already cancelled.", { type: "error" }); return; }
     if (isPast) { showAlert("Cannot cancel a booking that has already ended.", { type: "error" }); return; }
     if (isCurrent) { showAlert("Cannot cancel a booking that is currently in progress.", { type: "error" }); return; }
+    if (!myBookingIds.has(booking.id)) { showAlert("You can only cancel your own bookings.", { type: "error" }); return; }
     setDeleteConfirmBooking(booking);
   };
 
@@ -276,7 +302,9 @@ export function useCalendarBookings(currentMonth: DateTime) {
   }, [allBookings]);
 
   return {
-    bookings, allBookings, loading,
+    // Render list: org-wide busy slots + own cancelled history for this month.
+    bookings: mergedBookings,
+    allBookings, myBookingIds, loading,
     expandedDay, setExpandedDay,
     editingBooking, setEditingBooking,
     deleteConfirmBooking, setDeleteConfirmBooking,
