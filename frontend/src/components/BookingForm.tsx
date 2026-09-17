@@ -111,7 +111,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
     while (current <= endDate) {
       const dateStr = current.toISODate();
       const jsDate = current.toJSDate();
-      const cachedBookings = getCachedBookings(jsDate);
+      const cachedBookings = getCachedBookings(jsDate, roomId);
 
       let isValid = current >= now.startOf("day");
 
@@ -133,7 +133,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
     }
 
     setFilteredDates(newFilteredDates);
-  }, [bookings, minDate, maxDate]);
+  }, [bookings, minDate, maxDate, roomId]);
 
   const isDateDisabledInternal = useCallback(
     (date: Date): boolean => {
@@ -157,7 +157,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
 
   useEffect(() => {
     const date = selectedDate || new Date();
-    if (shouldFetchMonth(date)) {
+    if (shouldFetchMonth(date, roomId)) {
       fetchMonthBookings(date, roomId, authFetch);
     }
   }, [selectedDate, roomId, authFetch]);
@@ -177,7 +177,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
       { keepLocalTime: true }
     );
 
-    const cachedBookings = getCachedBookings(selectedDate);
+    const cachedBookings = getCachedBookings(selectedDate, roomId);
     if (cachedBookings) {
       if (isDayFullyBooked(selectedDateTime, cachedBookings)) {
         setError("This day is fully booked");
@@ -203,7 +203,7 @@ export default function BookingForm({ roomId, onBookingCreated, onClose, onValid
       setBookings(cachedBookings);
       setLoading(false);
     } else {
-      const unsubscribe = subscribeToMonth(selectedDate, (monthData) => {
+      const unsubscribe = subscribeToMonth(selectedDate, roomId, (monthData) => {
         const dateBookings =
           monthData.get(selectedDateTime.toFormat("yyyy-MM-dd")) || [];
         setBookings(dateBookings);

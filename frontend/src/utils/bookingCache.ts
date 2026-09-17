@@ -6,6 +6,9 @@ import type { BookingData } from "./bookingUtils";
 const MAX_CACHE_SIZE = 6;
 const MAX_LISTENERS_PER_MONTH = 10;
 
+// Availability data is per-room, so every cache bucket is keyed by
+// "<roomId>:<yyyy-MM>" — a month-only key leaked Room A's slots into
+// Room B whenever both were opened in the same month.
 interface CacheData {
   data: Map<string, Map<string, BookingData[]>>;
   loading: Set<string>;
@@ -18,17 +21,40 @@ const bookingCache: CacheData = {
   listeners: new Map(),
 };
 
+function monthKey(dateTime: DateTime): string {
+  return dateTime.toFormat("yyyy-MM");
+}
+
+function cacheKey(dateTime: DateTime, roomId: number): string {
+  return `${roomId}:${monthKey(dateTime)}`;
+}
+
+function monthPartOfKey(key: string): string {
+  return key.slice(key.indexOf(":") + 1);
+}
+
+/** Test hook: wipe all cached availability data. */
+export function resetBookingCache(): void {
+  bookingCache.data.clear();
+  bookingCache.loading.clear();
+  bookingCache.listeners.clear();
+}
+
 function cleanupOldestEntries(): void {
   if (bookingCache.data.size <= MAX_CACHE_SIZE) return;
 
   const entries = Array.from(bookingCache.data.entries());
-  entries.sort((a, b) => a[0].localeCompare(b[0]));
+  // Evict by oldest month, not by composite key (room ids would skew a
+  // plain lexicographic sort).
+  entries.sort((a, b) =>
+    monthPartOfKey(a[0]).localeCompare(monthPartOfKey(b[0]))
+  );
 
   const toRemove = entries.slice(0, entries.length - MAX_CACHE_SIZE);
-  toRemove.forEach(([monthKey]) => {
-    bookingCache.data.delete(monthKey);
-    bookingCache.listeners.delete(monthKey);
-    bookingCache.loading.delete(monthKey);
+  toRemove.forEach(([key]) => {
+    bookingCache.data.delete(key);
+    bookingCache.listeners.delete(key);
+    bookingCache.loading.delete(key);
   });
 }
 
@@ -46,15 +72,14 @@ export function hasTimeSlots(date: Date): boolean {
   return checkDate <= maxDate;
 }
 
-function hasMonthData(dateTime: DateTime): boolean {
-  const monthKey = dateTime.toFormat("yyyy-MM");
-  return bookingCache.data.has(monthKey);
+function hasMonthData(dateTime: DateTime, roomId: number): boolean {
+  return bookingCache.data.has(cacheKey(dateTime, roomId));
 }
 
-export function shouldFetchMonth(date: Date): boolean {
+export function shouldFetchMonth(date: Date, roomId: number): boolean {
   const monthStart = DateTime.fromJSDate(date).setZone(OFFICE_TIMEZONE).startOf("month");
-  const monthKey = monthStart.toFormat("yyyy-MM");
-  return !bookingCache.loading.has(monthKey) && !hasMonthData(monthStart);
+  const key = cacheKey(monthStart, roomId);
+  return !bookingCache.loading.has(key) && !hasMonthData(monthStart, roomId);
 }
 
 export async function fetchMonthBookings(
@@ -63,11 +88,11 @@ export async function fetchMonthBookings(
   authFetch: (url: string) => Promise<Record<string, unknown>>
 ): Promise<void> {
   const monthStart = DateTime.fromJSDate(date).setZone(OFFICE_TIMEZONE).startOf("month");
-  const monthKey = monthStart.toFormat("yyyy-MM");
+  const key = cacheKey(monthStart, roomId);
 
-  if (bookingCache.loading.has(monthKey)) return;
+  if (bookingCache.loading.has(key)) return;
 
-  bookingCache.loading.add(monthKey);
+  bookingCache.loading.add(key);
 
   try {
     // Org-wide availability (not personal /bookings/): conflicts must be
@@ -93,34 +118,33 @@ export async function fetchMonthBookings(
       bookingsByDate.get(dateKey)!.push(booking);
     });
 
-    bookingCache.data.set(monthKey, bookingsByDate);
+    bookingCache.data.set(key, bookingsByDate);
 
     cleanupOldestEntries();
 
-    const listeners = bookingCache.listeners.get(monthKey) || [];
+    const listeners = bookingCache.listeners.get(key) || [];
     listeners.forEach((callback) => callback(bookingsByDate));
   } finally {
-    bookingCache.loading.delete(monthKey);
+    bookingCache.loading.delete(key);
   }
 }
 
 export function subscribeToMonth(
   date: Date,
+  roomId: number,
   callback: (data: Map<string, BookingData[]>) => void
 ): () => void {
-  const monthKey = DateTime.fromJSDate(date)
-    .setZone(OFFICE_TIMEZONE)
-    .toFormat("yyyy-MM");
+  const key = cacheKey(DateTime.fromJSDate(date).setZone(OFFICE_TIMEZONE), roomId);
 
-  if (!bookingCache.listeners.has(monthKey)) {
-    bookingCache.listeners.set(monthKey, new Set());
+  if (!bookingCache.listeners.has(key)) {
+    bookingCache.listeners.set(key, new Set());
   }
 
-  const listeners = bookingCache.listeners.get(monthKey)!;
+  const listeners = bookingCache.listeners.get(key)!;
 
   if (listeners.size >= MAX_LISTENERS_PER_MONTH) {
     warn(
-      `Max listeners (${MAX_LISTENERS_PER_MONTH}) reached for month ${monthKey}. Cleanup may be needed.`
+      `Max listeners (${MAX_LISTENERS_PER_MONTH}) reached for ${key}. Cleanup may be needed.`
     );
     return () => {};
   }
@@ -128,23 +152,21 @@ export function subscribeToMonth(
   listeners.add(callback);
 
   return () => {
-    const currentListeners = bookingCache.listeners.get(monthKey);
+    const currentListeners = bookingCache.listeners.get(key);
     if (currentListeners) {
       currentListeners.delete(callback);
       if (currentListeners.size === 0) {
-        bookingCache.listeners.delete(monthKey);
+        bookingCache.listeners.delete(key);
       }
     }
   };
 }
 
-export function getCachedBookings(date: Date): BookingData[] | null {
+export function getCachedBookings(date: Date, roomId: number): BookingData[] | null {
   const dateKey = dateToKey(date);
-  const monthKey = DateTime.fromJSDate(date)
-    .setZone(OFFICE_TIMEZONE)
-    .toFormat("yyyy-MM");
-
-  const monthData = bookingCache.data.get(monthKey);
+  const monthData = bookingCache.data.get(
+    cacheKey(DateTime.fromJSDate(date).setZone(OFFICE_TIMEZONE), roomId)
+  );
   if (!monthData) return null;
 
   return monthData.get(dateKey) || [];
