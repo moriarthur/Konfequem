@@ -71,7 +71,12 @@ Scoped via `ScopedRateThrottle` (`backend/config/settings.py` → `DEFAULT_THROT
 Caveats: throttle counters live in Django's default LocMemCache (per-process). Single gunicorn worker in `backend/entrypoint.sh`; verified on prod 2026-08-27 that effective limits on Render (free tier) still run ~2-4x softer than nominal — buckets split across infra instances/ident variability; a shared cache (Redis) is the real fix if limits ever matter for real. `NUM_PROXIES=1` is set in settings.py (env-overridable) so anon buckets key on the proxy-supplied client IP, not the spoofable full X-Forwarded-For header. In tests, mutate `SimpleRateThrottle.THROTTLE_RATES` in place (class-level snapshot — replacing the settings dict is invisible).
 
 ## Key Business Rules
-- Office hours: 08:00–22:00 Europe/Berlin (CEST/CET aware)
+- Booking time rules (office hours, duration, advance limit) live in ONE place:
+  `backend/rooms/validators.py` (`booking_time_errors`) — used by both
+  `BookingSerializer` (API) and `Booking.clean()` (admin/full_clean). Overlap
+  via `Booking.overlapping()` (cancelled excluded — parity with the DB constraint).
+- Office hours: 08:00–22:00 Europe/Berlin (CEST/CET aware); same-day end rule
+  (overnight slots rejected)
 - Min booking: 15 min, max: 8 hours, max advance: 90 days
 - Overlap detection on both backend and frontend
 - All data scoped to user's organization (except platform_admin)

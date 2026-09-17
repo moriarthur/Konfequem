@@ -7,10 +7,10 @@ from django.core.validators import (
     RegexValidator,
 )
 from django.utils import timezone
-from datetime import timedelta
 from django.db.models import Q
 
 from .models_users import Organization, User  # noqa: F401 — register models with Django
+from .validators import booking_time_errors
 
 
 class RoomFeature(models.Model):
@@ -103,37 +103,46 @@ class Booking(models.Model):
 
     MAX_DAYS_AHEAD = 90
 
+    @staticmethod
+    def overlapping(room, start, end, exclude_pk=None):
+        """Active bookings for the room overlapping [start, end).
+
+        Cancelled bookings are history and don't block — matching the
+        serializer and the partial DB exclusion constraint (migration 0004).
+        """
+        overlapping = (
+            Booking.objects.filter(room=room)
+            .exclude(status="cancelled")
+            .filter(Q(start_time__lt=end) & Q(end_time__gt=start))
+        )
+        if exclude_pk:
+            overlapping = overlapping.exclude(pk=exclude_pk)
+        return overlapping
+
     def clean(self):
         super().clean()
-        now = timezone.now()
+        # Same rules as the API serializer (rooms/validators.py) — the
+        # admin gets office hours and duration limits too, not just the API.
+        errors = {}
+        for field, message in booking_time_errors(
+            self.start_time, self.end_time, max_days_ahead=self.MAX_DAYS_AHEAD
+        ):
+            errors.setdefault(field, []).append(message)
 
-        if self.start_time < now:
-            raise ValidationError({"start_time": "Start time cannot be in the past."})
-        if self.end_time <= self.start_time:
-            raise ValidationError({"end_time": "End time must be after start time."})
-        if self.start_time > now + timedelta(days=self.MAX_DAYS_AHEAD):
-            raise ValidationError(
-                {
-                    "start_time": (
-                        f"Booking cannot be more than "
-                        f"{self.MAX_DAYS_AHEAD} days in advance."
-                    )
-                }
+        if (
+            self.room_id
+            and self.start_time
+            and self.end_time
+            and self.overlapping(
+                self.room, self.start_time, self.end_time, exclude_pk=self.pk
+            ).exists()
+        ):
+            errors.setdefault("non_field_errors", []).append(
+                "This room is already booked for the selected time range."
             )
 
-        overlapping = Booking.objects.filter(
-            room=self.room, organization=self.organization
-        ).filter(Q(start_time__lt=self.end_time) & Q(end_time__gt=self.start_time))
-        if self.pk:
-            overlapping = overlapping.exclude(pk=self.pk)
-        if overlapping.exists():
-            raise ValidationError(
-                {
-                    "non_field_errors": (
-                        "This room is already booked for " "the selected time range."
-                    )
-                }
-            )
+        if errors:
+            raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         if self.start_time:

@@ -3,10 +3,9 @@ from django.utils import timezone
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
-from datetime import timedelta
 from .models import Booking, Room, RoomFeature
 from .models_users import Organization, User
-from django.db.models import Q
+from .validators import booking_time_errors, DEFAULT_MAX_DAYS_AHEAD
 
 
 class RoomFeatureSerializer(serializers.ModelSerializer):
@@ -51,43 +50,21 @@ class BookingSerializer(serializers.ModelSerializer):
 
         now = timezone.now()
 
-        # --- Technical validation ---
+        # --- Technical validation (shared with Booking.clean) ---
         if not start or not end or not room:
             errors.append("All fields are required.")
         else:
-            # Check proper datetime
-            if start >= end:
-                errors.append("End time must be after start time.")
-            if start < now:
-                errors.append("Start time cannot be in the past.")
-
-            # Get Berlin timezone
-            berlin_tz = timezone.get_default_timezone()
-
-            # Ensure times are in Berlin timezone for validation
-            start_local = start.astimezone(berlin_tz)
-            end_local = end.astimezone(berlin_tz)
-
-            # Office hours: 08:00 – 22:00 (Berlin time)
-            # Bookings can start from 08:00 until 21:45 (to end by 22:00)
-            if start_local.hour < 8 or start_local.hour >= 22:
-                errors.append("Bookings must start between 08:00 and 21:45.")
-            if end_local.hour > 22 or (end_local.hour == 22 and end_local.minute > 0):
-                errors.append("Bookings must end by 22:00.")
-
-            # Duration limits: 15 min – 8 hours
-            duration = (end - start).total_seconds() / 60
-            if duration < 15:
-                errors.append("Booking must be at least 15 minutes.")
-            if duration > 8 * 60:
-                errors.append("Booking cannot exceed 8 hours.")
-
-            # Max advance booking
-            max_days = getattr(Booking, "MAX_DAYS_AHEAD", 90)
-            if start > now + timedelta(days=max_days):
-                errors.append(
-                    f"Booking cannot be more than {max_days} days in advance."
+            errors.extend(
+                message
+                for _, message in booking_time_errors(
+                    start,
+                    end,
+                    now=now,
+                    max_days_ahead=getattr(
+                        Booking, "MAX_DAYS_AHEAD", DEFAULT_MAX_DAYS_AHEAD
+                    ),
                 )
+            )
 
         # --- Tenant isolation ---
         # A booking must target a room in the requester's organization —
@@ -105,14 +82,12 @@ class BookingSerializer(serializers.ModelSerializer):
             # simultaneously are caught by the DB exclusion constraint
             # (rooms migration 0002) and surfaced as the same 400 by the
             # viewset's IntegrityError handling.
-            overlapping = (
-                Booking.objects.filter(room=room)
-                .exclude(status="cancelled")
-                .filter(Q(start_time__lt=end) & Q(end_time__gt=start))
-            )
-            if self.instance:
-                overlapping = overlapping.exclude(pk=self.instance.pk)
-            if overlapping.exists():
+            if Booking.overlapping(
+                room,
+                start,
+                end,
+                exclude_pk=self.instance.pk if self.instance else None,
+            ).exists():
                 errors.append(
                     "This room is already booked for the selected time range."
                 )

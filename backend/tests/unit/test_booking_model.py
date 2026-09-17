@@ -3,8 +3,8 @@ Unit tests for Booking model validation.
 
 Tests validate:
 - Past date rejection
-- Duration constraints
-- Overlap prevention
+- Office hours, duration and advance limits (shared validator)
+- Overlap prevention (cancelled bookings don't block)
 - 90-day advance booking limit
 """
 
@@ -16,6 +16,19 @@ from rooms.models import Booking, Room
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+
+
+def berlin_at(days_ahead, hour, minute=0):
+    """Deterministic aware datetime: N days from now at a fixed Berlin hour.
+
+    Booking rules are enforced in Berlin local time, so tests pin the
+    local hour instead of deriving times from "now + timedelta" — those
+    drift in and out of office hours depending on when the suite runs.
+    """
+    local_now = timezone.now().astimezone(timezone.get_default_timezone())
+    return (local_now + timedelta(days=days_ahead)).replace(
+        hour=hour, minute=minute, second=0, microsecond=0
+    )
 
 
 @pytest.mark.unit
@@ -102,11 +115,9 @@ class TestBookingModel:
         assert booking.pk is not None
         assert booking.end_time - booking.start_time == timedelta(hours=2)
 
-    def test_booking_allows_minimum_duration(
-        self, db, user, room, utc_now, organization
-    ):
-        """Test that booking can be very short (e.g., 15 minutes)."""
-        start = utc_now + timedelta(hours=1)
+    def test_booking_allows_minimum_duration(self, db, user, room, organization):
+        """Test that booking can be exactly 15 minutes."""
+        start = berlin_at(1, 10)
         booking = Booking(
             room=room,
             user=user,
@@ -116,15 +127,29 @@ class TestBookingModel:
             organization=organization,
         )
 
-        # Model allows this; serializer enforces the 15-min limit
-        booking.full_clean()  # Should not raise at model level
+        booking.full_clean()  # Should not raise
         assert booking.end_time - booking.start_time == timedelta(minutes=15)
 
-    def test_booking_allows_maximum_duration(
-        self, db, user, room, utc_now, organization
-    ):
-        """Test that booking can be up to 8 hours (max at serializer level)."""
-        start = utc_now + timedelta(hours=1)
+    def test_booking_rejects_short_duration(self, db, user, room, organization):
+        """Test that a sub-15-minute booking is rejected (shared rule)."""
+        start = berlin_at(1, 10)
+        booking = Booking(
+            room=room,
+            user=user,
+            start_time=start,
+            date=start.date(),
+            end_time=start + timedelta(minutes=5),
+            organization=organization,
+        )
+
+        with pytest.raises(ValidationError) as exc_info:
+            booking.full_clean()
+
+        assert "at least 15 minutes" in str(exc_info.value)
+
+    def test_booking_allows_maximum_duration(self, db, user, room, organization):
+        """Test that booking can be up to 8 hours."""
+        start = berlin_at(1, 10)
         booking = Booking(
             room=room,
             user=user,
@@ -134,8 +159,76 @@ class TestBookingModel:
             organization=organization,
         )
 
-        booking.full_clean()  # Model allows this
+        booking.full_clean()  # Should not raise
         assert booking.end_time - booking.start_time == timedelta(hours=8)
+
+    def test_booking_rejects_overlong_duration(self, db, user, room, organization):
+        """Test that a booking longer than 8 hours is rejected (shared rule)."""
+        start = berlin_at(1, 10)
+        booking = Booking(
+            room=room,
+            user=user,
+            start_time=start,
+            date=start.date(),
+            end_time=start + timedelta(hours=9),
+            organization=organization,
+        )
+
+        with pytest.raises(ValidationError) as exc_info:
+            booking.full_clean()
+
+        assert "cannot exceed 8 hours" in str(exc_info.value)
+
+    # ========================================================================
+    # Office Hours Tests (shared validator — previously serializer-only)
+    # ========================================================================
+
+    def test_booking_rejects_start_before_office_hours(
+        self, db, user, room, organization
+    ):
+        booking = Booking(
+            room=room,
+            user=user,
+            start_time=berlin_at(1, 7),
+            date=berlin_at(1, 7).date(),
+            end_time=berlin_at(1, 9),
+            organization=organization,
+        )
+
+        with pytest.raises(ValidationError) as exc_info:
+            booking.full_clean()
+
+        assert "start_time" in exc_info.value.message_dict
+        assert "between 08:00 and 21:45" in str(exc_info.value)
+
+    def test_booking_rejects_end_after_office_hours(self, db, user, room, organization):
+        booking = Booking(
+            room=room,
+            user=user,
+            start_time=berlin_at(1, 21),
+            date=berlin_at(1, 21).date(),
+            end_time=berlin_at(2, 0, minute=30),
+            organization=organization,
+        )
+
+        with pytest.raises(ValidationError) as exc_info:
+            booking.full_clean()
+
+        assert "end_time" in exc_info.value.message_dict
+        assert "end by 22:00" in str(exc_info.value)
+
+    def test_booking_allows_last_possible_slot(self, db, user, room, organization):
+        """21:45 start (min duration) through 22:00 same day is the latest slot."""
+        booking = Booking(
+            room=room,
+            user=user,
+            start_time=berlin_at(1, 21, minute=45),
+            date=berlin_at(1, 21).date(),
+            end_time=berlin_at(1, 22),
+            organization=organization,
+        )
+
+        booking.full_clean()  # Should not raise
 
     # ========================================================================
     # Overlap Prevention Tests
@@ -221,15 +314,24 @@ class TestBookingModel:
             overlapping_booking.full_clean()
 
     def test_booking_allows_non_overlapping_same_day(
-        self, db, user, room, booking, organization
+        self, db, user, room, organization
     ):
         """Test that non-overlapping booking same day is allowed."""
+        first = Booking.objects.create(
+            room=room,
+            user=user,
+            start_time=berlin_at(1, 10),
+            date=berlin_at(1, 10).date(),
+            end_time=berlin_at(1, 12),
+            organization=organization,
+        )
+
         non_overlapping = Booking(
             room=room,
             user=user,
-            start_time=booking.end_time + timedelta(minutes=30),
-            date=(booking.end_time + timedelta(minutes=30)).date(),
-            end_time=booking.end_time + timedelta(hours=2),
+            start_time=berlin_at(1, 12, minute=30),
+            date=berlin_at(1, 12).date(),
+            end_time=berlin_at(1, 14),
             organization=organization,
         )
 
@@ -237,6 +339,7 @@ class TestBookingModel:
         non_overlapping.save()
 
         assert non_overlapping.pk is not None
+        assert first.pk is not None
 
     def test_booking_allows_non_overlapping_different_day(
         self, db, user, room, booking, organization
@@ -284,43 +387,75 @@ class TestBookingModel:
 
     def test_booking_allows_self_overlap_on_update(self, db, user, booking):
         """Test that booking can be updated without overlap conflict with itself."""
+        # Pin office-hours-safe times so the extended end can't cross 22:00
+        # regardless of when the suite runs.
+        booking.start_time = berlin_at(1, 10)
+        booking.end_time = berlin_at(1, 12)
+        booking.save()
         # Simulate updating the booking's end time
-        booking.end_time = booking.end_time + timedelta(minutes=30)
+        booking.end_time = berlin_at(1, 12, minute=30)
         booking.full_clean()  # Should not raise (excludes self)
         booking.save()
 
         # Verify the update worked
         booking.refresh_from_db()
-        assert booking.end_time > booking.start_time + timedelta(hours=2)
+        assert booking.end_time == berlin_at(1, 12, minute=30)
+
+    # ========================================================================
+    # Cancelled Bookings Don't Block (parity with serializer + DB constraint)
+    # ========================================================================
+
+    def test_clean_ignores_cancelled_overlap(self, db, user, room, organization):
+        """A cancelled booking is history — clean() must not treat it as busy."""
+        Booking.objects.create(
+            room=room,
+            user=user,
+            organization=organization,
+            start_time=berlin_at(1, 10),
+            date=berlin_at(1, 10).date(),
+            end_time=berlin_at(1, 11),
+            status="cancelled",
+        )
+
+        rebooking = Booking(
+            room=room,
+            user=user,
+            start_time=berlin_at(1, 10, minute=30),
+            date=berlin_at(1, 10).date(),
+            end_time=berlin_at(1, 11, minute=30),
+            organization=organization,
+        )
+
+        rebooking.full_clean()  # Should not raise (cancelled doesn't block)
 
     # ========================================================================
     # 90-Day Advance Booking Limit Tests
     # ========================================================================
 
-    def test_booking_at_90_day_limit(self, db, user, room, utc_now, organization):
-        """Test that booking exactly 90 days ahead is allowed."""
-        max_date = utc_now + timedelta(days=Booking.MAX_DAYS_AHEAD)
+    def test_booking_at_90_day_limit(self, db, user, room, organization):
+        """Test that a booking just inside the 90-day window is allowed."""
+        # 89 days out at a fixed Berlin hour — always inside the limit and
+        # inside office hours, regardless of when the suite runs.
+        near_max = berlin_at(89, 10)
         booking = Booking(
             room=room,
             user=user,
-            start_time=max_date,
-            date=max_date.date(),
-            end_time=max_date + timedelta(hours=2),
+            start_time=near_max,
+            date=near_max.date(),
+            end_time=near_max + timedelta(hours=2),
             organization=organization,
         )
 
         booking.full_clean()  # Should not raise
-        assert booking.start_time.date() == (utc_now + timedelta(days=90)).date()
 
-    def test_booking_beyond_90_day_limit_rejected(
-        self, db, user, room, utc_now, organization
-    ):
+    def test_booking_beyond_90_day_limit_rejected(self, db, user, room, organization):
         """Test that booking more than 90 days ahead is rejected."""
-        beyond_max = utc_now + timedelta(days=Booking.MAX_DAYS_AHEAD + 1)
+        beyond_max = berlin_at(Booking.MAX_DAYS_AHEAD + 1, 10)
         booking = Booking(
             room=room,
             user=user,
             start_time=beyond_max,
+            date=beyond_max.date(),
             end_time=beyond_max + timedelta(hours=2),
             organization=organization,
         )
@@ -331,15 +466,14 @@ class TestBookingModel:
         assert "start_time" in exc_info.value.message_dict
         assert "90" in str(exc_info.value) or "days" in str(exc_info.value).lower()
 
-    def test_booking_slightly_beyond_90_day_limit(
-        self, db, user, room, utc_now, organization
-    ):
+    def test_booking_slightly_beyond_90_day_limit(self, db, user, room, organization):
         """Test that booking 91 days ahead is rejected."""
-        future = utc_now + timedelta(days=91)
+        future = berlin_at(91, 10)
         booking = Booking(
             room=room,
             user=user,
             start_time=future,
+            date=future.date(),
             end_time=future + timedelta(hours=1),
             organization=organization,
         )
@@ -410,13 +544,13 @@ class TestBookingModel:
     # Edge Cases
     # ========================================================================
 
-    def test_booking_with_midnight_spanning(
-        self, db, user, room, utc_now, organization
-    ):
-        """Test booking that spans across midnight."""
-        # Set start to 23:00 and end to 01:00 next day
-        start = utc_now + timedelta(days=1)
-        start = start.replace(hour=23, minute=0, second=0, microsecond=0)
+    def test_booking_with_midnight_spanning(self, db, user, room, organization):
+        """Overnight bookings are rejected: 22:00 close + same-day end rule.
+
+        The model used to allow these (only the serializer checked office
+        hours) — validation is centralized now, so clean() rejects them.
+        """
+        start = berlin_at(1, 23)
         end = start + timedelta(hours=2)
 
         booking = Booking(
@@ -428,11 +562,11 @@ class TestBookingModel:
             organization=organization,
         )
 
-        booking.full_clean()  # Model allows this; serializer may enforce office hours
-        booking.save()
+        with pytest.raises(ValidationError) as exc_info:
+            booking.full_clean()
 
-        assert booking.start_time.hour == 23
-        assert booking.end_time.hour == 1
+        assert "start_time" in exc_info.value.message_dict
+        assert "end_time" in exc_info.value.message_dict
 
     def test_booking_exactly_now_rejected(self, db, user, room, utc_now, organization):
         """Test that booking starting exactly now is rejected (past check)."""
