@@ -69,6 +69,15 @@ jobs:
         working-directory: ./backend
         run: pytest tests/ -v --cov=rooms --cov-report=term-missing --cov-report=xml
 
+      # Second pass against the Postgres service: exercises the
+      # PostgreSQL-only backstops (overlap exclusion constraint, tenant
+      # triggers) whose tests skip on the SQLite default run.
+      - name: Run pytest (PostgreSQL)
+        working-directory: ./backend
+        env:
+          TEST_DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
+        run: pytest tests/ -v --no-cov
+
       - uses: actions/upload-artifact@v4
         with:
           name: backend-coverage

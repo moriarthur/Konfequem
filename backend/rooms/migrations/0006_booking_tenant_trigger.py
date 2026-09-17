@@ -20,14 +20,16 @@ BEGIN
         SELECT 1 FROM rooms_room r
         WHERE r.id = NEW.room_id AND r.organization_id <> NEW.organization_id
     ) THEN
-        RAISE EXCEPTION 'booking room does not belong to the booking organization';
+        RAISE EXCEPTION 'booking room does not belong to the booking organization'
+            USING ERRCODE = '23514';
     END IF;
     IF EXISTS (
         SELECT 1 FROM rooms_user u
         WHERE u.id = NEW.user_id
           AND (u.organization_id IS NULL OR u.organization_id <> NEW.organization_id)
     ) THEN
-        RAISE EXCEPTION 'booking user does not belong to the booking organization';
+        RAISE EXCEPTION 'booking user does not belong to the booking organization'
+            USING ERRCODE = '23514';
     END IF;
     RETURN NEW;
 END;

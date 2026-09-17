@@ -1008,6 +1008,7 @@ class TestBookingOverlapConstraint:
 
 
 @pytest.mark.integration
+@pytest.mark.django_db(transaction=True)
 @pytest.mark.skipif(
     connection.vendor != "postgresql",
     reason="tenant trigger is PostgreSQL-only (rooms migration 0006)",
@@ -1076,6 +1077,55 @@ class TestBookingTenantTrigger:
         )
 
         assert booking.pk is not None
+
+    def test_trigger_allows_booking_update(self, db, user, booking):
+        """UPDATE on a consistent booking (e.g. cancel) passes the check."""
+        booking.status = "cancelled"
+        booking.save(update_fields=["status", "updated_at"])
+
+        booking.refresh_from_db()
+        assert booking.status == "cancelled"
+
+    def test_trigger_blocks_room_org_change_with_bookings(
+        self, db, user, room, booking
+    ):
+        """Moving a booked room to another org would strand its bookings
+        cross-tenant — the DB guard must reject it."""
+        original_org_id = room.organization_id
+        foreign_org = Organization.objects.create(
+            name="Trigger Foreign", slug="trigger-foreign-3"
+        )
+
+        with pytest.raises(IntegrityError):
+            Room.objects.filter(pk=room.pk).update(organization=foreign_org)
+
+        room.refresh_from_db()
+        assert room.organization_id == original_org_id
+
+    def test_trigger_blocks_user_org_change_with_bookings(self, db, user, booking):
+        original_org_id = user.organization_id
+        foreign_org = Organization.objects.create(
+            name="Trigger Foreign", slug="trigger-foreign-4"
+        )
+
+        with pytest.raises(IntegrityError):
+            User.objects.filter(pk=user.pk).update(organization=foreign_org)
+
+        user.refresh_from_db()
+        assert user.organization_id == original_org_id
+
+    @staticmethod
+    def _foreign_org(slug: str) -> Organization:
+        return Organization.objects.create(name="Trigger Foreign", slug=slug)
+
+    def test_trigger_allows_room_org_change_without_bookings(self, db, room):
+        """A room with no bookings can still be moved freely."""
+        foreign_org = self._foreign_org("trigger-foreign-5")
+
+        Room.objects.filter(pk=room.pk).update(organization=foreign_org)
+
+        room.refresh_from_db()
+        assert room.organization == foreign_org
 
 
 @pytest.mark.integration

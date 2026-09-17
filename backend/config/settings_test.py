@@ -1,21 +1,42 @@
 """
-Test settings for Konfequam.
+Test settings for Konfequem.
 
-Imports from main settings and overrides database for SQLite testing.
+Defaults to SQLite in-memory. Set TEST_DATABASE_URL to point the suite
+at real PostgreSQL instead — that exercises the Postgres-only backstops
+(overlap exclusion constraint, tenant triggers) whose tests otherwise
+skip.
 """
+
+import os
+from urllib.parse import urlparse, unquote
 
 from config.settings import *  # noqa: F403,F405
 
-# Allow test server host
+# Allow test server
 ALLOWED_HOSTS = ["*"]
 
-# Override database to use SQLite for local testing
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": ":memory:",
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
+
+if TEST_DATABASE_URL:
+    parsed = urlparse(TEST_DATABASE_URL)
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": parsed.path.lstrip("/"),
+            "USER": parsed.username,
+            "PASSWORD": unquote(parsed.password or ""),
+            "HOST": parsed.hostname,
+            "PORT": parsed.port or 5432,
+        }
     }
-}
+else:
+    # Override database to use SQLite for local testing
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": ":memory:",
+        }
+    }
 
 # Use faster password hasher for tests
 PASSWORD_HASHERS = [

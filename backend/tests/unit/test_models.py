@@ -10,6 +10,7 @@ Tests validate:
 import pytest
 from django.core.exceptions import ValidationError
 from rooms.models import Room
+from rooms.models_users import Organization
 
 
 @pytest.mark.unit
@@ -212,3 +213,74 @@ class TestRoomModel:
         )
         rooms = Room.objects.filter(name="Conference Room")
         assert rooms.count() == 2
+
+
+@pytest.mark.unit
+class TestOrgChangeGuards:
+    """Model-level org-change guards (admin surface). The DB-level
+    backstop for writers bypassing validation is migration 0007, tested
+    by the pg-only trigger tests."""
+
+    def test_room_cannot_change_org_with_bookings(self, db, user, room, organization):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from rooms.models import Booking
+
+        start = timezone.now() + timedelta(days=1)
+        Booking.objects.create(
+            room=room,
+            user=user,
+            organization=organization,
+            start_time=start,
+            end_time=start + timedelta(hours=1),
+            date=start.date(),
+        )
+        foreign_org = Organization.objects.create(name="Other", slug="other-org-guard")
+        room.organization = foreign_org
+
+        with pytest.raises(ValidationError) as exc_info:
+            room.full_clean()
+
+        assert "cannot change organization" in str(exc_info.value)
+
+    def test_room_can_change_org_without_bookings(self, db, room):
+        from rooms.models_users import Organization
+
+        foreign_org = Organization.objects.create(name="Mover", slug="mover-org-guard")
+        room.organization = foreign_org
+
+        room.full_clean()  # Should not raise
+
+    def test_user_cannot_change_org_with_bookings(self, db, user, room, organization):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from rooms.models import Booking
+
+        start = timezone.now() + timedelta(days=1)
+        Booking.objects.create(
+            room=room,
+            user=user,
+            organization=organization,
+            start_time=start,
+            end_time=start + timedelta(hours=1),
+            date=start.date(),
+        )
+        foreign_org = Organization.objects.create(name="Other", slug="other-org-u")
+        user.organization = foreign_org
+
+        with pytest.raises(ValidationError) as exc_info:
+            user.full_clean()
+
+        assert "cannot change organization" in str(exc_info.value)
+
+    def test_user_can_change_org_without_bookings(self, db, user):
+        from rooms.models_users import Organization
+
+        foreign_org = Organization.objects.create(name="Mover", slug="mover-org-u")
+        user.organization = foreign_org
+
+        user.full_clean()  # Should not raise

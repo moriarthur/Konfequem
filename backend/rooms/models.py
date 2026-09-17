@@ -70,6 +70,23 @@ class Room(models.Model):
     def __str__(self):
         return self.name
 
+    def clean(self):
+        super().clean()
+        # Moving a room to another organization would silently turn its
+        # existing bookings cross-tenant. Forbidden while bookings exist —
+        # matched by the rooms_room_org_guard DB trigger (migration 0007).
+        if not self.pk:
+            return
+        old_org_id = (
+            Room.objects.filter(pk=self.pk)
+            .values_list("organization_id", flat=True)
+            .first()
+        )
+        if old_org_id != self.organization_id and self.bookings.exists():
+            raise ValidationError(
+                {"organization": "Room has bookings; cannot change organization."}
+            )
+
 
 class Booking(models.Model):
     """Booking model with minimal backend validation."""
