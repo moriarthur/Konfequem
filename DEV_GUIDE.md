@@ -22,7 +22,10 @@ docker compose exec backend python manage.py createsuperuser
 # Admin: http://localhost:8000/admin
 ```
 
-### Local Mode (macOS/Windows without Docker)
+### Local Mode (without Docker)
+Requires a reachable PostgreSQL — settings are Postgres-only. Easiest: start
+just the compose `db` service (`docker compose up -d db`, reachable on
+127.0.0.1:5433) or install Postgres locally.
 ```bash
 # Copy Local environment file
 cp .env.local.example .env
@@ -49,17 +52,14 @@ npm run dev
 The project uses two environment templates:
 
 - **`.env.docker.example`** - For Docker/PostgreSQL setup
-  - DATABASE_URL: `postgresql://admin:secret@db:5432/konfequem`
-  - DOCKER: `true`
+  - DATABASE_URL: `postgresql://admin:<POSTGRES_PASSWORD>@db:5432/konfequem`
+  - POSTGRES_PASSWORD: required by docker-compose (no fallback)
+  - DOCKER: `true` (legacy, informational)
 
-- **`.env.local.example`** - For local/SQLite setup
-  - DATABASE_URL: `sqlite:///backend/db.sqlite3`
-  - DOCKER: `false`
-
-> **Note:** `config/settings.py` is hard-wired to the PostgreSQL engine — a
-> `sqlite://` DATABASE_URL will not work. Local (non-Docker) runs need a
-> real PostgreSQL URL (e.g. the docker `db` service or a local Postgres
-> install). The `.env.local.example` sqlite line is outdated in that respect.
+- **`.env.local.example`** - For local (non-Docker) backend runs
+  - DATABASE_URL: PostgreSQL on `127.0.0.1:5433` (the compose `db` service)
+    or any other local Postgres instance
+  - DOCKER: `false` (legacy, informational)
 
 To switch environments:
 1. Stop any running services
@@ -82,12 +82,15 @@ python manage.py createsuperuser
 # Run development server
 python manage.py runserver
 
-# Run tests (no Makefile — call pytest directly)
-python3 -m pytest --tb=short -q            # All tests
-python3 -m pytest tests/unit -q            # Unit tests only
+# A Makefile lives in backend/ — run these from that directory
+make test              # All tests
+make test-unit         # Unit tests only
+make test-cov          # With coverage
+make lint              # flake8 (CI config)
+make format            # black
 
-# Formatting / linting (CI enforces both)
-python3 -m black rooms config tests --exclude=migrations --check
+# Or call the tools directly:
+python3 -m pytest --tb=short -q
 python3 -m flake8 rooms config tests --exclude=migrations --max-line-length=88 --extend-ignore=E203,W503
 ```
 
