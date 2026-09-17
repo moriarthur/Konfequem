@@ -108,7 +108,11 @@ class RoomViewSet(viewsets.ModelViewSet):
         serializer.save(organization=self.request.user.organization)
 
     def perform_destroy(self, instance):
-        if instance.bookings.filter(end_time__gt=timezone.now()).exists():
+        if (
+            instance.bookings.filter(end_time__gt=timezone.now())
+            .exclude(status="cancelled")
+            .exists()
+        ):
             raise ValidationError(
                 {"general": ["Room has upcoming bookings and cannot be deleted."]}
             )

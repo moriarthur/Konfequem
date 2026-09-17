@@ -282,6 +282,18 @@ class TestRoomViewSet:
         assert "general" in response.data
         assert Room.objects.filter(pk=room.pk).exists()
 
+    def test_delete_room_with_cancelled_future_bookings_allowed(
+        self, db, admin_api_client, room, booking
+    ):
+        """A cancelled future booking is history — it must not block deletion."""
+        booking.status = "cancelled"
+        booking.save()
+
+        response = admin_api_client.delete(f"/api/rooms/{room.id}/")
+
+        assert response.status_code == 204
+        assert not Room.objects.filter(pk=room.pk).exists()
+
 
 @pytest.mark.integration
 class TestBookingViewSet:
@@ -1127,3 +1139,92 @@ class TestBookingCancel:
             date=(now + timedelta(days=1)).date(),
         )
         assert booking.pk is not None
+
+
+@pytest.mark.integration
+class TestBookingTenantIsolation:
+    """A booking must never target a room from another organization."""
+
+    @staticmethod
+    def _make_foreign_room():
+        foreign_org = Organization.objects.create(
+            name="Foreign Org", slug="foreign-org"
+        )
+        return Room.objects.create(
+            name="Foreign Room",
+            location="Elsewhere",
+            capacity=4,
+            organization=foreign_org,
+        )
+
+    def test_create_booking_other_orgs_room_forbidden(
+        self, db, authenticated_api_client, future_start_time
+    ):
+        """Creating a booking for another org's room is rejected (400)."""
+        foreign_room = self._make_foreign_room()
+
+        response = authenticated_api_client.post(
+            "/api/bookings/",
+            {
+                "room": foreign_room.id,
+                "start_time": future_start_time.isoformat(),
+                "end_time": (future_start_time + timedelta(hours=1)).isoformat(),
+            },
+            format="json",
+        )
+
+        assert response.status_code == 400
+        assert "general" in response.data
+        assert not Booking.objects.filter(room=foreign_room).exists()
+
+    def test_create_other_orgs_room_even_without_overlap(
+        self, db, authenticated_api_client, future_start_time
+    ):
+        """The check is not overlap-dependent: a free foreign slot is still 400."""
+        foreign_room = self._make_foreign_room()
+        start = future_start_time + timedelta(days=5)
+
+        response = authenticated_api_client.post(
+            "/api/bookings/",
+            {
+                "room": foreign_room.id,
+                "start_time": start.isoformat(),
+                "end_time": (start + timedelta(hours=1)).isoformat(),
+            },
+            format="json",
+        )
+
+        assert response.status_code == 400
+        assert not Booking.objects.filter(room=foreign_room).exists()
+
+    def test_update_booking_to_other_orgs_room_forbidden(
+        self, db, authenticated_api_client, booking
+    ):
+        """PATCH/PUT must not move a booking into another org's room."""
+        foreign_room = self._make_foreign_room()
+
+        response = authenticated_api_client.patch(
+            f"/api/bookings/{booking.id}/",
+            {"room": foreign_room.id},
+            format="json",
+        )
+
+        assert response.status_code == 400
+        booking.refresh_from_db()
+        assert booking.room_id != foreign_room.id
+
+    def test_own_orgs_room_still_bookable(
+        self, db, authenticated_api_client, room, future_start_time
+    ):
+        """Sanity: the isolation check does not affect same-org bookings."""
+        response = authenticated_api_client.post(
+            "/api/bookings/",
+            {
+                "room": room.id,
+                "start_time": future_start_time.isoformat(),
+                "end_time": (future_start_time + timedelta(hours=1)).isoformat(),
+            },
+            format="json",
+        )
+
+        assert response.status_code == 201
