@@ -146,6 +146,38 @@ class TestChangePassword:
         user.refresh_from_db()
         assert user.check_password(NEW_PASSWORD)
 
+    def test_password_change_rolls_back_if_blacklisting_fails(
+        self, api_client, user, monkeypatch
+    ):
+        """Password save and blacklisting are one transaction."""
+        RefreshToken.for_user(user)  # a second outstanding token to blacklist
+        real_get_or_create = BlacklistedToken.objects.get_or_create
+        calls = {"n": 0}
+
+        def flaky_get_or_create(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] > 1:
+                raise RuntimeError("blacklist backend down")
+            return real_get_or_create(*args, **kwargs)
+
+        monkeypatch.setattr(
+            BlacklistedToken.objects, "get_or_create", flaky_get_or_create
+        )
+
+        with pytest.raises(RuntimeError):
+            _auth(api_client, user).post(
+                CHANGE_PASSWORD_URL,
+                {
+                    "old_password": "testpass123",
+                    "new_password": NEW_PASSWORD,
+                    "confirm_password": NEW_PASSWORD,
+                },
+                format="json",
+            )
+
+        user.refresh_from_db()
+        assert user.check_password("testpass123")
+
     def test_blacklists_all_outstanding_refresh_tokens(self, api_client, user):
         """A stolen refresh token must not survive a password change."""
         stolen = str(RefreshToken.for_user(user))

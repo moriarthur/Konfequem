@@ -366,14 +366,18 @@ class ChangePasswordView(APIView):
                 status=400,
             )
 
-        user.set_password(new_password)
-        user.save()
-        # Invalidate every outstanding refresh token (SimpleJWT): a stolen
-        # refresh token must not survive a password change. Access tokens
-        # stay valid up to ACCESS_TOKEN_LIFETIME (30 min) — the accepted
-        # limitation of stateless JWTs.
-        for token in OutstandingToken.objects.filter(user=user):
-            BlacklistedToken.objects.get_or_create(token=token)
+        # Atomic: if blacklisting any token fails, the password change must
+        # roll back too — never leave the old refresh tokens valid under a
+        # new password.
+        with transaction.atomic():
+            user.set_password(new_password)
+            user.save()
+            # Invalidate every outstanding refresh token (SimpleJWT): a
+            # stolen refresh token must not survive a password change.
+            # Access tokens stay valid up to ACCESS_TOKEN_LIFETIME (30 min)
+            # — the accepted limitation of stateless JWTs.
+            for token in OutstandingToken.objects.filter(user=user):
+                BlacklistedToken.objects.get_or_create(token=token)
         return Response({"message": "Password changed successfully."})
 
 
