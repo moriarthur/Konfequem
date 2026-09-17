@@ -32,3 +32,6 @@ htmlcov/
 # CodeGraph
 .codegraph/
 .mcp.json
+
+# Local audit working file
+codex_audit

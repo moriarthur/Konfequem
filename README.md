@@ -62,9 +62,9 @@ konfequem/
 | Frontend | React 19, TypeScript, Vite |
 | Backend | Django 4.2, Django REST Framework |
 | Auth | SimpleJWT (access + refresh tokens) |
-| Database | PostgreSQL (Docker) / SQLite (local) |
+| Database | PostgreSQL (required — dev via Docker Compose) |
 | Infra | Docker, Docker Compose |
-| Testing | pytest, Django test runner |
+| Testing | pytest (backend), Vitest + MSW (frontend) |
 
 ## Getting Started
 

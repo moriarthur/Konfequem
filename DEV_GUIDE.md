@@ -160,7 +160,8 @@ DJANGO_SECRET_KEY=your-secret-key-here
 DJANGO_DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
 DOCKER=false
-DATABASE_URL=sqlite:///backend/db.sqlite3
+POSTGRES_PASSWORD=change-me-local-only
+DATABASE_URL=postgresql://admin:change-me-local-only@127.0.0.1:5433/konfequem
 VITE_BACKEND_URL=http://localhost:8000
 ```
 
