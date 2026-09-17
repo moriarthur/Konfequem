@@ -11,8 +11,9 @@ services:
     environment:
       POSTGRES_DB: konfequem
       POSTGRES_USER: admin
-      # Local dev only — override via POSTGRES_PASSWORD in .env
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secret}
+      # Local dev only. Required — compose fails fast without it
+      # (must match the password inside DATABASE_URL in .env)
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
     # Loopback only: the dev DB must not be reachable from the LAN

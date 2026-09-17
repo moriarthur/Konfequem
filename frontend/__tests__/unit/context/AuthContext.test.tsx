@@ -416,9 +416,12 @@ describe('AuthContext', () => {
         })
       )
 
-      await expect(
-        result.current.authFetch('/api/test')
-      ).rejects.toThrow()
+      // act() wrapper: authFetch's failed refresh logs the session out and
+      // triggers state updates — without it React warns about updates
+      // outside act().
+      await act(async () => {
+        await expect(result.current.authFetch('/api/test')).rejects.toThrow()
+      })
     })
   })
 
