@@ -85,6 +85,18 @@ class BookingSerializer(serializers.ModelSerializer):
                     f"Booking cannot be more than {max_days} days in advance."
                 )
 
+        # --- Tenant isolation ---
+        # A booking must target a room in the requester's organization —
+        # on create and on update (PATCH/PUT can swap the room). Staff
+        # users keep their read-all access; they manage data via Django admin.
+        if room:
+            request_user = self.context["request"].user
+            if (
+                not request_user.is_staff
+                and room.organization_id != request_user.organization_id
+            ):
+                errors.append("You can only book rooms in your own organization.")
+
         # --- Logical validation ---
         if room and start and end:
             # Check for overlapping bookings. Two requests that pass this check
