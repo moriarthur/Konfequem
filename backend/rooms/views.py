@@ -16,6 +16,10 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
     TokenBlacklistView,
 )
+from rest_framework_simplejwt.token_blacklist.models import (
+    BlacklistedToken,
+    OutstandingToken,
+)
 
 from .models import Room, Booking, RoomFeature
 from .models_users import Organization, User
@@ -364,6 +368,12 @@ class ChangePasswordView(APIView):
 
         user.set_password(new_password)
         user.save()
+        # Invalidate every outstanding refresh token (SimpleJWT): a stolen
+        # refresh token must not survive a password change. Access tokens
+        # stay valid up to ACCESS_TOKEN_LIFETIME (30 min) — the accepted
+        # limitation of stateless JWTs.
+        for token in OutstandingToken.objects.filter(user=user):
+            BlacklistedToken.objects.get_or_create(token=token)
         return Response({"message": "Password changed successfully."})
 
 

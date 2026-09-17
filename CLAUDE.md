@@ -38,7 +38,9 @@ cd frontend && npm run dev
 - `POST /api/join/` — join org via invite key, returns JWT
 - `GET /api/invites/<key>/` — org preview before joining
 - `GET /api/users/me/` / `PUT /api/users/me/` — current user
-- `POST /api/users/change-password/` — change password
+- `POST /api/users/change-password/` — change password (blacklists ALL the user's
+  outstanding refresh tokens — stolen refresh dies immediately; access tokens stay
+  valid up to 30 min, accepted stateless-JWT limitation; frontend logs out after)
 - `/api/rooms/` — rooms (org-scoped, auth required; create/update/delete org_admin only,
   deletion blocked while future bookings exist; write serializer takes feature PKs)
 - `/api/room-features/` — room features (read-only)

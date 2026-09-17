@@ -171,9 +171,14 @@ export default function ProfilePage() {
         body: JSON.stringify(passwordForm),
       });
       if (response) {
-        showAlert("Password changed successfully", { type: "success" });
+        showAlert("Password changed. Please sign in with your new password.", { type: "success" });
         setShowPasswordModal(false);
         setPasswordForm({ old_password: "", new_password: "", confirm_password: "" });
+        // The server blacklisted every refresh token, including this
+        // session's — end the session explicitly instead of waiting for
+        // the next refresh to 401.
+        await logout();
+        navigate("/login");
       }
     } catch (err: unknown) {
       const e = err as { message?: string; error?: string };

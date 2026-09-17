@@ -10,7 +10,11 @@ only through the success path (or not at all).
 """
 
 import pytest
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
+from rest_framework_simplejwt.token_blacklist.models import (
+    BlacklistedToken,
+    OutstandingToken,
+)
 
 from rooms.models_users import User
 
@@ -141,6 +145,72 @@ class TestChangePassword:
 
         user.refresh_from_db()
         assert user.check_password(NEW_PASSWORD)
+
+    def test_blacklists_all_outstanding_refresh_tokens(self, api_client, user):
+        """A stolen refresh token must not survive a password change."""
+        stolen = str(RefreshToken.for_user(user))
+        RefreshToken.for_user(user)
+        RefreshToken.for_user(user)
+
+        response = _auth(api_client, user).post(
+            CHANGE_PASSWORD_URL,
+            {
+                "old_password": "testpass123",
+                "new_password": NEW_PASSWORD,
+                "confirm_password": NEW_PASSWORD,
+            },
+            format="json",
+        )
+
+        assert response.status_code == 200
+        # Every outstanding token is blacklisted, including the current
+        # session's (RefreshToken.for_user records an OutstandingToken).
+        outstanding = OutstandingToken.objects.filter(user=user).count()
+        assert outstanding == 4
+        assert BlacklistedToken.objects.filter(token__user=user).count() == outstanding
+
+        refresh_response = api_client.post(
+            "/api/token/refresh/", {"refresh": stolen}, format="json"
+        )
+        assert refresh_response.status_code == 401
+
+    def test_blacklisting_is_idempotent(self, api_client, user):
+        """Tokens already blacklisted don't blow up the password change."""
+        pre_blacklisted = RefreshToken.for_user(user)
+        pre_blacklisted.blacklist()
+
+        response = _auth(api_client, user).post(
+            CHANGE_PASSWORD_URL,
+            {
+                "old_password": "testpass123",
+                "new_password": NEW_PASSWORD,
+                "confirm_password": NEW_PASSWORD,
+            },
+            format="json",
+        )
+
+        assert response.status_code == 200
+        assert BlacklistedToken.objects.filter(token__user=user).count() == (
+            OutstandingToken.objects.filter(user=user).count()
+        )
+
+    def test_no_tokens_outstanding_still_succeeds(self, api_client, user):
+        """Auth via a bare access token — no refresh outstanding at all."""
+        access = AccessToken.for_user(user)
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
+
+        response = api_client.post(
+            CHANGE_PASSWORD_URL,
+            {
+                "old_password": "testpass123",
+                "new_password": NEW_PASSWORD,
+                "confirm_password": NEW_PASSWORD,
+            },
+            format="json",
+        )
+
+        assert response.status_code == 200
+        assert BlacklistedToken.objects.filter(token__user=user).count() == 0
 
     def test_requires_all_fields(self, api_client, user):
         response = _auth(api_client, user).post(
