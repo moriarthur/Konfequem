@@ -255,6 +255,9 @@ export const handlers = [
     return createErrorResponse('Invalid refresh token', 401)
   }),
 
+  // Token blacklist (logout) — best-effort call from AuthContext.logout()
+  http.post('/api/token/blacklist/', () => new HttpResponse(null, { status: 200 })),
+
   // ============================================================================
   // Room Handlers
   // ============================================================================
