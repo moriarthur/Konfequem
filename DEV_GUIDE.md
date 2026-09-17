@@ -56,6 +56,11 @@ The project uses two environment templates:
   - DATABASE_URL: `sqlite:///backend/db.sqlite3`
   - DOCKER: `false`
 
+> **Note:** `config/settings.py` is hard-wired to the PostgreSQL engine — a
+> `sqlite://` DATABASE_URL will not work. Local (non-Docker) runs need a
+> real PostgreSQL URL (e.g. the docker `db` service or a local Postgres
+> install). The `.env.local.example` sqlite line is outdated in that respect.
+
 To switch environments:
 1. Stop any running services
 2. Copy the appropriate example file: `cp .env.<environment>.example .env`
@@ -77,10 +82,13 @@ python manage.py createsuperuser
 # Run development server
 python manage.py runserver
 
-# Run tests
-make test              # All tests
-make test-unit         # Unit tests only
-make test-cov          # With coverage
+# Run tests (no Makefile — call pytest directly)
+python3 -m pytest --tb=short -q            # All tests
+python3 -m pytest tests/unit -q            # Unit tests only
+
+# Formatting / linting (CI enforces both)
+python3 -m black rooms config tests --exclude=migrations --check
+python3 -m flake8 rooms config tests --exclude=migrations --max-line-length=88 --extend-ignore=E203,W503
 ```
 
 ### Frontend (React)
@@ -95,8 +103,10 @@ npm run dev
 npm run build
 
 # Run tests
-npm test               # All tests
-npm run test:coverage  # With coverage
+npx vitest run          # All tests, single run
+npm run test:unit       # Unit tests only
+npm run lint            # ESLint
+npx tsc --noEmit        # TypeScript check
 ```
 
 ### Docker Commands
@@ -118,10 +128,13 @@ docker compose exec backend python manage.py migrate
 
 ### Required (Root .env)
 - `DJANGO_SECRET_KEY`: Django secret key (change in production)
-- `DJANGO_DEBUG`: True/False (development/production)
+- `DJANGO_DEBUG`: True/False (development/production; the wildcard
+  ALLOWED_HOSTS fallback applies only while DEBUG=True)
 - `ALLOWED_HOSTS`: Comma-separated list of allowed hosts
 - `DATABASE_URL`: Database connection string
-- `DOCKER`: true/false (Docker detection)
+- `POSTGRES_PASSWORD`: local docker Postgres password (docker-compose
+  requires it — no fallback)
+- `DOCKER`: legacy, no longer read by the backend; harmless to keep
 
 ### Frontend (Loaded from Root .env)
 - `VITE_BACKEND_URL`: Backend API URL (default: http://localhost:8000)
@@ -133,8 +146,8 @@ docker compose exec backend python manage.py migrate
 DJANGO_SECRET_KEY=your-secret-key-here
 DJANGO_DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
-DOCKER=true
-DATABASE_URL=postgresql://admin:secret@db:5432/konfequem
+DATABASE_URL=postgresql://admin:<postgres-password>@db:5432/konfequem
+POSTGRES_PASSWORD=<postgres-password>
 VITE_BACKEND_URL=http://localhost:8000
 ```
 
@@ -150,25 +163,67 @@ VITE_BACKEND_URL=http://localhost:8000
 
 ## API Documentation
 
+All `/api/` endpoints return paginated lists (`{count, next, previous, results}`,
+100/page) except `/api/availability/`. The frontend follows `next` links via
+`fetchAllPages()` — do not read only `results` from list endpoints.
+
+### Multi-org model
+- Registration creates an organization + its org_admin in one step
+- Joining is via invite key (UUID on Organization; rotatable by org_admin)
+- All data is scoped to the user's organization; roles: platform_admin
+  (`is_staff`, manages via Django admin — no API writes), org_admin, member
+
 ### Authentication
-- Login: POST /api/token/
-- Refresh: POST /api/token/refresh/
-- Logout: DELETE /api/token/blacklist/
+- Login: POST /api/token/ (throttled)
+- Refresh (rotating + blacklist-on-rotation): POST /api/token/refresh/
+- Logout: POST /api/token/blacklist/
+- Register (creates org + org_admin): POST /api/register/ (throttled)
+- Join via invite key: POST /api/join/ (throttled)
+- Invite preview: GET /api/invites/{key}/
+- Current user: GET /api/users/me/ · PUT /api/users/me/
+- Change password: POST /api/users/change-password/ — blacklists ALL of the
+  user's outstanding refresh tokens (access tokens stay valid up to 30 min)
+- Org members (org_admin only): GET /api/org/members/
+- Rotate invite key (org_admin only): POST /api/org/invite/regenerate/
 
 ### Rooms
-- List rooms: GET /api/rooms/
+- List rooms: GET /api/rooms/ (org-scoped)
 - Get room details: GET /api/rooms/{id}/
+- Create/update/delete: org_admin only; deletion blocked while active future
+  bookings exist (cancelled ones don't block)
+
+### Room features
+- GET /api/room-features/ (read-only)
 
 ### Bookings
-- List bookings: GET /api/bookings/
-- Create booking: POST /api/bookings/
-- Update booking: PUT /api/bookings/{id}/
-- Delete booking: DELETE /api/bookings/{id}/
+- List bookings: GET /api/bookings/?month=YYYY-MM | ?date=YYYY-MM-DD —
+  personal only (user-scoped)
+- Create booking: POST /api/bookings/ — room must belong to the user's org
+- Update booking: PUT/PATCH /api/bookings/{id}/
+- Cancel (soft, preferred): POST /api/bookings/{id}/cancel/ — row stays for
+  history, slot frees; future-only, idempotent; cancelled bookings are
+  excluded from overlap checks and the DB exclusion constraint
+- Delete: DELETE /api/bookings/{id}/ — hard delete, kept for API completeness;
+  the UI uses cancel
+- Booking rules live in ONE place: `backend/rooms/validators.py`
+  (office hours 08:00–22:00 Berlin, same-day end, 15 min–8 h duration,
+  90-day advance) — enforced by both the serializer and `Booking.clean()`
+
+### Availability (org-wide)
+- GET /api/availability/?month=YYYY-MM[&room=<id>] — minimal non-personal
+  fields (id, room, room_name, times, status) for every active booking in the
+  org; cancelled excluded; strict month validation; foreign/unknown room → 404.
+  The calendar and conflict pre-checks run on this, not on /api/bookings/
 
 ## Testing Notes
-- No automated tests currently implemented
-- Manual testing via admin interface and UI
-- Consider adding unit/integration tests for future
+- Backend: 230+ tests (pytest; unit + integration + e2e). 2 tests skip on
+  SQLite — the Postgres-only exclusion-constraint tests
+- Frontend: 170+ tests (Vitest + MSW; handlers in
+  `frontend/__tests__/mocks/handlers.ts`)
+- CI runs flake8 + black --check + pytest + eslint + tsc + vitest on every push
+- Timezone rule: use the `berlin_tz`/`berlin_now` fixtures and pin Berlin
+  hours (`berlin_at()` in model tests) — never hardcode UTC offsets, and
+  never build booking times from `now + timedelta` (drifts out of office hours)
 
 ## Troubleshooting
 
