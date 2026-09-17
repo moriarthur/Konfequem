@@ -103,6 +103,11 @@ class Booking(models.Model):
 
     MAX_DAYS_AHEAD = 90
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["start_time"], name="rooms_booking_start_idx"),
+        ]
+
     @staticmethod
     def overlapping(room, start, end, exclude_pk=None):
         """Active bookings for the room overlapping [start, end).
@@ -139,6 +144,28 @@ class Booking(models.Model):
         ):
             errors.setdefault("non_field_errors", []).append(
                 "This room is already booked for the selected time range."
+            )
+
+        # --- Tenant consistency ---
+        # organization, room.organization and user.organization must agree.
+        # The API enforces this in the serializer; admin/ORM writes get it
+        # here — a mismatched row would leak a foreign room name into the
+        # org's availability feed.
+        if (
+            self.organization_id
+            and self.room_id
+            and self.room.organization_id != self.organization_id
+        ):
+            errors.setdefault("non_field_errors", []).append(
+                "Room does not belong to the booking's organization."
+            )
+        if (
+            self.organization_id
+            and self.user_id
+            and self.user.organization_id != self.organization_id
+        ):
+            errors.setdefault("non_field_errors", []).append(
+                "User does not belong to the booking's organization."
             )
 
         if errors:

@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.utils import timezone
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError, transaction
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import Booking, Room, RoomFeature
 from .models_users import Organization, User
@@ -228,19 +229,29 @@ class RegisterSerializer(serializers.Serializer):
         return value
 
     def create(self, validated_data):
-        org = Organization.objects.create(
-            name=validated_data["org_name"],
-            slug=validated_data["org_slug"],
-        )
-        user = User.objects.create_user(
-            username=validated_data["username"],
-            email=validated_data["email"],
-            password=validated_data["password"],
-            first_name=validated_data.get("first_name", ""),
-            last_name=validated_data.get("last_name", ""),
-            role="org_admin",
-            organization=org,
-        )
+        try:
+            # Atomic: a unique-constraint race (username / org slug taken
+            # between validate_* and INSERT) must roll back the org too —
+            # no orphan organizations — and surface as a friendly 400.
+            with transaction.atomic():
+                org = Organization.objects.create(
+                    name=validated_data["org_name"],
+                    slug=validated_data["org_slug"],
+                )
+                user = User.objects.create_user(
+                    username=validated_data["username"],
+                    email=validated_data["email"],
+                    password=validated_data["password"],
+                    first_name=validated_data.get("first_name", ""),
+                    last_name=validated_data.get("last_name", ""),
+                    role="org_admin",
+                    organization=org,
+                )
+        except IntegrityError:
+            raise serializers.ValidationError(
+                "A user with this username or an organization with this slug "
+                "already exists."
+            )
         return _user_response(user, org)
 
 
@@ -274,15 +285,21 @@ class JoinSerializer(serializers.Serializer):
         return value
 
     def create(self, validated_data):
-        user = User.objects.create_user(
-            username=validated_data["username"],
-            email=validated_data["email"],
-            password=validated_data["password"],
-            first_name=validated_data.get("first_name", ""),
-            last_name=validated_data.get("last_name", ""),
-            role="member",
-            organization=self._org,
-        )
+        try:
+            with transaction.atomic():
+                user = User.objects.create_user(
+                    username=validated_data["username"],
+                    email=validated_data["email"],
+                    password=validated_data["password"],
+                    first_name=validated_data.get("first_name", ""),
+                    last_name=validated_data.get("last_name", ""),
+                    role="member",
+                    organization=self._org,
+                )
+        except IntegrityError:
+            raise serializers.ValidationError(
+                "A user with this username already exists."
+            )
         return _user_response(user, self._org)
 
 

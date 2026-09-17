@@ -1,7 +1,11 @@
 import pytest
+from unittest.mock import patch
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
+
+from rooms.models_users import Organization
 
 User = get_user_model()
 
@@ -208,6 +212,50 @@ def member(organization):
 
 
 @pytest.mark.django_db
+class TestRegistrationAtomicity:
+    """A unique-constraint race must 400, never 500, and never leave
+    orphan rows behind (audit P2: registration not atomic)."""
+
+    def test_register_user_race_rolls_back_org(self):
+        client = APIClient()
+        payload = {
+            "username": "raceuser",
+            "email": "raceuser@example.com",
+            "password": "Str0ng!Pass123",
+            "org_name": "Race Corp",
+            "org_slug": "race-corp",
+        }
+
+        with patch(
+            "rooms.serializers.User.objects.create_user",
+            side_effect=IntegrityError("duplicate username"),
+        ):
+            resp = client.post("/api/register/", payload, format="json")
+
+        assert resp.status_code == 400
+        # The org created inside the failed transaction is rolled back
+        assert not Organization.objects.filter(slug="race-corp").exists()
+
+    def test_join_username_race_returns_400(self, organization):
+        client = APIClient()
+        payload = {
+            "invite_key": str(organization.invite_key),
+            "username": "racebob",
+            "email": "racebob@example.com",
+            "password": "Str0ng!Pass123",
+        }
+
+        with patch(
+            "rooms.serializers.User.objects.create_user",
+            side_effect=IntegrityError("duplicate username"),
+        ):
+            resp = client.post("/api/join/", payload, format="json")
+
+        assert resp.status_code == 400
+        assert not User.objects.filter(username="racebob").exists()
+
+
+@pytest.mark.django_db
 class TestOrgMembers:
     def test_admin_sees_members(self, org_admin, member, organization):
         client = APIClient()
@@ -231,6 +279,24 @@ class TestOrgMembers:
         client = APIClient()
         resp = client.get("/api/org/members/")
         assert resp.status_code == 401
+
+    def test_hybrid_staff_org_admin_forbidden(self, organization):
+        """is_staff + role='org_admin' hybrids are denied, same policy as
+        rooms — no hybrid accounts exist in the product model."""
+        hybrid = User.objects.create_user(
+            username="hybridadmin",
+            email="hybrid@example.com",
+            password="hybrid-pass-123",
+            role="org_admin",
+            is_staff=True,
+            organization=organization,
+        )
+        client = APIClient()
+        refresh = RefreshToken.for_user(hybrid)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+
+        assert client.get("/api/org/members/").status_code == 403
+        assert client.post("/api/org/invite/regenerate/").status_code == 403
 
 
 @pytest.mark.django_db

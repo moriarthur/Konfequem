@@ -24,6 +24,23 @@ class IsOrgAdminOrReadOnly(BasePermission):
         )
 
 
+class IsOrgAdmin(BasePermission):
+    """Org admins only, with the same hybrid policy as rooms: staff users
+    and org-less accounts are denied even when role == 'org_admin'.
+    """
+
+    message = "Only organization admins can do this."
+
+    def has_permission(self, request, view):
+        user = request.user
+        return (
+            bool(user and user.is_authenticated)
+            and not user.is_staff
+            and user.role == "org_admin"
+            and user.organization_id is not None
+        )
+
+
 class StaffReadOnly(BasePermission):
     """Bookings: reads any authenticated user (the queryset is user-scoped
     anyway), writes denied for staff/platform admins — they manage bookings

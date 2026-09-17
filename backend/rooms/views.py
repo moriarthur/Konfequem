@@ -1,4 +1,5 @@
 import uuid as uuid_mod
+from datetime import datetime
 
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -23,7 +24,7 @@ from rest_framework_simplejwt.token_blacklist.models import (
 
 from .models import Room, Booking, RoomFeature
 from .models_users import Organization, User
-from .permissions import IsOrgAdminOrReadOnly, StaffReadOnly
+from .permissions import IsOrgAdmin, IsOrgAdminOrReadOnly, StaffReadOnly
 from .serializers import (
     RoomSerializer,
     RoomWriteSerializer,
@@ -284,11 +285,19 @@ class AvailabilityView(APIView):
             if room is None:
                 return Response({"error": "Room not found."}, status=404)
 
+        # Half-open Berlin-month range — same semantics as the year/month
+        # lookups but index-friendly (rooms_booking_start_idx).
+        berlin_tz = timezone.get_default_timezone()
+        month_start = datetime(year, month, 1, tzinfo=berlin_tz)
+        next_month_start = datetime(
+            year + (month == 12), month % 12 + 1, 1, tzinfo=berlin_tz
+        )
+
         queryset = (
             Booking.objects.filter(
                 organization=user.organization,
-                start_time__year=year,
-                start_time__month=month,
+                start_time__gte=month_start,
+                start_time__lt=next_month_start,
             )
             .exclude(status="cancelled")
             .select_related("room")
@@ -419,30 +428,22 @@ class JoinView(APIView):
 
 
 class OrgMembersView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsOrgAdmin]
 
     def get(self, request):
-        user = request.user
-        if user.role != "org_admin":
-            return Response({"error": "Only org admins can view members."}, status=403)
-        members = User.objects.filter(organization=user.organization).values(
+        members = User.objects.filter(organization=request.user.organization).values(
             "id", "username", "email", "role", "first_name", "last_name"
         )
         return Response(list(members))
 
 
 class RegenerateInviteView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsOrgAdmin]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "regenerate_invite"
 
     def post(self, request):
-        user = request.user
-        if user.role != "org_admin":
-            return Response(
-                {"error": "Only org admins can regenerate invite keys."}, status=403
-            )
-        org = user.organization
+        org = request.user.organization
         org.invite_key = uuid_mod.uuid4()
         org.save()
         return Response({"invite_key": str(org.invite_key)})

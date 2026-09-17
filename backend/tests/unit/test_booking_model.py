@@ -13,6 +13,7 @@ from datetime import timedelta
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from rooms.models import Booking, Room
+from rooms.models_users import Organization
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -38,6 +39,67 @@ class TestBookingModel:
     # ========================================================================
     # Past Date Rejection Tests
     # ========================================================================
+
+    # ========================================================================
+    # Tenant Consistency Tests (admin/ORM writes — API checks the same in
+    # the serializer; a mismatched row would leak a foreign room name into
+    # the org's availability feed)
+    # ========================================================================
+
+    def test_clean_rejects_room_from_other_organization(self, db, user, organization):
+        foreign_org = Organization.objects.create(name="Foreign", slug="foreign-tc")
+        foreign_room = Room.objects.create(
+            name="Foreign Room", organization=foreign_org, capacity=4
+        )
+
+        booking = Booking(
+            room=foreign_room,
+            user=user,
+            organization=organization,
+            start_time=berlin_at(1, 10),
+            date=berlin_at(1, 10).date(),
+            end_time=berlin_at(1, 11),
+        )
+
+        with pytest.raises(ValidationError) as exc_info:
+            booking.full_clean()
+
+        assert "Room does not belong" in str(exc_info.value)
+
+    def test_clean_rejects_user_from_other_organization(self, db, user, room):
+        foreign_org = Organization.objects.create(name="Foreign", slug="foreign-tc2")
+        colleague = User.objects.create_user(
+            username="tc-colleague",
+            email="tc-colleague@example.com",
+            password="tc-pass-123456",
+            organization=foreign_org,
+        )
+
+        booking = Booking(
+            room=room,
+            user=colleague,
+            organization=user.organization,
+            start_time=berlin_at(1, 10),
+            date=berlin_at(1, 10).date(),
+            end_time=berlin_at(1, 11),
+        )
+
+        with pytest.raises(ValidationError) as exc_info:
+            booking.full_clean()
+
+        assert "User does not belong" in str(exc_info.value)
+
+    def test_clean_accepts_consistent_organization(self, db, user, room, organization):
+        booking = Booking(
+            room=room,
+            user=user,
+            organization=organization,
+            start_time=berlin_at(1, 10),
+            date=berlin_at(1, 10).date(),
+            end_time=berlin_at(1, 11),
+        )
+
+        booking.full_clean()  # Should not raise
 
     def test_booking_rejects_past_start_time(self, db, user, room, organization):
         """Test that booking cannot start in the past."""
