@@ -7,6 +7,7 @@ import { isOrgAdmin } from "../utils/roles";
 import { useAlert } from "../context/AlertContext";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import BottomNav from "../components/BottomNav";
+import TopNav from "../components/TopNav";
 import Button from "../components/ui/Button";
 import Logo from "../components/Logo";
 import { Heading, Text } from "../components/ui/Typography";
@@ -235,8 +236,9 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-surface-muted pb-20">
-      <div className="px-4 py-6 max-w-4xl mx-auto">
+    <div className="min-h-screen bg-surface-muted pb-20 md:pb-10">
+      <TopNav />
+      <div className="px-4 pb-6 pt-6 md:pt-20 max-w-4xl mx-auto">
         <div className="mb-6">
           <Heading level={1} className="text-2xl font-semibold text-accent-secondary">
             Profile

@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { OFFICE_TIMEZONE } from "../utils/bookingUtils";
 import { useAlert } from "../context/AlertContext";
 import BottomNav from "../components/BottomNav";
+import TopNav from "../components/TopNav";
 import { Heading, Text } from "../components/ui/Typography";
 import { useCalendarBookings, DayInfo } from "../components/calendar/useCalendarBookings";
 import BookingCardInline from "../components/calendar/BookingCardInline";
@@ -107,8 +108,9 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="min-h-screen bg-surface-muted pb-20">
-      <div className="px-4 py-6 max-w-4xl mx-auto">
+    <div className="min-h-screen bg-surface-muted pb-20 md:pb-10">
+      <TopNav />
+      <div className="px-4 pb-6 pt-6 md:pt-20 max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>

@@ -4,6 +4,7 @@ import { useAlert } from "../context/AlertContext";
 import Button from "../components/ui/Button";
 import { error as logError } from "../utils/logger";
 import BottomNav from "../components/BottomNav";
+import TopNav from "../components/TopNav";
 import RoomList from "../components/RoomList";
 import RoomFilters from "../components/RoomFilters";
 import BookingForm from "../components/BookingForm";
@@ -209,8 +210,9 @@ export default function RoomsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-surface-muted pb-20">
-      <div className="px-4 py-6 max-w-4xl mx-auto">
+    <div className="min-h-screen bg-surface-muted pb-20 md:pb-10">
+      <TopNav />
+      <div className="px-4 pb-6 pt-6 md:pt-20 max-w-4xl mx-auto">
         <div className="flex items-center justify-between gap-4 mb-2">
           <Heading level={1} className="text-2xl font-semibold text-accent-secondary">
             Rooms

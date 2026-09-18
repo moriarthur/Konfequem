@@ -18,6 +18,10 @@ const roomName = `E2E Room ${unique.slice(-4)}`;
 test("booking happy path: register org, create room, book slot, see it on the calendar", async ({
   page,
 }) => {
+  // Desktop viewport → the Primary (top) nav; the mobile bottom bar is
+  // hidden but still in the DOM, so always scope to the visible one.
+  const primaryNav = page.getByRole("navigation", { name: "Primary" });
+
   // --- 1. Register org + org_admin -------------------------------------
   await page.goto("/register");
   await page.getByLabel("Organization name").fill("E2E Test Org");
@@ -29,7 +33,7 @@ test("booking happy path: register org, create room, book slot, see it on the ca
   await page.waitForURL((url) => url.pathname === "/");
 
   // --- 2. Create a room (org admins see "+ Add Room") -------------------
-  await page.locator('[aria-label="Rooms"]').click();
+  await primaryNav.getByRole("button", { name: "Rooms" }).click();
   await page.getByRole("button", { name: "+ Add Room" }).click();
   await page.getByLabel("Room name").fill(roomName);
   await page.getByLabel("Location", { exact: false }).fill("Floor 1");
@@ -57,7 +61,7 @@ test("booking happy path: register org, create room, book slot, see it on the ca
   ).toBeVisible({ timeout: 10_000 });
 
   // --- 4. The booking appears on the calendar ----------------------------
-  await page.locator('[aria-label="Calendar"]').click();
+  await primaryNav.getByRole("button", { name: "Calendar" }).click();
   await expect(page.getByRole("heading", { name: "Calendar" })).toBeVisible();
 
   // Today's cell gets a busy chip (time + room name) once availability loads.

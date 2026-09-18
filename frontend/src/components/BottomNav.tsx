@@ -7,7 +7,8 @@ interface NavItem {
   icon: () => ReactNode;
 }
 
-const navItems: NavItem[] = [
+// Shared with TopNav (desktop) so both navigations stay in sync.
+export const navItems: NavItem[] = [
   {
     path: "/",
     label: "Home",
@@ -83,7 +84,10 @@ export default function BottomNav() {
   const navigate = useNavigate();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-surface-base border-t border-border-subtle safe-area-inset-bottom z-50">
+    <nav
+      aria-label="Mobile"
+      className="fixed bottom-0 left-0 right-0 bg-surface-base border-t border-border-subtle safe-area-inset-bottom z-50 md:hidden"
+    >
       <div className="flex justify-around items-center h-16">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
@@ -93,7 +97,7 @@ export default function BottomNav() {
               key={item.path}
               onClick={() => navigate(item.path)}
               className={`flex flex-col items-center justify-center w-full h-full transition-colors relative ${
-                isActive ? "text-accent-primary" : "text-accent-secondary/60"
+                isActive ? "text-accent-primary" : "text-accent-secondary/70"
               }`}
               aria-label={item.label}
               aria-current={isActive ? "page" : undefined}

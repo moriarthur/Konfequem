@@ -52,8 +52,9 @@ try {
   await page.waitForURL((url) => url.pathname === "/");
   await shot("home");
 
-  // Rooms list
-  await page.locator('[aria-label="Rooms"]').click();
+  // Rooms list (desktop viewport → Primary top nav)
+  const primaryNav = page.getByRole("navigation", { name: "Primary" });
+  await primaryNav.getByRole("button", { name: "Rooms" }).click();
   await page.getByRole("button", { name: "Book this room" }).first().waitFor();
   await shot("rooms");
 
@@ -63,14 +64,22 @@ try {
   await shot("booking");
   await page.locator('[aria-label="Close"]').click();
 
-  // Calendar with the day expanded
-  await page.locator('[aria-label="Calendar"]').click();
+  // Calendar month grid with busy chips (today shows past + current)
+  await primaryNav.getByRole("button", { name: "Calendar" }).click();
   await page.getByRole("heading", { name: "Calendar" }).waitFor();
   const today = page.locator("div.cursor-pointer.bg-white");
   await today.waitFor({ timeout: 15_000 });
+  await shot("calendar");
+
+  // Expanded day: past, current ("Now"), and — on other days — cancelled
   await today.click();
   await page.getByRole("heading", { name: /\w+ \d{1,2}, \d{4}/ }).waitFor();
-  await shot("calendar");
+  await shot("calendar-day");
+
+  // Profile with booking history (ongoing / completed / cancelled)
+  await primaryNav.getByRole("button", { name: "Profile" }).click();
+  await page.getByRole("heading", { name: "Profile", exact: true }).waitFor();
+  await shot("profile");
 
   console.log(`\nSaved to ${OUT_DIR}`);
 } finally {

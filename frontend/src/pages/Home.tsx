@@ -5,6 +5,7 @@ import { error as logError } from "../utils/logger";
 import { OFFICE_TIMEZONE, BookingData } from "../utils/bookingUtils";
 import { useAlert } from "../context/AlertContext";
 import BottomNav from "../components/BottomNav";
+import TopNav from "../components/TopNav";
 import Button from "../components/ui/Button";
 import BookingForm from "../components/BookingForm";
 import Logo from "../components/Logo";
@@ -193,9 +194,10 @@ export default function Home() {
   const username = user?.username as string | undefined;
 
   return (
-    <div className="min-h-screen bg-surface-muted pb-20">
+    <div className="min-h-screen bg-surface-muted pb-20 md:pb-10">
+      {isAuthenticated && <TopNav />}
       {loading && (
-        <div className="px-4 py-6 max-w-4xl mx-auto">
+        <div className="px-4 pb-6 pt-6 md:pt-20 max-w-4xl mx-auto">
           <div className="mb-6">
             <div className="flex items-center justify-center gap-1 mb-4">
               <Skeleton className="h-5 w-28" />
@@ -220,174 +222,20 @@ export default function Home() {
       )}
 
       {!loading && isAuthenticated ? (
-        <div className="px-4 py-6 max-w-4xl mx-auto">
+        <div className="px-4 pb-6 pt-6 md:pt-20 max-w-4xl mx-auto">
           <section className="mb-6">
-            <div className="flex items-center justify-center gap-1 mb-4">
-              <span className="text-xl font-bold tracking-wide" style={{ color: "#61b390" }}>KONFEQUEM</span>
-              <Logo size="sm" className="mx-1" />
-              <span className="text-xl font-bold tracking-wide" style={{ color: "#01352c" }}>WORKSPACE</span>
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <Logo size="sm" className="h-8 w-8" alt="" />
+              <span className="text-xl font-bold tracking-wide text-accent-secondary">Konfequem</span>
             </div>
             <div className="text-center">
-              <p className="text-sm text-accent-secondary/60">
+              <p className="text-sm text-accent-secondary/70">
                 {getTimeBasedGreeting()}, {firstName || username || "there"}
               </p>
             </div>
             <Text variant="muted" className="text-sm text-center mt-1">
               {getTodayDate()}
             </Text>
-          </section>
-
-          <section className="mb-6">
-            <div className="bg-surface-base border border-border-subtle rounded-xl p-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-accent-secondary/60 mb-1">Available now</p>
-                  <p className="text-2xl font-semibold text-accent-secondary">
-                    {availableNow} <span className="text-sm font-normal text-accent-secondary/60">of {rooms?.length || 0} rooms</span>
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-accent-secondary/60 mb-1">Today's meetings</p>
-                  <p className="text-2xl font-semibold text-accent-secondary">
-                    {todayBookingsCount}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {upcomingBookings.current && (
-            <section className="mb-6">
-              <div className="bg-status-success/10 border border-status-success/20 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-status-success">
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/>
-                    <path d="M8.5 12.5L10.5 14.5L15.5 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  <p className="text-sm font-medium text-status-success">Happening now</p>
-                </div>
-                <p className="font-semibold text-accent-secondary">
-                  {(upcomingBookings.current.room_name as string) || roomDisplayName(upcomingBookings.current.room)}
-                </p>
-                <p className="text-sm text-accent-secondary/70 mt-1">
-                  Until {DateTime.fromISO(upcomingBookings.current.end_time).setZone("Europe/Berlin").toFormat("HH:mm")}
-                </p>
-              </div>
-            </section>
-          )}
-
-          {!upcomingBookings.current && upcomingBookings.upcoming.length > 0 && (
-            <section className="mb-6">
-              <div className="bg-status-warning/10 border border-status-warning/20 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-status-warning">
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/>
-                    <path d="M12 8V12L14.5 14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  <p className="text-sm font-medium text-status-warning">Upcoming next</p>
-                </div>
-                <p className="font-semibold text-accent-secondary">
-                  {(upcomingBookings.upcoming[0].room_name as string) || roomDisplayName(upcomingBookings.upcoming[0].room)}
-                </p>
-                <p className="text-sm text-accent-secondary/70 mt-1">
-                  {DateTime.fromISO(upcomingBookings.upcoming[0].start_time).setZone("Europe/Berlin").toFormat("HH:mm")} –{" "}
-                  {DateTime.fromISO(upcomingBookings.upcoming[0].end_time).setZone("Europe/Berlin").toFormat("HH:mm")}
-                </p>
-              </div>
-            </section>
-          )}
-
-          <section className="mb-6">
-            <div className="bg-surface-base border border-border-subtle rounded-xl p-4">
-              <Heading level={2} className="text-lg font-semibold text-accent-secondary mb-4">
-                Upcoming Bookings
-              </Heading>
-
-              {upcomingBookings.upcoming.length === 0 && !upcomingBookings.current ? (
-                <EmptyState
-                  icon={
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-12 h-12">
-                      <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                      <path d="M3 10H21" stroke="currentColor" strokeWidth="1.5"/>
-                      <path d="M8 2V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                      <path d="M16 2V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                      <path d="M12 14V14.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                      <circle cx="12" cy="17" r="0.5" fill="currentColor"/>
-                    </svg>
-                  }
-                  title="No upcoming bookings"
-                  description="Your schedule is clear. Book a room to get started."
-                  action={
-                    <button
-                      onClick={() => navigate("/rooms")}
-                      className="px-4 py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-primary/90 text-sm font-medium"
-                    >
-                      Book a room
-                    </button>
-                  }
-                />
-              ) : (
-                <>
-                  <div className="space-y-2">
-                    {upcomingBookings.current && (
-                      <div className="w-full bg-surface-base border rounded-xl p-3 flex items-center justify-between gap-3 border-status-success/30 bg-status-success/5">
-                        <div className="flex-1 min-w-0 text-left">
-                          <p className="font-medium text-accent-secondary truncate">
-                            {(upcomingBookings.current.room_name as string) || roomDisplayName(upcomingBookings.current.room)}
-                          </p>
-                          <p className="text-xs text-accent-secondary/60">
-                            {DateTime.fromISO(upcomingBookings.current.start_time).setZone("Europe/Berlin").toFormat("HH:mm")} –{" "}
-                            {DateTime.fromISO(upcomingBookings.current.end_time).setZone("Europe/Berlin").toFormat("HH:mm")}
-                            <span className="ml-2 text-status-success font-medium">Now</span>
-                          </p>
-                        </div>
-                        <span className="text-xs font-medium text-status-success px-2 py-1 bg-status-success/10 rounded-full flex-shrink-0">
-                          In Progress
-                        </span>
-                      </div>
-                    )}
-                    {upcomingBookings.upcoming.map((booking) => {
-                      const start = DateTime.fromISO(booking.start_time).setZone("Europe/Berlin");
-                      const now = DateTime.now().setZone("Europe/Berlin");
-                      const isToday = start.hasSame(now, "day");
-                      const isTomorrow = start.hasSame(now.plus({ days: 1 }), "day");
-
-                      let dateLabel = start.toFormat("EEE, MMM d");
-                      if (isToday) dateLabel = "Today";
-                      if (isTomorrow) dateLabel = "Tomorrow";
-
-                      return (
-                        <button
-                          key={String(booking.id)}
-                          onClick={() => setDetailsBooking(booking)}
-                          className="w-full bg-surface-muted border border-border-subtle rounded-xl p-3 flex items-center justify-between gap-3 hover:ring-2 hover:ring-accent-primary/30 hover:bg-surface-base transition-all group"
-                        >
-                          <div className="flex-1 min-w-0 text-left">
-                            <p className="font-medium text-accent-secondary truncate">
-                              {(booking.room_name as string) || roomDisplayName(booking.room)}
-                            </p>
-                            <p className="text-xs text-accent-secondary/60">
-                              {dateLabel} • {start.toFormat("HH:mm")} –{" "}
-                              {DateTime.fromISO(booking.end_time).setZone("Europe/Berlin").toFormat("HH:mm")}
-                            </p>
-                          </div>
-                          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-accent-secondary/30 group-hover:text-accent-primary group-hover:translate-x-0.5 transition-all flex-shrink-0">
-                            <path d="M9.5 7L14.5 12L9.5 17" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <button
-                    onClick={() => navigate("/calendar")}
-                    className="w-full text-center text-sm text-accent-primary hover:underline mt-4"
-                  >
-                    View all bookings →
-                  </button>
-                </>
-              )}
-            </div>
           </section>
 
           <section className="mb-4">
@@ -522,10 +370,163 @@ export default function Home() {
               <span className={!showQuickBook ? 'ml-2' : ''}>
                 {showQuickBook
                   ? (bookingToEdit ? 'Update Booking' : 'Book a Room')
-                  : 'Quick Book a Room'
+                  : 'Book a room'
                 }
               </span>
             </Button>
+          </section>
+
+          <section className="mb-6">
+            <div className="bg-surface-base border border-border-subtle rounded-xl p-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-accent-secondary/80 mb-1">Available now</p>
+                  <p className="text-2xl font-semibold text-accent-secondary">
+                    {availableNow} <span className="text-sm font-normal text-accent-secondary/70">of {rooms?.length || 0} rooms</span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-accent-secondary/80 mb-1">Today's meetings</p>
+                  <p className="text-2xl font-semibold text-accent-secondary">
+                    {todayBookingsCount}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {upcomingBookings.current && (
+            <section className="mb-6">
+              <div className="bg-status-success/10 border border-status-success/20 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-status-success">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M8.5 12.5L10.5 14.5L15.5 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <p className="text-sm font-medium text-status-success">Happening now</p>
+                </div>
+                <p className="font-semibold text-accent-secondary">
+                  {(upcomingBookings.current.room_name as string) || roomDisplayName(upcomingBookings.current.room)}
+                </p>
+                <p className="text-sm text-accent-secondary/70 mt-1">
+                  Until {DateTime.fromISO(upcomingBookings.current.end_time).setZone("Europe/Berlin").toFormat("HH:mm")}
+                </p>
+              </div>
+            </section>
+          )}
+
+          {!upcomingBookings.current && upcomingBookings.upcoming.length > 0 && (
+            <section className="mb-6">
+              <div className="bg-status-warning/10 border border-status-warning/20 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-status-warning">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M12 8V12L14.5 14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <p className="text-sm font-medium text-status-warning">Upcoming next</p>
+                </div>
+                <p className="font-semibold text-accent-secondary">
+                  {(upcomingBookings.upcoming[0].room_name as string) || roomDisplayName(upcomingBookings.upcoming[0].room)}
+                </p>
+                <p className="text-sm text-accent-secondary/70 mt-1">
+                  {DateTime.fromISO(upcomingBookings.upcoming[0].start_time).setZone("Europe/Berlin").toFormat("HH:mm")} –{" "}
+                  {DateTime.fromISO(upcomingBookings.upcoming[0].end_time).setZone("Europe/Berlin").toFormat("HH:mm")}
+                </p>
+              </div>
+            </section>
+          )}
+
+          <section className="mb-6">
+            <div className="bg-surface-base border border-border-subtle rounded-xl p-4">
+              <Heading level={2} className="text-lg font-semibold text-accent-secondary mb-4">
+                Upcoming Bookings
+              </Heading>
+
+              {upcomingBookings.upcoming.length === 0 && !upcomingBookings.current ? (
+                <EmptyState
+                  icon={
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-12 h-12">
+                      <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                      <path d="M3 10H21" stroke="currentColor" strokeWidth="1.5"/>
+                      <path d="M8 2V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                      <path d="M16 2V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                      <path d="M12 14V14.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      <circle cx="12" cy="17" r="0.5" fill="currentColor"/>
+                    </svg>
+                  }
+                  title="No upcoming bookings"
+                  description="Your schedule is clear. Book a room to get started."
+                  action={
+                    <button
+                      onClick={() => navigate("/rooms")}
+                      className="px-4 py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-primary/90 text-sm font-medium"
+                    >
+                      Book a room
+                    </button>
+                  }
+                />
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    {upcomingBookings.current && (
+                      <div className="w-full bg-surface-base border rounded-xl p-3 flex items-center justify-between gap-3 border-status-success/30 bg-status-success/5">
+                        <div className="flex-1 min-w-0 text-left">
+                          <p className="font-medium text-accent-secondary truncate">
+                            {(upcomingBookings.current.room_name as string) || roomDisplayName(upcomingBookings.current.room)}
+                          </p>
+                          <p className="text-xs text-accent-secondary/70">
+                            {DateTime.fromISO(upcomingBookings.current.start_time).setZone("Europe/Berlin").toFormat("HH:mm")} –{" "}
+                            {DateTime.fromISO(upcomingBookings.current.end_time).setZone("Europe/Berlin").toFormat("HH:mm")}
+                            <span className="ml-2 text-status-success font-medium">Now</span>
+                          </p>
+                        </div>
+                        <span className="text-xs font-medium text-status-success px-2 py-1 bg-status-success/10 rounded-full flex-shrink-0">
+                          In Progress
+                        </span>
+                      </div>
+                    )}
+                    {upcomingBookings.upcoming.map((booking) => {
+                      const start = DateTime.fromISO(booking.start_time).setZone("Europe/Berlin");
+                      const now = DateTime.now().setZone("Europe/Berlin");
+                      const isToday = start.hasSame(now, "day");
+                      const isTomorrow = start.hasSame(now.plus({ days: 1 }), "day");
+
+                      let dateLabel = start.toFormat("EEE, MMM d");
+                      if (isToday) dateLabel = "Today";
+                      if (isTomorrow) dateLabel = "Tomorrow";
+
+                      return (
+                        <button
+                          key={String(booking.id)}
+                          onClick={() => setDetailsBooking(booking)}
+                          className="w-full bg-surface-muted border border-border-subtle rounded-xl p-3 flex items-center justify-between gap-3 hover:ring-2 hover:ring-accent-primary/30 hover:bg-surface-base transition-all group"
+                        >
+                          <div className="flex-1 min-w-0 text-left">
+                            <p className="font-medium text-accent-secondary truncate">
+                              {(booking.room_name as string) || roomDisplayName(booking.room)}
+                            </p>
+                            <p className="text-xs text-accent-secondary/70">
+                              {dateLabel} • {start.toFormat("HH:mm")} –{" "}
+                              {DateTime.fromISO(booking.end_time).setZone("Europe/Berlin").toFormat("HH:mm")}
+                            </p>
+                          </div>
+                          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-accent-secondary/30 group-hover:text-accent-primary group-hover:translate-x-0.5 transition-all flex-shrink-0">
+                            <path d="M9.5 7L14.5 12L9.5 17" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    onClick={() => navigate("/calendar")}
+                    className="w-full text-center text-sm text-accent-primary hover:underline mt-4"
+                  >
+                    View all bookings →
+                  </button>
+                </>
+              )}
+            </div>
           </section>
 
           <section className="mb-4">
