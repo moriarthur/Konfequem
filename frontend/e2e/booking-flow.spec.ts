@@ -64,9 +64,11 @@ test("booking happy path: register org, create room, book slot, see it on the ca
   await primaryNav.getByRole("button", { name: "Calendar" }).click();
   await expect(page.getByRole("heading", { name: "Calendar" })).toBeVisible();
 
-  // Today's cell gets a busy chip (time + room name) once availability loads.
+  // The booking chip appears in its selected day once availability loads.
+  // Click the chip itself instead of assuming the selected date is today:
+  // after the office-hour edge the first enabled picker day may be tomorrow.
   await expect(page.getByText(roomName).first()).toBeVisible({ timeout: 15_000 });
-  await page.locator("div.cursor-pointer.bg-white").click(); // today's cell → expanded day
+  await page.getByText(roomName).first().click();
   await expect(page.getByRole("heading", { name: /\w+ \d{1,2}, \d{4}/ })).toBeVisible();
   await expect(page.getByText(roomName).first()).toBeVisible();
 });
