@@ -208,6 +208,16 @@ if not DEBUG:
     # HSTS tells browsers to stay on https for a year.
     SECURE_SSL_REDIRECT = True
     SECURE_HSTS_SECONDS = 31536000
+    # Deliberately OFF: the app runs on shared platform domains
+    # (konfequem-backend.onrender.com / konfequem.netlify.app). We don't own
+    # that subdomain tree, so includeSubdomains/preload are not ours to set —
+    # `manage.py check --deploy` warns about them and that is expected.
+    # Revisit only if the project gets its OWN domain: then verify via
+    # certificate-transparency logs (https://crt.sh/?q=%25.<domain>) that no
+    # insecure subdomains exist, enable both flags, and submit to
+    # https://hstspreload.org.
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_HSTS_PRELOAD = False
 
 # Logging
 LOGGING = {
