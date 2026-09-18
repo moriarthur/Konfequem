@@ -8,7 +8,6 @@ import BottomNav from "../components/BottomNav";
 import TopNav from "../components/TopNav";
 import Button from "../components/ui/Button";
 import BookingForm from "../components/BookingForm";
-import Logo from "../components/Logo";
 import { Heading, Text } from "../components/ui/Typography";
 import { Skeleton, StatCardSkeleton, BookingListSkeleton } from "../components/ui/Skeleton";
 import EmptyState from "../components/ui/EmptyState";
@@ -199,12 +198,8 @@ export default function Home() {
       {loading && (
         <div className="px-4 pb-6 pt-6 md:pt-20 max-w-4xl mx-auto">
           <div className="mb-6">
-            <div className="flex items-center justify-center gap-1 mb-4">
-              <Skeleton className="h-5 w-28" />
-              <Skeleton className="h-5 w-5" />
-              <Skeleton className="h-5 w-28" />
-            </div>
-            <Skeleton className="h-4 w-48 mx-auto" />
+            <Skeleton className="h-6 w-52 mx-auto" />
+            <Skeleton className="h-4 w-48 mx-auto mt-2" />
           </div>
 
           <div className="grid grid-cols-2 gap-3 mb-6">
@@ -224,14 +219,10 @@ export default function Home() {
       {!loading && isAuthenticated ? (
         <div className="px-4 pb-6 pt-6 md:pt-20 max-w-4xl mx-auto">
           <section className="mb-6">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <Logo size="sm" className="h-8 w-8" alt="" />
-              <span className="text-xl font-bold tracking-wide text-accent-secondary">Konfequem</span>
-            </div>
             <div className="text-center">
-              <p className="text-sm text-accent-secondary/70">
+              <h2 className="text-xl font-semibold text-accent-secondary">
                 {getTimeBasedGreeting()}, {firstName || username || "there"}
-              </p>
+              </h2>
             </div>
             <Text variant="muted" className="text-sm text-center mt-1">
               {getTodayDate()}
