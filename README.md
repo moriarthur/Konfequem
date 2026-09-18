@@ -10,11 +10,30 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat&logo=postgresql&logoColor=white)](https://postgresql.org)
 [![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white)](https://docker.com)
 
-*Book rooms by the hour with real-time calendar views, JWT-secured API, and office-hours validation.*
+*Book rooms by the hour with an interactive availability calendar, JWT-secured API, and office-hours validation.*
 
 </div>
 
 ---
+
+## Live Demo
+
+**[konfequem.netlify.app](https://konfequem.netlify.app)**
+
+| Demo access | |
+|---|---|
+| Login | `demo-reviewer` |
+| Password | `DemoOnly-Br4nd-New-2026` |
+
+The account comes preloaded with sample rooms and bookings (member role, no
+admin rights). Demo-only — please don't enter real data. Demo content is
+reset periodically.
+
+| Home | Rooms |
+|---|---|
+| ![Home dashboard](docs/screenshots/home.png) | ![Room list](docs/screenshots/rooms.png) |
+| **Booking** | **Calendar** |
+| ![Booking flow](docs/screenshots/booking.png) | ![Calendar](docs/screenshots/calendar.png) |
 
 ## What it does
 
@@ -29,7 +48,26 @@ Konfequem is a room booking system for organizations that need to manage shared 
 - **User Profiles** — Account management and booking history
 - **Timezone-Aware** — Stores UTC, displays Europe/Berlin; correct DST handling
 - **Docker-Ready** — Full Docker Compose stack (Django + React + PostgreSQL)
-- **Test Suite** — pytest on backend, testing infrastructure on frontend
+- **Test Suite** — 241 pytest tests on the backend, Vitest + MSW on the frontend, Playwright E2E over the full booking flow
+
+## Engineering Highlights
+
+- **Strict multi-tenancy** — every query is organization-scoped; DB-level
+  guard triggers (plus model validation) prevent moving rooms/users across
+  orgs while bookings reference them, even for writers that bypass the API.
+- **One source of truth for booking rules** — office hours, duration and
+  advance limits live in a single validator module shared by the DRF
+  serializer *and* `Model.clean()`, so the API and Django admin can't drift.
+- **Soft-cancel with parity** — cancelled bookings stay as history, are
+  excluded from overlap checks in the serializer *and* in the partial DB
+  exclusion constraint; the slot frees up, the audit trail stays.
+- **Token hygiene** — changing a password blacklists *all* outstanding
+  refresh tokens, so a stolen refresh token dies immediately.
+- **DST-safe time handling** — everything stores UTC, renders in
+  Europe/Berlin; tests use timezone fixtures instead of hardcoded offsets.
+- **Deliberate rate limiting** — throttles are scoped per auth-sensitive
+  endpoint only; data endpoints stay unthrottled so tab navigation can't
+  exhaust a global budget.
 
 ## Architecture
 
@@ -100,6 +138,24 @@ docker compose exec backend python manage.py createsuperuser
 | Maximum booking | 8 hours |
 | Advance booking | Up to 90 days |
 | Overlap detection | Server-side validation |
+
+## Testing
+
+```bash
+# Backend — pytest (241 tests)
+cd backend && python3 -m pytest --tb=short -q
+
+# Frontend — Vitest + MSW component tests
+cd frontend && npx vitest run
+
+# Browser E2E — full booking flow via Playwright
+# (requires the Docker Compose stack running: docker compose up -d)
+cd frontend && npm run e2e
+```
+
+The E2E test is self-contained: it registers its own throwaway organization,
+creates a room, books a slot, and asserts the booking shows up on the
+calendar — no seeded data required. It is run locally, not (yet) in CI.
 
 ---
 
