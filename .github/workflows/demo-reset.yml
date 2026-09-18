@@ -1,0 +1,44 @@
+name: Demo reset
+
+# Monthly reset of the public demo organization (slug "demo"): the seed
+# command deletes and recreates ONLY that org (rooms, bookings, demo users
+# cascade with it), keeping the credentials published in the README valid.
+# Real organizations, the old "konfequem" dev org, and room features
+# (global) are never touched.
+#
+# Requires the repo secrets (same as backup.yml):
+#   SUPABASE_DB_URL — connection URI for the Supabase database
+# The demo password is not a secret: it is published in the README by
+# design, so the scheduled reset keeps those credentials working.
+on:
+  schedule:
+    # 1st of each month at 04:07 UTC, off the round hour.
+    - cron: "7 4 1 * *"
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Reset demo data
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+          DJANGO_SECRET_KEY: demo-reset-run
+          DEMO_PASSWORD: DemoOnly-Br4nd-New-2026
+        run: |
+          python manage.py migrate --noinput
+          python manage.py seed_demo --reset

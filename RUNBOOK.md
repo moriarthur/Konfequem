@@ -54,6 +54,25 @@ Rotation via Render env alone is never enough for the superuser (see table).
   red means Supabase or secrets are broken.
 - **Sentry:** not installed. Backend errors live in ephemeral Render logs.
 
+## Public demo account (README credentials)
+- Seeded by `manage.py seed_demo` — creates org "Demo Workspaces" (slug
+  `demo`), rooms, sample bookings, and members `demo-reviewer` /
+  `demo-colleague` (role `member`, no admin rights).
+- **Reset anytime** (keeps the README password working — the command reads
+  `DEMO_PASSWORD`):
+  ```bash
+  # Against Supabase/prod (from backend/):
+  DATABASE_URL='<supabase-uri>' DJANGO_SECRET_KEY=x \
+    DEMO_PASSWORD='DemoOnly-Br4nd-New-2026' python manage.py seed_demo --reset
+  ```
+- Scheduled: `.github/workflows/demo-reset.yml` runs the same reset on the
+  1st of each month (uses the `SUPABASE_DB_URL` secret, no new secrets).
+- Only the org with slug `demo` is ever deleted — real orgs are untouched.
+  If a reviewer joined the demo org via an invite key, their memberships are
+  cascaded away with it; registered accounts in *their own* orgs are not.
+- Local E2E runs (`npm run e2e`) each leave one disposable `e2e-*` org in the
+  local DB — harmless, delete via Django admin if the list gets noisy.
+
 ## Known deferred items (do not "fix" blindly)
 - `check --deploy` warns about `SECURE_HSTS_INCLUDE_SUBDOMAINS`/`PRELOAD` —
   intentionally off: the app is on shared platform domains (see settings.py).
