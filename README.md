@@ -29,13 +29,14 @@ The account comes preloaded with sample rooms and bookings (member role, no
 admin rights). Demo-only — please don't enter real data. Demo content is
 reset periodically.
 
-| Home | Rooms |
+![Home dashboard](docs/screenshots/home.png)
+
+| Rooms | Booking |
 |---|---|
-| ![Home dashboard](docs/screenshots/home.png) | ![Room list](docs/screenshots/rooms.png) |
-| **Booking** | **Calendar** |
-| ![Booking flow](docs/screenshots/booking.png) | ![Calendar](docs/screenshots/calendar.png) |
-| **Day view** | **Profile** |
-| ![Calendar day view](docs/screenshots/calendar-day.png) | ![Profile](docs/screenshots/profile.png) |
+| ![Room list](docs/screenshots/rooms.png) | ![Booking flow](docs/screenshots/booking.png) |
+| ![Calendar](docs/screenshots/calendar.png) | ![Calendar day view](docs/screenshots/calendar-day.png) |
+
+![Profile](docs/screenshots/profile.png)
 
 ## What it does
 

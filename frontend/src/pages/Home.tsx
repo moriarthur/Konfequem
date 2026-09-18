@@ -6,6 +6,7 @@ import { OFFICE_TIMEZONE, BookingData } from "../utils/bookingUtils";
 import { useAlert } from "../context/AlertContext";
 import BottomNav from "../components/BottomNav";
 import TopNav from "../components/TopNav";
+import Logo from "../components/Logo";
 import Button from "../components/ui/Button";
 import BookingForm from "../components/BookingForm";
 import { Heading, Text } from "../components/ui/Typography";
@@ -219,6 +220,14 @@ export default function Home() {
       {!loading && isAuthenticated ? (
         <div className="px-4 pb-6 pt-6 md:pt-20 max-w-4xl mx-auto">
           <section className="mb-6">
+            {/* Mobile has no top nav, so the brand header lives here;
+                on md+ the TopNav already shows it. */}
+            <div className="md:hidden flex items-center justify-center gap-2 mb-3">
+              <Logo size="sm" className="h-8 w-8" alt="" />
+              <span className="text-xl font-bold tracking-wide text-accent-secondary">
+                Konfequem
+              </span>
+            </div>
             <div className="text-center">
               <h2 className="text-xl font-semibold text-accent-secondary">
                 {getTimeBasedGreeting()}, {firstName || username || "there"}
