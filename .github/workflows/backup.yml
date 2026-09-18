@@ -10,7 +10,7 @@ name: Backup
 #   SUPABASE_DB_URL — a full connection URI against the SESSION pooler
 #   (port 5432), NOT the transaction pooler (:6543) the app uses: pg_dump
 #   does not work through transaction-mode pooling.
-#     gh secret set SUPABASE_DB_URL --repo moriarthur/Konfequem
+#     gh secret set SUPABASE_DB_URL --repo moriarthur/konfequem
 #   BACKUP_AGE_PUBLIC_KEY — age recipient public key (age1...), from:
 #     age-keygen -o backup_age.key   # private: keep offline; pubkey: this secret
 #

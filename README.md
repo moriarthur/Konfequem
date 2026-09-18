@@ -115,7 +115,7 @@ konfequem/
 # Prerequisites: Docker & Docker Compose
 
 # Clone
-git clone https://github.com/moriarthur/Konfequem.git
+git clone https://github.com/moriarthur/konfequem.git
 cd Konfequem
 
 # Configure
