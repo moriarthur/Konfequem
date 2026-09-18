@@ -1,17 +1,22 @@
 name: Backup
 
-# Daily pg_dump of the Supabase database into a workflow artifact.
-# GitHub's free artifact quota is far more than a dump of this size needs;
-# retention-days keeps a rolling window of dailies.
+# Daily encrypted pg_dump of the Supabase database into a workflow artifact.
+# The dump contains user data, invite keys and password hashes, so it is
+# age-encrypted with the BACKUP_AGE_PUBLIC_KEY repo secret before upload —
+# plaintext never reaches GitHub. Decryption requires the PRIVATE key, which
+# lives only with the maintainer (never in the repo or in GitHub).
 #
-# Requires the repo secret SUPABASE_DB_URL — a full connection URI against
-# the SESSION pooler (port 5432), NOT the transaction pooler (:6543) the app
-# uses: pg_dump does not work through transaction-mode pooling.
-#   gh secret set SUPABASE_DB_URL --repo moriarthur/Konfequem
-#   postgresql://postgres.debmjuxnibreictnydfe:<PASSWORD>@aws-0-eu-west-1.pooler.supabase.com:5432/postgres
+# Requires the repo secrets:
+#   SUPABASE_DB_URL — a full connection URI against the SESSION pooler
+#   (port 5432), NOT the transaction pooler (:6543) the app uses: pg_dump
+#   does not work through transaction-mode pooling.
+#     gh secret set SUPABASE_DB_URL --repo moriarthur/Konfequem
+#   BACKUP_AGE_PUBLIC_KEY — age recipient public key (age1...), from:
+#     age-keygen -o backup_age.key   # private: keep offline; pubkey: this secret
 #
-# Restore recipe (test it once in a while):
+# Restore drill (run occasionally — this is the restore test):
 #   gh run download <run-id> -n supabase-backup -D /tmp/bak
+#   age -d -i backup_age.key -o /tmp/bak/dump.dump /tmp/bak/dump.dump.age
 #   docker run --rm -v /tmp/bak:/bak -e DB_URL="$SUPABASE_DB_URL" postgres:17 \
 #     sh -c 'createdb "$DB_URL" -T template0 konfequem_restore && \
 #            pg_restore "$DB_URL" --dbname=konfequem_restore --no-owner /bak/dump.dump'
@@ -25,14 +30,26 @@ jobs:
   pg_dump:
     runs-on: ubuntu-latest
     steps:
-      - name: Fail fast if the secret is missing
+      - name: Fail fast if a secret is missing
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_AGE_PUBLIC_KEY: ${{ secrets.BACKUP_AGE_PUBLIC_KEY }}
         run: |
           if [ -z "$SUPABASE_DB_URL" ]; then
             echo "::error::SUPABASE_DB_URL secret is not set (see the comment at the top of this file)."
             exit 1
           fi
+          if [ -z "$BACKUP_AGE_PUBLIC_KEY" ]; then
+            echo "::error::BACKUP_AGE_PUBLIC_KEY secret is not set — refusing to upload a plaintext dump (see the comment at the top of this file)."
+            exit 1
+          fi
+          if [[ "$BACKUP_AGE_PUBLIC_KEY" != age1* ]]; then
+            echo "::error::BACKUP_AGE_PUBLIC_KEY does not look like an age recipient key (expected 'age1...')."
+            exit 1
+          fi
+
+      - name: Install age
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq age
 
       - name: Dump database
         env:
@@ -48,9 +65,30 @@ jobs:
             sh -c 'pg_dump "$DB_URL" --format=custom --file=/backup/dump.dump'
           ls -lh /tmp/backup/dump.dump
 
+      - name: Encrypt dump
+        env:
+          BACKUP_AGE_PUBLIC_KEY: ${{ secrets.BACKUP_AGE_PUBLIC_KEY }}
+        run: |
+          age -r "$BACKUP_AGE_PUBLIC_KEY" -o /tmp/backup/dump.dump.age /tmp/backup/dump.dump
+          # The plaintext must not survive into the artifact upload.
+          shred -u /tmp/backup/dump.dump
+          if [ -f /tmp/backup/dump.dump ]; then
+            echo "::error::plaintext dump still present after encryption"
+            exit 1
+          fi
+
+      - name: Verify encrypted artifact
+        run: |
+          test -s /tmp/backup/dump.dump.age
+          # CI holds no private key, so full decryption is the maintainer's
+          # local restore drill (see the recipe at the top). Here: sanity —
+          # the payload must parse as an age file.
+          head -c 22 /tmp/backup/dump.dump.age | grep -q "age-encryption.org/v1"
+          ls -lh /tmp/backup/dump.dump.age
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: supabase-backup
-          path: /tmp/backup/dump.dump
+          path: /tmp/backup/dump.dump.age
           retention-days: 30
