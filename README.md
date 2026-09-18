@@ -20,6 +20,8 @@
 
 **[konfequem.netlify.app](https://konfequem.netlify.app)**
 
+![Konfequem product demo](docs/screenshots/demo.gif)
+
 | Demo access | |
 |---|---|
 | Login | `demo-reviewer` |

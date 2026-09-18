@@ -19,6 +19,7 @@ frontend/dist/
 # Playwright E2E artifacts
 frontend/test-results/
 frontend/playwright-report/
+frontend/demo-output/
 
 # Virtual environment
 backend/venv/

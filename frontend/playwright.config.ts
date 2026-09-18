@@ -11,6 +11,9 @@ import { defineConfig } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./e2e",
+  // e2e/demo holds the scripted demo recorder (playwright.demo.config.ts);
+  // keep the slow, cinematic run out of `npm run e2e`.
+  testIgnore: "**/demo/**",
   timeout: 60_000,
   retries: 0,
   // One flow, one browser — the test registers its own org with a unique

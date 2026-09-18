@@ -16,7 +16,8 @@
     "test:e2e": "vitest run __tests__/e2e",
     "test:watch": "vitest watch",
     "e2e": "playwright test",
-    "screenshots": "node scripts/capture-screenshots.mjs"
+    "screenshots": "node scripts/capture-screenshots.mjs",
+    "demo": "bash scripts/record-demo.sh"
   },
   "dependencies": {
     "framer-motion": "^12.23.12",
