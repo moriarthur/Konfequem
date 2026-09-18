@@ -35,3 +35,8 @@ htmlcov/
 
 # Local audit working file
 codex_audit
+
+# age PRIVATE key for backups — must NEVER be committed
+backup_age.key
+*.key
+!package-lock.json
