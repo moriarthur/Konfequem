@@ -123,7 +123,9 @@ class Command(BaseCommand):
 
     def _seed_bookings(self, rooms):
         """Sample bookings around today, skipping weekends so the calendar
-        always shows a realistic office week. Times are Berlin-local."""
+        always shows a realistic office week: past (completed), a booking
+        happening right now, upcoming ones, and one future cancellation.
+        Times are Berlin-local."""
         users = {
             u.username: u for u in User.objects.filter(username__startswith="demo")
         }
@@ -134,7 +136,9 @@ class Command(BaseCommand):
             (borealis, today, 14, 15, "demo-colleague"),
             (cascade, self._workday(1), 10, 12, "demo-reviewer"),
             (aurora, self._workday(2), 16, 17.5, "demo-colleague"),
+            (borealis, self._workday(3), 9, 9.75, "demo-reviewer"),
             (den, self._workday(-1), 9, 11, "demo-reviewer"),
+            (aurora, self._workday(-2), 11, 12, "demo-colleague"),
         ]
         now = timezone.now()
         for room, day, start_h, end_h, username in plan:
@@ -151,14 +155,29 @@ class Command(BaseCommand):
                 date=start.date(),
                 status=status,
             )
-        # One cancelled booking so the profile history isn't uniformly green.
+
+        # A booking happening right now (demo-reviewer's) — gives the Home
+        # dashboard its "Happening now" card and the calendar a green
+        # "Current" marker regardless of when the demo is looked at.
+        Booking.objects.create(
+            organization=den.organization,
+            room=den,
+            user=users["demo-reviewer"],
+            start_time=now - dt.timedelta(hours=1),
+            end_time=now + dt.timedelta(hours=1),
+            date=now.astimezone(BERLIN).date(),
+            status="ongoing",
+        )
+
+        # A future cancellation so the expanded calendar day shows the
+        # Cancelled badge and the profile history isn't uniformly green.
         cancelled_start = dt.datetime.combine(
-            self._workday(-1), dt.time(13, 0), tzinfo=BERLIN
+            self._workday(1), dt.time(13, 0), tzinfo=BERLIN
         )
         Booking.objects.create(
             organization=cascade.organization,
             room=cascade,
-            user=users["demo-colleague"],
+            user=users["demo-reviewer"],
             start_time=cancelled_start,
             end_time=cancelled_start + dt.timedelta(hours=1),
             date=cancelled_start.date(),

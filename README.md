@@ -34,6 +34,8 @@ reset periodically.
 | ![Home dashboard](docs/screenshots/home.png) | ![Room list](docs/screenshots/rooms.png) |
 | **Booking** | **Calendar** |
 | ![Booking flow](docs/screenshots/booking.png) | ![Calendar](docs/screenshots/calendar.png) |
+| **Day view** | **Profile** |
+| ![Calendar day view](docs/screenshots/calendar-day.png) | ![Profile](docs/screenshots/profile.png) |
 
 ## What it does
 
