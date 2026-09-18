@@ -192,6 +192,30 @@ describe('getAvailableSlots', () => {
       expect(overlapsBooking).toBe(false)
     })
   })
+
+  it('offers the last slots when "now" rounds up to the next hour (20:56 regression)', () => {
+    // 20:56 rounds up to 21:00 — the old +1h skip jumped past the 22:00
+    // office end and returned zero slots for the whole 20:46–20:59 window.
+    const now = dt(20, 56, 16)
+    const slots = getAvailableSlots(now, [], 15, now)
+    expect(slots.length).toBeGreaterThan(0)
+    expect(slots[0].start.hour).toBe(21)
+    expect(slots[0].start.minute).toBe(0)
+  })
+
+  it('never offers a slot starting in the past (21:00:30 second-precision race)', () => {
+    // Minute-only quantization rounds 21:00:30 down to the 21:00 slot,
+    // which the server rejects as "in the past".
+    const now = DateTime.fromObject(
+      { year: 2025, month: 6, day: 16, hour: 21, minute: 0, second: 30 },
+      { zone: TZ }
+    )
+    const slots = getAvailableSlots(now, [], 15, now)
+    expect(slots.length).toBeGreaterThan(0)
+    slots.forEach(slot => {
+      expect(slot.start >= now).toBe(true)
+    })
+  })
 })
 
 describe('groupSlotsByPeriod', () => {

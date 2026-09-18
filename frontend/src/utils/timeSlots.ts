@@ -213,13 +213,21 @@ export function getAvailableSlots(
   let current = startTime;
 
   if (currentTime && date.hasSame(currentTime, "day")) {
+    // Round UP to the next 15-minute boundary (20:56 "now" → 21:00; luxon
+    // normalizes minute 60 into the next hour). No extra hour skip here:
+    // skipping used to wipe out today's remaining slots in the
+    // 20:46–20:59 window — the rounded hour jumped past the 22:00 office
+    // end and the day showed a false "No available slots".
     current = currentTime.set({
       minute: Math.ceil(currentTime.minute / 15) * 15,
       second: 0,
       millisecond: 0,
     });
-    if (current.minute === 0) {
-      current = current.plus({ hours: 1 });
+    // The minute-only quantization ignores seconds, so at 21:00:30 the
+    // rounded slot (21:00) would start in the past and the server would
+    // reject it. Step to the next boundary whenever we landed before now.
+    if (current < currentTime) {
+      current = current.plus({ minutes: minDuration });
     }
   }
 
