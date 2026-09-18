@@ -43,6 +43,8 @@ jobs:
             echo "::error::BACKUP_AGE_PUBLIC_KEY secret is not set — refusing to upload a plaintext dump (see the comment at the top of this file)."
             exit 1
           fi
+          # Normalize case (bech32 is case-insensitive; canonical form is lowercase)
+          BACKUP_AGE_PUBLIC_KEY="${BACKUP_AGE_PUBLIC_KEY,,}"
           if [[ "$BACKUP_AGE_PUBLIC_KEY" != age1* ]]; then
             echo "::error::BACKUP_AGE_PUBLIC_KEY does not look like an age recipient key (expected 'age1...')."
             exit 1
