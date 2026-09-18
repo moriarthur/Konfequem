@@ -70,6 +70,11 @@ class Room(models.Model):
     def __str__(self):
         return self.name
 
+    class Meta:
+        # Default ordering keeps the paginated rooms list deterministic
+        # (avoids DRF's UnorderedObjectListWarning).
+        ordering = ["name"]
+
     def clean(self):
         super().clean()
         # Moving a room to another organization would silently turn its
@@ -123,6 +128,10 @@ class Booking(models.Model):
     MAX_DAYS_AHEAD = 90
 
     class Meta:
+        # Default ordering keeps the paginated bookings list deterministic
+        # (avoids DRF's UnorderedObjectListWarning); pk tiebreak for
+        # identical start times.
+        ordering = ["start_time", "id"]
         indexes = [
             models.Index(fields=["start_time"], name="rooms_booking_start_idx"),
         ]
