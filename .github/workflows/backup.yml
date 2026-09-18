@@ -72,8 +72,9 @@ jobs:
           BACKUP_AGE_PUBLIC_KEY: ${{ secrets.BACKUP_AGE_PUBLIC_KEY }}
         run: |
           age -r "$BACKUP_AGE_PUBLIC_KEY" -o /tmp/backup/dump.dump.age /tmp/backup/dump.dump
-          # The plaintext must not survive into the artifact upload.
-          shred -u /tmp/backup/dump.dump
+          # The plaintext must not survive into the artifact upload. The file
+          # is owned by root (docker mount), so plain shred/rm would fail.
+          sudo shred -u /tmp/backup/dump.dump
           if [ -f /tmp/backup/dump.dump ]; then
             echo "::error::plaintext dump still present after encryption"
             exit 1
